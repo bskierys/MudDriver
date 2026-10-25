@@ -25,6 +25,9 @@ Applies whenever you use the `unreal-mcp` server (Epic's ModelContextProtocol pl
 - **Property names can't be guessed.** Run `ObjectTools.list_properties` before `get_properties` / `set_properties`. Setting an unknown name can fail silently.
 - **Blueprint defaults** live on the CDO: `BlueprintTools.get_default_object`, then `ObjectTools.set_properties`. Compile with `compile_blueprint` after structural changes.
 - **Verify visually** with `EditorAppToolset.CaptureViewport` / `CaptureAssetImage` after level or asset edits.
+- **New actors in World Partition maps** (`Lvl_Offroad`) live in their own `__ExternalActors__` package. `save_actor` and `save_assets([map])` both skip a package that isn't on disk yet. `save_assets([])` (save all dirty) writes it; check `git status` after.
+- **WP landscape isn't loaded in the editor**, so `SceneTools.trace_world` hits nothing there. Place actors relative to known actors (e.g. PlayerStart) and let PIE settle them.
+- **ObjectTools arg names:** `list_properties(instance)`, `get_properties(instance, properties[])`, `set_properties(instance, values)` where `values` is a JSON string.
 
 ## Not available
 

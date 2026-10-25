@@ -36,7 +36,7 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 
 ## ADR-003 — Environment forces run inside the Chaos vehicle simulation
 
-**Status:** proposed, needs a spike (2026-10-25)
+**Status:** accepted for the simulation hook; stepping mode pending S1-12 (2026-10-25)
 
 **Problem.** Mud resistance, river current and winch tension are continuous forces. If they are applied from the game thread, they depend on frame rate and get unstable on a low-end PC.
 
@@ -49,6 +49,8 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 **Amended 2026-10-25 (plan critique round 1).**
 - **Physics stepping.** The project currently has `bSubstepping=False` and no async physics tick, so physics steps once per frame with a variable dt. The T0.4 spike also picks the stepping mode: async physics with a fixed dt (recommended, Chaos vehicles are built for it) or substepping. It's tested with a stiff spring-to-anchor force at 20 and 120 fps.
 - **Template change.** Swapping the movement component class means changing the `AMudDriverPawn` / `AMudDriverOffroadCar` constructors to take `FObjectInitializer`.
+
+**Amended 2026-10-25 (spike S1-07..S1-09).** Subclassing works in 5.8: `FB1VehicleSimulation` ticks on the physics thread, and a 3 kN push and a stiff spring-to-anchor both apply from it (user drove against the spring: works as described). One deviation from the plan: custom input can't travel in `FChaosVehicleAsyncInput`, because `SetCurrentAsyncInputOutput` is non-virtual and always allocates the base structs. Game-thread data goes through a lock-guarded latest-value buffer on the simulation instead. The fallback (component-Tick `AddForce`) isn't needed. Stepping mode is still open (S1-12).
 
 ---
 
@@ -194,3 +196,17 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 **Alternatives.** Mud as a landscape paint layer with radius reduction (the radius side effect above, and no per-layer collision). A deformable heightfield (expensive; out of scope per ADR-008).
 
 **Consequences.** Mud patches are authored as meshes on top of the landscape: a plane, a spline mesh, or a modelling-tools patch. The character walks through mud on the hard bottom; slowing the character in mud is a later polish item.
+
+---
+
+## ADR-013 — Test rigs live in a separate `MudDriverTests` module
+
+**Status:** accepted (2026-10-25)
+
+**Problem.** `AB1GymTestRig` derives from `AFunctionalTest`, which lives in the `FunctionalTesting` Developer module. Developer modules aren't available in Shipping, and a `UCLASS` can't be compiled out with `#if`, so the rig can't sit in the `MudDriver` runtime module.
+
+**Decision.** A second project module, `MudDriverTests` (type `DeveloperTool`), holds the gym test rigs and depends on `MudDriver` and `FunctionalTesting`. Symbols the tests need from the game module get `MUDDRIVER_API`.
+
+**Rationale.** Shipping builds stay clean without per-config hacks. Test code stays out of the game module.
+
+**Alternatives.** `FunctionalTesting` as a non-Shipping dependency of `MudDriver` (Shipping wouldn't compile). Blueprint-only rigs (logic and metrics harder to maintain).
