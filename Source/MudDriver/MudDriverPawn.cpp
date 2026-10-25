@@ -11,11 +11,16 @@
 #include "InputActionValue.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "MudDriver.h"
+#include "B1Log.h"
+#include "B1VehicleTelemetry.h"
+#include "B1VehicleShowDebug.h"
+#include "GameFramework/HUD.h"
 #include "TimerManager.h"
 
 #define LOCTEXT_NAMESPACE "VehiclePawn"
 
-AMudDriverPawn::AMudDriverPawn()
+AMudDriverPawn::AMudDriverPawn(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	// construct the front camera boom
 	FrontSpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("Front Spring Arm"));
@@ -96,14 +101,22 @@ void AMudDriverPawn::BeginPlay()
 {
 	Super::BeginPlay();
 
+	UE_LOG(LogB1Vehicle, Log, TEXT("%s spawned, movement component %s"), *GetName(), *GetNameSafe(ChaosVehicleMovement ? ChaosVehicleMovement->GetClass() : nullptr));
+
 	// set up the flipped check timer
 	GetWorld()->GetTimerManager().SetTimer(FlipCheckTimer, this, &AMudDriverPawn::FlippedCheck, FlipCheckTime, true);
+
+	GetWorld()->GetTimerManager().SetTimer(TelemetryTimer, this, &AMudDriverPawn::LogTelemetry, B1VehicleTelemetry::Interval, true);
+
+	ShowDebugHandle = AHUD::OnShowDebugInfo.AddUObject(this, &AMudDriverPawn::DrawShowDebug);
 }
 
 void AMudDriverPawn::EndPlay(EEndPlayReason::Type EndPlayReason)
 {
 	// clear the flipped check timer
 	GetWorld()->GetTimerManager().ClearTimer(FlipCheckTimer);
+	GetWorld()->GetTimerManager().ClearTimer(TelemetryTimer);
+	AHUD::OnShowDebugInfo.Remove(ShowDebugHandle);
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -294,6 +307,19 @@ void AMudDriverPawn::FlippedCheck()
 		// we're upright. reset the flipped check flag
 		bPreviousFlipCheck = false;
 	}
+}
+
+void AMudDriverPawn::LogTelemetry()
+{
+	if (B1VehicleTelemetry::IsEnabled())
+	{
+		B1VehicleTelemetry::LogWheels(*ChaosVehicleMovement);
+	}
+}
+
+void AMudDriverPawn::DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos)
+{
+	B1VehicleShowDebug::Draw(Canvas, DisplayInfo, *ChaosVehicleMovement);
 }
 
 #undef LOCTEXT_NAMESPACE

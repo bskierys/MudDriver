@@ -28,7 +28,8 @@ public class MudDriver : ModuleRules
 			"MudDriver/Variant_OffRoad",
 			"MudDriver/Variant_TimeTrial",
 			"MudDriver/Variant_TimeTrial/UI",
-			"MudDriver/Debug"
+			"MudDriver/Debug",
+			"MudDriver/Vehicle"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "Projects" });

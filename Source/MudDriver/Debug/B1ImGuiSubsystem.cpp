@@ -1,25 +1,25 @@
-#include "MudImGuiSubsystem.h"
-#include "MudImGuiVehicleBasics.h"
+#include "B1ImGuiSubsystem.h"
+#include "B1ImGuiVehicleBasics.h"
 #include "NetImguiModule.h"
 #include "Engine/GameInstance.h"
 
-bool UMudImGuiSubsystem::ShouldCreateSubsystem(UObject* Outer) const
+bool UB1ImGuiSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 {
 	return NETIMGUI_ENABLED && Super::ShouldCreateSubsystem(Outer);
 }
 
-void UMudImGuiSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+void UB1ImGuiSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 
 #if NETIMGUI_ENABLED
-	RegisterWindow("Debug", "Vehicle Basics", &MudImGui::DrawVehicleBasics);
+	RegisterWindow("Debug", "Vehicle Basics", &B1ImGui::DrawVehicleBasics);
 
-	DrawHandle = FNetImguiModule::Get().OnDrawImgui.AddUObject(this, &UMudImGuiSubsystem::DrawImGui);
+	DrawHandle = FNetImguiModule::Get().OnDrawImgui.AddUObject(this, &UB1ImGuiSubsystem::DrawImGui);
 #endif
 }
 
-void UMudImGuiSubsystem::Deinitialize()
+void UB1ImGuiSubsystem::Deinitialize()
 {
 #if NETIMGUI_ENABLED
 	if (FNetImguiModule::IsAvailable())
@@ -32,12 +32,12 @@ void UMudImGuiSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-void UMudImGuiSubsystem::RegisterWindow(const char* Menu, const char* Name, TFunction<void(UWorld*, bool*)> Draw)
+void UB1ImGuiSubsystem::RegisterWindow(const char* Menu, const char* Name, TFunction<void(UWorld*, bool*)> Draw)
 {
 	Windows.Add({ Menu, Name, MoveTemp(Draw) });
 }
 
-void UMudImGuiSubsystem::DrawImGui()
+void UB1ImGuiSubsystem::DrawImGui()
 {
 #if NETIMGUI_ENABLED
 	DrawMainMenuBar();
@@ -53,7 +53,7 @@ void UMudImGuiSubsystem::DrawImGui()
 #endif
 }
 
-void UMudImGuiSubsystem::DrawMainMenuBar()
+void UB1ImGuiSubsystem::DrawMainMenuBar()
 {
 #if NETIMGUI_ENABLED
 	if (!ImGui::BeginMainMenuBar())

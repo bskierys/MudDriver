@@ -1,0 +1,5 @@
+#include "B1Log.h"
+
+DEFINE_LOG_CATEGORY(LogB1Vehicle);
+DEFINE_LOG_CATEGORY(LogB1Physics);
+DEFINE_LOG_CATEGORY(LogB1Test);

@@ -1,10 +1,14 @@
-#include "MudCheatManager.h"
+#include "B1CheatManager.h"
+#include "B1Jeep.h"
+#include "B1Log.h"
+#include "B1VehicleMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "MudDriver.h"
 #include "NetImguiModule.h"
 #include "Interfaces/IPluginManager.h"
 #include "Misc/Paths.h"
 
-void UMudCheatManager::NetImGuiLaunch()
+void UB1CheatManager::NetImGuiLaunch()
 {
 #if NETIMGUI_ENABLED && PLATFORM_WINDOWS
 	if (FNetImguiModule::Get().IsConnected())
@@ -43,4 +47,29 @@ void UMudCheatManager::NetImGuiLaunch()
 #else
 	UE_LOG(LogMudDriver, Warning, TEXT("NetImGuiLaunch: NetImgui is not available in this build"));
 #endif
+}
+
+void UB1CheatManager::B1TestForce(const FString& Mode)
+{
+	static const TMap<FString, EB1TestForce> Modes = {
+		{ TEXT("off"), EB1TestForce::Off },
+		{ TEXT("push"), EB1TestForce::Push },
+		{ TEXT("spring"), EB1TestForce::Spring },
+	};
+
+	const EB1TestForce* NewMode = Modes.Find(Mode.ToLower());
+	if (!NewMode)
+	{
+		UE_LOG(LogB1Physics, Warning, TEXT("B1TestForce: unknown mode '%s', use off | push | spring"), *Mode);
+		return;
+	}
+
+	const AB1Jeep* Jeep = Cast<AB1Jeep>(GetOuterAPlayerController()->GetPawn());
+	if (!Jeep)
+	{
+		UE_LOG(LogB1Physics, Warning, TEXT("B1TestForce: the player isn't driving an AB1Jeep"));
+		return;
+	}
+
+	Jeep->GetB1VehicleMovement()->SetTestForce(*NewMode);
 }

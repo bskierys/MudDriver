@@ -10,6 +10,9 @@ class UCameraComponent;
 class USpringArmComponent;
 class UInputAction;
 class UChaosWheeledVehicleMovementComponent;
+class AHUD;
+class UCanvas;
+class FDebugDisplayInfo;
 struct FInputActionValue;
 
 /**
@@ -90,8 +93,12 @@ protected:
 	/** Flip check timer */
 	FTimerHandle FlipCheckTimer;
 
+	FTimerHandle TelemetryTimer;
+
+	FDelegateHandle ShowDebugHandle;
+
 public:
-	AMudDriverPawn();
+	AMudDriverPawn(const FObjectInitializer& ObjectInitializer);
 
 	// Begin Pawn interface
 
@@ -191,6 +198,10 @@ protected:
 	/** Checks if the car is flipped upside down and automatically resets it */
 	UFUNCTION()
 	void FlippedCheck();
+
+	void LogTelemetry();
+
+	void DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos);
 
 public:
 	/** Returns the front spring arm subobject */

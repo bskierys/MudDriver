@@ -11,11 +11,11 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerStart.h"
 #include "Widgets/Input/SVirtualJoystick.h"
-#include "MudCheatManager.h"
+#include "B1CheatManager.h"
 
 AMudDriverPlayerController::AMudDriverPlayerController()
 {
-	CheatClass = UMudCheatManager::StaticClass();
+	CheatClass = UB1CheatManager::StaticClass();
 }
 
 void AMudDriverPlayerController::BeginPlay()

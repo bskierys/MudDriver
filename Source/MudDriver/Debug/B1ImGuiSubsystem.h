@@ -2,11 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
-#include "MudImGuiSubsystem.generated.h"
+#include "B1ImGuiSubsystem.generated.h"
 
 /** Owns the NetImgui main menu bar and the debug windows launchable from it */
 UCLASS()
-class UMudImGuiSubsystem : public UGameInstanceSubsystem
+class UB1ImGuiSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
 

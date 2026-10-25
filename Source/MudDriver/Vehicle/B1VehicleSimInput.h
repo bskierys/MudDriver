@@ -1,0 +1,45 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "B1VehicleSimInput.generated.h"
+
+UENUM()
+enum class EB1TestForce : uint8
+{
+	Off,
+	Push,
+	Spring
+};
+
+/** Stand-ins for the river current (push) and the winch (spring) used to test physics stepping */
+USTRUCT()
+struct FB1TestForceSettings
+{
+	GENERATED_BODY()
+
+	/** World +Y */
+	UPROPERTY(EditAnywhere, Category = "TestForce|Config", meta = (Units = "N"))
+	float PushForce = 3000.0f;
+
+	UPROPERTY(EditAnywhere, Category = "TestForce|Config", meta = (Units = "m"))
+	float SpringRestLength = 5.0f;
+
+	/** N/m */
+	UPROPERTY(EditAnywhere, Category = "TestForce|Config")
+	float SpringStiffness = 20000.0f;
+
+	/** N*s/m */
+	UPROPERTY(EditAnywhere, Category = "TestForce|Config")
+	float SpringDamping = 3000.0f;
+
+	UPROPERTY(EditAnywhere, Category = "TestForce|Config", meta = (Units = "N"))
+	float SpringMaxForce = 15000.0f;
+};
+
+/** Game thread → physics thread data, copied once per game frame */
+struct FB1VehicleSimInput
+{
+	EB1TestForce TestForce = EB1TestForce::Off;
+	FB1TestForceSettings TestForceSettings;
+	FVector TestForceAnchor = FVector::ZeroVector;
+};

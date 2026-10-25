@@ -36,5 +36,5 @@ class AMudDriverOffroadCar : public AMudDriverPawn
 
 public:
 
-	AMudDriverOffroadCar();
+	AMudDriverOffroadCar(const FObjectInitializer& ObjectInitializer);
 };

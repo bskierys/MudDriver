@@ -10,7 +10,8 @@
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 
-AMudDriverOffroadCar::AMudDriverOffroadCar()
+AMudDriverOffroadCar::AMudDriverOffroadCar(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	// construct the mesh components
 	Chassis = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Chassis"));

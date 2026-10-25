@@ -16,5 +16,5 @@ class AMudDriverSportsCar : public AMudDriverPawn
 	
 public:
 
-	AMudDriverSportsCar();
+	AMudDriverSportsCar(const FObjectInitializer& ObjectInitializer);
 };
