@@ -53,20 +53,6 @@ Examples:
 - ❌ `Feature: Added a New Composite Tool For Creating Blueprints With Variables` (Title case, verbose)
 - ❌ `feat: bp_create_with_variables 🚀` (no emojis)
 
-## Push
-
-```bash
-git push -u origin dev   # first push if dev didn't exist remotely
-git push                 # subsequent
-```
-
-Don't force push. If push fails due to upstream changes:
-```bash
-git pull --rebase
-# resolve conflicts if any
-git push
-```
-
 ## Then tell the user
 
 "Committed `<message>` to `dev`. Run `/git-pr` to update the long-lived `dev` → `main` PR."
