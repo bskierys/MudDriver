@@ -20,6 +20,6 @@ For full overview of the game prototype, go to `VISION.md`.
 
 ## Hard rules
 
-- After C++ changes: run UnrealBuildTool, fix errors, then report done.
+- After C++ changes: run UnrealBuildTool, fix errors, then report done. `Scripts/BuildEditor.ps1` closes and reopens the editor for you, see [.claude/rules/editor-lifecycle.md](.claude/rules/editor-lifecycle.md).
 - Never commit directly to main. Work goes on dev or a topic branch off dev.
 - We work locally, never push.

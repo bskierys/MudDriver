@@ -23,7 +23,7 @@ $LogName = "$LogName.log"
 $LogPath = Join-Path $ProjectDir "Saved\Logs\$LogName"
 
 if (Get-Process UnrealEditor -ErrorAction SilentlyContinue) {
-    Write-Warning "an editor is running; close it first or the run may fight over assets"
+    Write-Warning "an editor is running; close it with Scripts\StopEditor.ps1 or the run may fight over assets"
 }
 
 # test names are "Project.Functional Tests.<map path minus /Game/, dotted>.<actor label>", matched as a substring

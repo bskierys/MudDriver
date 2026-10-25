@@ -50,6 +50,7 @@ Domain rules in [.claude/rules/](.claude/rules/) (loaded per-file by `applyTo` g
 | File | applyTo |
 |---|---|
 | [.claude/rules/mcp-tools.md](.claude/rules/mcp-tools.md) | always (Unreal MCP usage) |
+| [.claude/rules/editor-lifecycle.md](.claude/rules/editor-lifecycle.md) | always (closing, opening and rebuilding the editor) |
 
 ---
 
@@ -59,6 +60,9 @@ These apply in every conversation without invoking a command.
 
 **Before implementing any feature:**
 - Check [.claude/docs/DECISIONS.md](.claude/docs/DECISIONS.md) — your design might already have an ADR.
+
+**When the editor must be closed, opened or restarted:**
+- Don't ask the user. Use `Scripts/StopEditor.ps1`, `Scripts/StartEditor.ps1` or `Scripts/BuildEditor.ps1` per [.claude/rules/editor-lifecycle.md](.claude/rules/editor-lifecycle.md).
 
 **Before any architecture or tech decision:**
 - Read [.claude/docs/ARCHITECTURE.md](.claude/docs/ARCHITECTURE.md). It is the source of truth.

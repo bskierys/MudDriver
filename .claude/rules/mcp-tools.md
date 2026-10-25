@@ -41,6 +41,6 @@ Applies whenever you use the `unreal-mcp` server (Epic's ModelContextProtocol pl
 - Arbitrary editor Python.
 - Creating asset types without a toolset `create` (e.g. physical materials). `DataAssetTools.create` only takes `UDataAsset` subclasses. Ask the user to make one by hand, then `AssetTools.duplicate` it for variants.
 - `StartPIE`'s `startTransform` doesn't move the player when the game mode picks a PlayerStart. To test a spot, place a rig there (it spawns its own vehicle).
-- C++ header/layout changes in a running editor. Live Coding (`LiveCodingToolset`) only handles function-body edits; anything else needs a full build with the editor closed.
+- C++ header/layout changes in a running editor. Live Coding (`LiveCodingToolset`) only handles function-body edits; anything else needs a full build with the editor closed. Run `Scripts/BuildEditor.ps1` ([editor-lifecycle.md](editor-lifecycle.md)).
 
 If a toolset you expect is missing from `list_toolsets`, its plugin isn't enabled in `MudDriver.uproject`. Toolset plugins live in `Engine/Plugins/Experimental/Toolsets/`.
