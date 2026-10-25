@@ -118,6 +118,7 @@ void AB1GymTestRig::StartTest()
 	TimeToStuck = -1.0f;
 	SettleTimeMeasured = 0.0f;
 	PeakOscillation = 0.0f;
+	MaxSinkDepth.Init(0.0f, B1Movement ? B1Movement->GetNumWheels() : 0);
 	TautTime = -1.0f;
 	StretchFirst = FFloatInterval();
 	StretchLast = FFloatInterval();
@@ -193,6 +194,11 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 	if (Speed > SettleSpeed)
 	{
 		SettleTimeMeasured = ScriptTime;
+	}
+
+	for (int32 WheelIndex = 0; WheelIndex < MaxSinkDepth.Num(); ++WheelIndex)
+	{
+		MaxSinkDepth[WheelIndex] = FMath::Max(MaxSinkDepth[WheelIndex], B1Movement->GetWheelSinkDepth(WheelIndex));
 	}
 
 	StuckTimer = Speed < StuckSpeed ? StuckTimer + DeltaSeconds : 0.0f;
@@ -289,11 +295,22 @@ void AB1GymTestRig::FinishScript()
 			TautTime, SettleAfterTaut, AmpFirst, AmpLast, AmpGrowth);
 	}
 
+	FString SinkMetrics;
+	if (MaxSinkDepth.Num() > 0)
+	{
+		TArray<FString> PerWheel;
+		for (const float Depth : MaxSinkDepth)
+		{
+			PerWheel.Add(FString::Printf(TEXT("%.1f"), Depth));
+		}
+		SinkMetrics = TEXT(" sink=") + FString::Join(PerWheel, TEXT("/"));
+	}
+
 	const bool bPassed = Failures.Num() == 0;
 	const FString Name = TestLabel.IsEmpty() ? GetName() : TestLabel;
-	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f avgDt=%.4f frames=%d%s%s%s"),
+	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f avgDt=%.4f frames=%d%s%s%s%s"),
 		*Name, bPassed ? TEXT("PASS") : TEXT("FAIL"),
-		PathLength, Displacement, MaxSpeed, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, AvgDt, NumFrames, *SpringMetrics,
+		PathLength, Displacement, MaxSpeed, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics,
 		bPassed ? TEXT("") : TEXT(" failed="), *FString::Join(Failures, TEXT(",")));
 
 	UE_LOG(LogB1Test, Display, TEXT("%s"), *Line);

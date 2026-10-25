@@ -2,6 +2,7 @@
 #include "B1VehicleSimulation.h"
 #include "B1Log.h"
 #include "B1CollisionChannels.h"
+#include "B1PhysicalMaterial_Mud.h"
 #include "DrawDebugHelpers.h"
 
 UB1VehicleMovementComponent::UB1VehicleMovementComponent(const FObjectInitializer& ObjectInitializer)
@@ -52,7 +53,10 @@ void UB1VehicleMovementComponent::Update(float DeltaTime)
 	Input.TestForce = TestForce;
 	Input.TestForceSettings = TestForceSettings;
 	Input.TestForceAnchor = TestForceAnchor;
+	GatherMudParams(Input.MudMaterials);
 	Simulation->SetGameThreadInput(Input);
+
+	SimOutput = Simulation->GetGameThreadOutput();
 
 #if ENABLE_DRAW_DEBUG
 	if (TestForce == EB1TestForce::Spring)
@@ -62,6 +66,33 @@ void UB1VehicleMovementComponent::Update(float DeltaTime)
 		DrawDebugLine(GetWorld(), Location, TestForceAnchor, bTaut ? FColor::Red : FColor::Green, false, -1.0f, 0, 3.0f);
 	}
 #endif
+}
+
+float UB1VehicleMovementComponent::GetWheelSinkDepth(int32 WheelIndex) const
+{
+	return SimOutput.SinkDepth.IsValidIndex(WheelIndex) ? SimOutput.SinkDepth[WheelIndex] : 0.0f;
+}
+
+void UB1VehicleMovementComponent::GatherMudParams(TArray<FB1MudSimParams>& OutParams)
+{
+	for (int32 WheelIndex = 0; WheelIndex < GetNumWheels(); ++WheelIndex)
+	{
+		if (UB1PhysicalMaterial_Mud* Mud = Cast<UB1PhysicalMaterial_Mud>(GetWheelState(WheelIndex).PhysMaterial.Get()))
+		{
+			KnownMudMaterials.AddUnique(Mud);
+		}
+	}
+
+	OutParams.Reset(KnownMudMaterials.Num());
+	for (UB1PhysicalMaterial_Mud* Mud : KnownMudMaterials)
+	{
+		FB1MudSimParams& Params = OutParams.AddDefaulted_GetRef();
+		Params.Material = Mud;
+		Params.MaxSinkDepth = Mud->MaxSinkDepth;
+		Params.SinkRate = Mud->SinkRate;
+		Params.RiseRate = Mud->RiseRate;
+		Params.FullSinkSlipSpeed = Mud->FullSinkSlipSpeed;
+	}
 }
 
 FB1VehicleSimulation* UB1VehicleMovementComponent::GetB1Simulation() const

@@ -234,3 +234,30 @@ The gym and its smoke test were done. Mud sinking (S1-18+) needs per-surface par
 
 ### Open follow-ups
 - S1-18: per-wheel `SinkDepth` in `FB1VehicleSimulation`.
+
+---
+
+## 2026-10-25 — S1-18 per-wheel sink depth
+
+### Context
+The mud presets were on the gym patches (S1-17). ADR-001 needs a per-wheel depth state on the physics thread, driven by wheelspin and rolling.
+
+### What was built
+- `FB1VehicleSimulation::UpdateSinkDepth`, plus an output channel (`FB1VehicleSimOutput`, `OutputLock`, `GetGameThreadOutput`).
+- `FB1MudSimParams` in the sim input. `UB1VehicleMovementComponent::GatherMudParams` keeps a `KnownMudMaterials` cache and exposes `GetWheelSinkDepth`.
+- `UB1PhysicalMaterial_Mud::FullSinkSlipSpeed` (5 m/s).
+- `sink=` in the `B1Wheels` telemetry and in the rig result line.
+- Rig `B1Mud_SinkMedium` in `Lvl_Gym_Mud`.
+
+### Decisions made
+- The game thread doesn't send a per-wheel material table. It sends params for every mud material the vehicle has touched, and the physics thread matches its own trace hit by `TWeakObjectPtr ==` (no dereference). Cost: about one frame of firm on first contact with a new material.
+- The sink signal is the slip speed in m/s (`GetSlipMagnitude`), not Chaos's normalized slip. It's continuous and has physical units, and `FullSinkSlipSpeed` makes it tunable.
+- Rise is tied to distance rolled. A parked wheel neither sinks nor rises.
+- Airborne wheels keep their depth; non-mud contact resets it.
+
+### What we learned
+- Under full throttle the jeep's weight shifts back: the rears grip (slip 0, suspension 0.37) and the fronts spin at about 3 m/s. Only the fronts sink (7.4/8.8 cm in 2 s on medium).
+- Headless: gym 3/3 PASS (FirmSmoke 42.80 m, unchanged); `Lvl_Offroad` 8/8 PASS, no regressions.
+
+### Open follow-ups
+- S1-19: offset the suspension hit by `SinkDepth` (`PerformSuspensionTraces`), with a rate limit and an entry ramp.

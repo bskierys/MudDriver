@@ -6,6 +6,7 @@
 #include "B1VehicleMovementComponent.generated.h"
 
 class FB1VehicleSimulation;
+class UB1PhysicalMaterial_Mud;
 
 /** Wheeled movement that runs FB1VehicleSimulation on the physics thread */
 UCLASS(ClassGroup = (B1), meta = (BlueprintSpawnableComponent))
@@ -27,6 +28,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "TestForce|Config")
 	FB1TestForceSettings TestForceSettings;
 
+	/** cm, from the latest physics step; 0 off mud */
+	float GetWheelSinkDepth(int32 WheelIndex) const;
+
 protected:
 
 	/** Game thread, while the async input for the next physics step is open */
@@ -35,6 +39,15 @@ protected:
 private:
 
 	FB1VehicleSimulation* GetB1Simulation() const;
+
+	/** Adds the mud materials the wheels touch now; params of every known one go to the sim */
+	void GatherMudParams(TArray<FB1MudSimParams>& OutParams);
+
+	/** Grows as wheels touch new mud. The sim treats a material as firm until it's in here, about a frame late */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UB1PhysicalMaterial_Mud>> KnownMudMaterials;
+
+	FB1VehicleSimOutput SimOutput;
 
 	EB1TestForce TestForce = EB1TestForce::Off;
 	FVector TestForceAnchor = FVector::ZeroVector;

@@ -25,6 +25,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mud|Config", meta = (Units = "cm/s", ClampMin = "0"))
 	float SinkRate = 20.0f;
 
+	/** Wheel surface speed over ground speed that counts as full wheelspin */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mud|Config", meta = (Units = "m/s", ClampMin = "0.1"))
+	float FullSinkSlipSpeed = 5.0f;
+
 	/** Depth recovered per metre rolled with grip */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mud|Config", meta = (ClampMin = "0"))
 	float RiseRate = 5.0f;

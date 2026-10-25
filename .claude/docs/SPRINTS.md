@@ -133,7 +133,13 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds; the per-wheel table (S1-04) shows the mud material on the patches.
   **User check:** —
 
-- [ ] **S1-18** Per-wheel `SinkDepth` state (3 h) _(requires S1-07, S1-17)_
+- [x] **S1-18** Per-wheel `SinkDepth` state (3 h) _(requires S1-07, S1-17)_ <!-- done: 2026-10-25 -->
+  Result: `FB1VehicleSimulation::UpdateSinkDepth`, per wheel on mud:
+  - `+= SinkRate·spin·dt` and `−= RiseRate·rolled m·(1−spin)`, clamped to [0, MaxSinkDepth];
+  - `spin = clamp(|slip speed| / FullSinkSlipSpeed, 0, 1)` (new material param, default 5 m/s);
+  - non-mud contact → 0; airborne keeps its depth.
+
+  The game thread copies params for every mud material the wheels have touched (`KnownMudMaterials`) into `FB1VehicleSimInput::MudMaterials`; the physics thread matches `TraceResult.PhysMaterial` by weak-pointer equality, with no UObject reads. Output comes back via the lock-guarded `FB1VehicleSimOutput` → `GetWheelSinkDepth`. Telemetry gets `sink=` per wheel; the rig gets `sink=` (max per wheel). Rig `B1Mud_SinkMedium` (2 s full throttle from the medium patch entry) headless: sink=7.4/8.8/0.0/0.0. Telemetry rises 4.7→6.8 / 4.8→7.8 cm. The rears grip under weight transfer (slip 0) so they don't dig in; that should change once S1-20 lowers grip with depth. Gym 3/3 and `Lvl_Offroad` 8/8 PASS headless.
   In `FB1VehicleSimulation`: read the contact material per wheel, update `SinkDepth` from slip (sink) and rolling traction (rise), clamp, and output it through the async output for debug.
   ⚠️ Note: don't let the physics thread read the UObject while ImGui edits it on the game thread. Copy the mud params into the async input each frame, keyed by material.
   **Done:** builds; a rig at full throttle on medium mud logs a rising `SinkDepth` per wheel.

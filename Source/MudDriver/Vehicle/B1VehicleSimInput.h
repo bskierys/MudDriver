@@ -1,7 +1,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UObject/WeakObjectPtrTemplates.h"
 #include "B1VehicleSimInput.generated.h"
+
+class UPhysicalMaterial;
 
 UENUM()
 enum class EB1TestForce : uint8
@@ -36,10 +39,28 @@ struct FB1TestForceSettings
 	float SpringMaxForce = 15000.0f;
 };
 
+/** Copy of UB1PhysicalMaterial_Mud for the physics thread, matched to the wheel hit by weak pointer */
+struct FB1MudSimParams
+{
+	TWeakObjectPtr<UPhysicalMaterial> Material;
+	float MaxSinkDepth = 0.0f;
+	float SinkRate = 0.0f;
+	float RiseRate = 0.0f;
+	float FullSinkSlipSpeed = 1.0f;
+};
+
 /** Game thread → physics thread data, copied once per game frame */
 struct FB1VehicleSimInput
 {
 	EB1TestForce TestForce = EB1TestForce::Off;
 	FB1TestForceSettings TestForceSettings;
 	FVector TestForceAnchor = FVector::ZeroVector;
+	TArray<FB1MudSimParams> MudMaterials;
+};
+
+/** Physics thread → game thread, latest step */
+struct FB1VehicleSimOutput
+{
+	/** Per wheel, cm */
+	TArray<float> SinkDepth;
 };

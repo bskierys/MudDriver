@@ -166,6 +166,9 @@ private:
 	float SettleTimeMeasured = 0.0f;
 	float PeakOscillation = 0.0f;
 
+	/** Per wheel, cm */
+	TArray<float> MaxSinkDepth;
+
 	float TautTime = -1.0f;
 	FFloatInterval StretchFirst;
 	FFloatInterval StretchLast;
