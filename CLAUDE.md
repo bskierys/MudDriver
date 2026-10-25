@@ -19,7 +19,8 @@ This file is the **agent entry point**. Both Claude Code and GitHub Copilot read
 1. **Gameplay Ability System.** I want to base my game on GAS. So when in doubt, use patterns from this framework.
 2. **Best practices** I want to develop using good UE5 practices. When in doubt Use LyraStarterGame for source of good practices.
 3. **Physics, not great graphics** I don't care that much about AAA quality of graphics, in fact I want to have all recources for physics calculation and keep the graphics simple. To the degree that physics make sense of course. I want to have mud effects launching from tires when they spin in the mud, but I don't care about ray tracing lights etc. I have a low-end machine and I want the game to run on it.
-4. **Debug tools** I want to have proper debug tools for features that we are building. I want to use NetImGui as primary debugging tool, but other tools that good are: `ShowDebug` command to display text over a vehicle or obstacle. Cheat commands, Utility widgets to modify or track parameters (if can't be done with NetImGui).
+4. **Prototype first, optimise later.** The goal now is a good playable prototype. Don't let low-end performance drive design choices or add optimisation work yet; keep the cheap defaults we already have (ADR-011) and revisit performance in a later phase.
+5. **Debug tools** I want to have proper debug tools for features that we are building. I want to use NetImGui as primary debugging tool, but other tools that good are: `ShowDebug` command to display text over a vehicle or obstacle. Cheat commands, Utility widgets to modify or track parameters (if can't be done with NetImGui).
 
 ---
 

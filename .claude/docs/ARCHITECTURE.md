@@ -38,7 +38,7 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 - **Game → physics data:** `SetCurrentAsyncInputOutput` is non-virtual and always allocates the base async structs, so custom input can't ride the Chaos async input. The component's `Update(DeltaTime)` pushes a POD `FB1VehicleSimInput` through `SetGameThreadInput` into a `FCriticalSection`-guarded `PendingInput`; the physics step reads the latest copy.
 - Forces from the sim use `AddForce` in kg·cm/s² (N × 100).
 - **Test forces** (`EB1TestForce`: Off / Push / Spring, settings in `TestForceSettings`, category `TestForce|Config`): push = constant world +Y force; spring = one-sided spring-damper to an anchor captured at toggle time. While active, the component zeroes `SleepThreshold`, because a sleeping vehicle skips the simulation, and restores it on Off.
-- Physics currently steps once per frame (dt = frame time). The stepping mode is decided in S1-12.
+- Steps at a fixed 1/60 s (see Physics settings).
 
 ## Debug tooling
 
@@ -50,7 +50,7 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 ## Testing
 
 - `AB1GymTestRig : AFunctionalTest` (`MudDriverTests`): resolves a vehicle (explicit target, player's vehicle, or spawns `VehicleClass` with `SetRequiresControllerForInputs(false)`), waits `SettleTime`, plays an `InputScript` through the movement component setters, samples every tick and logs one line: `B1Test <name> PASS|FAIL dist= disp= vmax= stuck= settle= peakOsc= avgDt= frames= [failed=...]`. Optional `MaxFPS` forces `t.MaxFPS` for the run. `bAutoRun` runs it in a normal PIE session without the automation framework.
-- Rigs: `B1Gym_FullThrottle5s` in `Lvl_Offroad` (baseline ~86–88 m at 60 fps, MinDistance 50).
+- Rigs in `Lvl_Offroad`: `B1Gym_FullThrottle5s` (baseline ~85–88 m at 60 fps, MinDistance 50); `B1Step_Spring20/120` and `B1Step_Push20/120` (stepping checks, S1-12). Optional `TestForce` on the rig switches the jeep's test force on at script start. Spring runs log `taut`, `settleTaut`, stretch amplitude and growth. `settle=-1` means still moving at the end.
 - Headless: `Scripts/RunGymTests.ps1 [-Map] [-Filter]` runs `UnrealEditor-Cmd -nullrhi` with `Automation RunTests Project.Functional Tests.<map dotted>[.<label>]; Quit`. The editor exits 0 regardless, so the script parses `Test Completed. Result={...}` lines for its exit code. Needs the editor closed.
 - Agent-side, in-editor: place/configure rigs through MCP, `StartPIE`, read `LogB1Test` with `LogsToolset.GetLogEntries`.
 
@@ -58,7 +58,7 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 
 ## Physics settings
 
-`bSubstepping=False`, `bSubsteppingAsync=True`, no async physics tick. Chaos vehicle sim runs through the vehicle manager callback; observed dt equals frame time.
+Async physics, fixed step (ADR-003): `bTickPhysicsAsync=True`, `AsyncFixedTimeStepSize=0.016667`, `MaxPhysicsDeltaTime=0.1` (real time down to 10 fps), `bSubstepping=False`. The Chaos vehicle sim and our forces run once per 1/60 s step on the physics thread. Game-thread reads of physics state are interpolated, about a frame behind. <!-- updated 2026-10-25 -->
 
 ## Rendering settings
 

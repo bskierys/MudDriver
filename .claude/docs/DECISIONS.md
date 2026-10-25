@@ -36,7 +36,7 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 
 ## ADR-003 — Environment forces run inside the Chaos vehicle simulation
 
-**Status:** accepted for the simulation hook; stepping mode pending S1-12 (2026-10-25)
+**Status:** accepted (2026-10-25; stepping decided in S1-12)
 
 **Problem.** Mud resistance, river current and winch tension are continuous forces. If they are applied from the game thread, they depend on frame rate and get unstable on a low-end PC.
 
@@ -51,6 +51,16 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 - **Template change.** Swapping the movement component class means changing the `AMudDriverPawn` / `AMudDriverOffroadCar` constructors to take `FObjectInitializer`.
 
 **Amended 2026-10-25 (spike S1-07..S1-09).** Subclassing works in 5.8: `FB1VehicleSimulation` ticks on the physics thread, and a 3 kN push and a stiff spring-to-anchor both apply from it (user drove against the spring: works as described). One deviation from the plan: custom input can't travel in `FChaosVehicleAsyncInput`, because `SetCurrentAsyncInputOutput` is non-virtual and always allocates the base structs. Game-thread data goes through a lock-guarded latest-value buffer on the simulation instead. The fallback (component-Tick `AddForce`) isn't needed. Stepping mode is still open (S1-12).
+
+**Amended 2026-10-25 (S1-12, stepping).** Async physics with a fixed 1/60 s step: `bTickPhysicsAsync=True`, `AsyncFixedTimeStepSize=0.016667`, plus `MaxPhysicsDeltaTime=0.1`.
+- **Measured.** Rigs ran headless at 20 and 120 fps, using a 3 kN push rolling the jeep for 5 s and 40 % throttle against the spring. Full numbers are in HISTORY.md (2026-10-25, S1-12).
+- **The real problem was the clamp.** `MaxPhysicsDeltaTime` defaults to 1/30 s and clamps the frame delta in every mode, async included. At 20 fps physics then runs at 2/3 real time: push distance was 53 % short. Raising it to 0.1 keeps real time down to 10 fps.
+- **Async vs substepping.** With the clamp raised, async and substepping (1/60 max) both land within 1 % between frame rates. A single variable step (sync) lands within 3.6 %. Async wins:
+  - the same dt at every frame rate, so rig results repeat exactly across runs and machines;
+  - physics runs off the game thread (a side benefit for later optimisation, not a driver);
+  - at high fps it steps at 60 Hz, not once per frame.
+- **Cost.** The game thread reads interpolated physics results, about one frame behind. Camera, template UI and flip check are a user check.
+- **Rejected.** Substepping (ties on numbers, dt still varies with fps, sim steps on the game thread's timeline). Sync single step (frame-rate dependent beyond 3 % at 20 fps, worse with stiffer forces).
 
 ---
 
