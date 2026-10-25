@@ -40,6 +40,8 @@ All living docs are in [.claude/docs/](.claude/docs/). **`ARCHITECTURE.md` is th
 | [.claude/docs/ARCHITECTURE.md](.claude/docs/ARCHITECTURE.md) | System design bible — components, threading, IPC, tool contract, C++ bridge, install flow |
 | [.claude/docs/DECISIONS.md](.claude/docs/DECISIONS.md) | ADRs — why we chose X over Y |
 | [.claude/docs/PLAN.md](.claude/docs/PLAN.md) | Single active plan, zeroed by `/plan-new` |
+| [.claude/docs/ROADMAP.md](.claude/docs/ROADMAP.md) | Phases (outcome / scope / done when) + backlog |
+| [.claude/docs/SPRINTS.md](.claude/docs/SPRINTS.md) | Sprint tasks with done criteria and user checks |
 | [.claude/docs/HISTORY.md](.claude/docs/HISTORY.md) | Session snapshots — grown by `/save` |
 
 Domain rules in [.claude/rules/](.claude/rules/) (loaded per-file by `applyTo` glob):

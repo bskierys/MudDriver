@@ -1,0 +1,131 @@
+# ROADMAP — River Crossing prototype (Huta → Bagnisko)
+
+Source plan (closed): [plans/2026-10-25-river-crossing.md](plans/2026-10-25-river-crossing.md). It holds the detailed Approach, Testing model, Validation thresholds and Risks; read it before starting a phase.
+Sprint tasks live in [SPRINTS.md](SPRINTS.md); tick them there.
+
+**Phase closes when:** the agent's rig tests pass **and** the user signs off after a playtest. If feel and numbers disagree, feel wins and the thresholds get updated.
+**Performance target:** 60 fps at 1080p Medium on i7-12700H / RTX 3050 Ti Laptop (4 GB VRAM).
+
+---
+
+## Phase 0 — Foundation
+**Status:** in progress (Sprint 1)
+
+**Outcome.** The project runs on a low-end budget, custom code follows B1 conventions, the jeep runs on our own Chaos simulation subclass with a validated physics stepping mode, and there's a mud gym with an agent-runnable test rig.
+
+**Scope.**
+- [x] Low-end render budget (ADR-011)
+- [ ] `Mud*` → `B1*` rename, B1 log categories
+- [ ] Per-wheel debug (NetImGui + `ShowDebug B1Vehicle` + telemetry)
+- [ ] Template constructors → `FObjectInitializer`; `AB1Jeep`, `UB1VehicleMovementComponent`, `FB1VehicleSimulation`
+- [ ] Physics stepping decided (async fixed dt vs substepping), ADR-003 accepted
+- [ ] `AB1GymTestRig : AFunctionalTest` + headless runner
+- [ ] `Lvl_Gym_Mud` with layered mud patches (ADR-012)
+
+**Done when.** The spring-to-anchor rig test is stable at 20 and 120 fps, the gym smoke test passes in PIE and headless, and the user has checked the wheel debug and the gym layout.
+
+---
+
+## Phase 1 — Mud
+**Status:** core in Sprint 1, polish in Sprint 2
+
+**Outcome.** Mud that rewards driving slowly with intent: wheelspin digs you in, careful throttle gets you out, and deep mud stops you without a winch. Tires spray mud and leave trails.
+
+**Scope (minimum).**
+- [ ] `UB1PhysicalMaterial_Mud`, per-wheel sinking via trace offset, traction/resistance curves, belly drag (Sprint 1)
+- [ ] Mud NetImGui window with live tuning (Sprint 1)
+- [ ] `Vehicle.State.InMud` tag, `B1Unstuck`, `ShowDebug B1Mud` (Sprint 2, needs GAS)
+- [ ] Niagara mud spray (GPU sprites, depth-buffer collision) (Sprint 2)
+- [ ] Visual tire trails (ADR-008) (Sprint 2)
+
+**Stretch.** Spray tinted by surface, dirt mask on the jeep, fake trail depth, character slowed in mud.
+
+**Done when.**
+- Full throttle digs in on medium mud in 2–4 s.
+- ≤ 50 % throttle crosses a 20 m medium strip.
+- Deep mud stops the jeep.
+- A stuck jeep creeps < 5 cm in 10 s at zero throttle.
+- The user signs off at the mud playtest.
+
+---
+
+## Phase G — GAS + fuel
+**Status:** Sprint 2
+
+**Outcome.** A single ability system on the PlayerState drives vehicle condition and fuel. The controller and game mode can handle any pawn.
+
+**Scope (minimum).**
+- [ ] GameplayAbilities/Tags/Tasks modules, `AB1GameMode`, `AB1PlayerController` (any-pawn `OnPossess`), `AB1PlayerState` + ASC (ADR-004)
+- [ ] `UB1VehicleAttributeSet` (Condition, MaxCondition, Fuel, MaxFuel), `B1GameplayTags`
+- [ ] Fuel consumption from engine work, `UB1VehicleTuningData`, batched `GE_B1FuelDrain`, out-of-fuel → no torque (ADR-010)
+- [ ] "Vehicle Status" NetImGui window, cheats `B1AddFuel`, `B1SetCondition`, `B1DamageVehicle`
+
+**Stretch.** Fuel gauge in the vehicle UI.
+
+**Done when.**
+- Fuel per 100 m in medium mud is ≥ 2× that on firm ground.
+- At 0 fuel the jeep moves < 1 m under full throttle.
+- The user signs off on the fuel pressure.
+
+---
+
+## Phase 2 — Damage and vegetation
+**Status:** not started (replan before starting)
+
+**Outcome.** Speed has a cost: bumps, trees and branches damage the jeep, and vegetation reacts to it.
+
+**Scope (minimum).** Impact damage from chassis hits, condition penalties, large tree, small tree (topples), bush (drag + scratch), breakable branch, physics log, `ShowDebug B1Obstacles`.
+**Stretch.** Bush/branch WPO bending, break VFX, hit sounds.
+
+**Done when.**
+- The branch section at 40 km/h costs ≥ 3× the condition lost at 15 km/h.
+- At < 30 % condition, 0–30 km/h takes ≥ 25 % longer.
+- Cut branches cost 0 condition.
+- The user signs off.
+
+---
+
+## Phase 3 — River
+**Status:** not started (replan before starting)
+
+**Outcome.** The deep ford is a fight against the current; the shallow ford is a mud trap.
+
+**Scope (minimum).** Box `AB1RiverVolume`, hull-point side force, traction loss with submersion, deep and shallow-mud ford in `Lvl_Gym_River`, flow debug.
+**Stretch.** Spline river, splash VFX, water surface shading.
+
+**Done when.** ≥ 8 of 10 unwinched rig crossings of the deep ford end downstream on the shallow side, and the user signs off.
+
+---
+
+## Phase 4 — On foot and winch
+**Status:** not started (replan before starting)
+
+**Outcome.** The player can get out, carry the winch hook to a tree or a log, get back in and winch out. Branches can be cleared with a machete.
+
+**Scope (minimum).** `AB1Character` (first-person). Enter/exit ability: the character is hidden and attached to a seat socket while driving; the engine switches off on exit and restarts on enter. `UB1WinchComponent` + anchors, carry/attach hook, in-car analog pull (ADR-007), log pull, `GA_B1Machete`, Winch debug.
+**Stretch.** Cable sag visuals, hook-in-hand mesh, animations.
+
+**Done when.**
+- Winched to a tree, the jeep leaves deep mud and crosses the deep ford.
+- A winched log moves ≥ 3 m off the path.
+- The user signs off.
+
+---
+
+## Phase 5 — Scenario level
+**Status:** not started (replan before starting)
+
+**Outcome.** The full Huta → Bagnisko situation from VISION.md is playable.
+
+**Scope (minimum).** Greybox route: Huta → collapsed bridge → forest path (mud, bumps, branches, a log) → ford with two routes → Bagnisko arrival trigger. Built from modular meshes + spline tools. The user sculpts the landscape and paints any foliage; the agent places set pieces, volumes, anchors and triggers via MCP.
+**Stretch.** Vegetation dressing, landmarks.
+
+**Done when.** The route is playable start to finish with both ford routes, at 60 fps on the target laptop, and the user signs off.
+
+---
+
+## Backlog
+
+Bugs and ideas found during `/work` that are out of the current task's scope.
+
+- _(empty)_

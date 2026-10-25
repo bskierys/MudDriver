@@ -26,9 +26,11 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 
 **Decision.** `UB1PhysicalMaterial_Mud : UPhysicalMaterial` holds the mud tuning (max sink depth, sink and rise rates, traction and resistance curves vs depth). Chaos already reports the contact physical material per wheel (`FWheelStatus::PhysMaterial`).
 
-**Rationale.** No extra volume queries. Landscape layers and meshes get mud through the usual physical material assignment.
+**Rationale.** No extra volume queries. Mud meshes get mud through the usual physical material assignment.
 
 **Alternatives.** Mud overlap volumes (extra overlaps, and they don't follow the terrain shape). Data asset looked up by surface type (an extra indirection).
+
+**Amended 2026-10-25 by ADR-012.** The material goes on a separate mud surface mesh, not on a landscape paint layer. A landscape layer can't have its own collision channel, which sinking needs.
 
 ---
 
@@ -43,6 +45,10 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 **Rationale.** Forces get the same timestep as the tire and suspension model, and stay stable with substepping.
 
 **Alternatives.** `AddForce` from the component Tick (fastest to write, frame-rate dependent). It's the fallback if the spike shows that subclassing the simulation is too brittle in 5.8.
+
+**Amended 2026-10-25 (plan critique round 1).**
+- **Physics stepping.** The project currently has `bSubstepping=False` and no async physics tick, so physics steps once per frame with a variable dt. The T0.4 spike also picks the stepping mode: async physics with a fixed dt (recommended, Chaos vehicles are built for it) or substepping. It's tested with a stiff spring-to-anchor force at 20 and 120 fps.
+- **Template change.** Swapping the movement component class means changing the `AMudDriverPawn` / `AMudDriverOffroadCar` constructors to take `FObjectInitializer`.
 
 ---
 
@@ -167,3 +173,24 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 **Alternatives.** Keep the features and lower scalability per machine (still pays the shader and memory cost).
 
 **Consequences.** Lighting is flatter: sky light and SSAO only. Niagara particle collision must use depth-buffer collision, not distance fields.
+
+---
+
+## ADR-012 — Mud collision layering, sinking via suspension trace offset
+
+**Status:** accepted (2026-10-25)
+
+**Problem.** If the jeep "sinks" by lowering the wheel contact, the chassis body still collides with the same mud surface. It can never get below ground clearance, and that real collision fights the analytic belly drag. Lowering the wheel radius instead makes the jeep pull *harder* as it sinks (drive force = torque / radius).
+
+**Decision.**
+- A mud patch has two layers:
+  - **Mud surface**: a separate mesh with the `B1MudSurface` collision profile and a `UB1PhysicalMaterial_Mud`. Only the wheel suspension traces hit it (`WheelTraceCollisionResponses`). The chassis and the character ignore it.
+  - **Hard bottom**: the landscape or a mesh `MaxSinkDepth` below the surface. Everything collides with it.
+- Sinking is applied in `FB1VehicleSimulation` by overriding `PerformSuspensionTraces`: on mud, the hit point is offset down by the wheel's `SinkDepth`. Wheel radius stays unchanged.
+- Belly drag is analytic: when the average sink depth exceeds ground clearance, a drag force grows with `(SinkDepth - Clearance)`. The hard bottom is the backstop.
+
+**Rationale.** It keeps the chassis free to sit "in" the mud and keeps drive force physically sane. It also keeps the effect local to the vehicle simulation.
+
+**Alternatives.** Mud as a landscape paint layer with radius reduction (the radius side effect above, and no per-layer collision). A deformable heightfield (expensive; out of scope per ADR-008).
+
+**Consequences.** Mud patches are authored as meshes on top of the landscape: a plane, a spline mesh, or a modelling-tools patch. The character walks through mud on the hard bottom; slowing the character in mud is a later polish item.
