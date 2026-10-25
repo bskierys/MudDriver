@@ -155,3 +155,40 @@ Next Mud gym task after S1-13. The channel and profile worked, but the S1-13 tes
 ### Open follow-ups
 - Headless run of `B1Mud_PatchSurface` at the next editor close (PIE only so far).
 - S1-15 `Lvl_Gym_Mud` next. The `B1MudTest_*` geometry in `Lvl_Offroad` can retire once the gym has its own checks.
+
+---
+
+## 2026-10-25 — S1-15 mud gym greybox
+
+### Context
+The mud patch actor (S1-14) was done. The mud core tasks (S1-17+) need a dedicated gym map with patches of each depth, per ADR-009.
+
+### What was built
+- `/Game/B1/Gym/Lvl_Gym_Mud`: a copy of `VehicleBasic` (WP/OFPA) with the landscape, cones, tunnel and walls removed. Sky, fog, lights and the post process volume stay.
+- Ground: `WorldGridMaterial` cube tiles with tops at Z=0. Lanes run along +X. The patch zone (X 10–30 m) has gaps in the tiling for the patches:
+  - firm lane at Y 0;
+  - shallow 15 cm at Y 16, medium 35 cm at Y 29, deep 70 cm at Y 42, each 20×10 m with its own hard bottom.
+- Pit at Y −19: 2 m deep, an 8 m ramp in (14°), a 12 m ramp out (9.5°), and a 60 cm mud surface over the floor (`bHardBottom` off; the floor is the bottom).
+- `MI_B1Mud_Shallow/Medium/Deep` (tints of `M_B1Mud`). Text-render lane labels.
+- `Spawn_1_Firm` .. `Spawn_5_Pit` PlayerStarts at X −12 m.
+- `BP_B1GymGameMode` (empty child of `BP_OffRoadGameMode`) as the world override.
+- After the user's first drive: a 30 m firm margin on every side (floor X −50..120, Y −60..80 m), plus 3 m perimeter walls (`Gym/Walls`). The walls are hidden in game and use Custom collision with Camera ignored.
+- Rig `B1Gym_WallStop` (folder `B1Tests`): full throttle into the north wall, checks `endH ≥ −1.5`.
+
+### Decisions made
+- The default spawn is picked by the `Player0` actor tag, which `AOffroadGameMode::ChoosePlayerStart` already matches. No new C++. Other lanes: move the tag or use "Play from here".
+- Patches sit in gaps between ground tiles, not on top of the ground, so the hard bottom can be below ground level (ADR-012).
+- The patch depths (15/35/70 cm) are placeholder hard-bottom depths until the S1-17 presets set `MaxSinkDepth`.
+
+### What we learned
+- `AssetTools.duplicate` on an OFPA map copies its external actors too. The copy has to be saved before `load_level` accepts it.
+- The template's spring arms have `bDoCollisionTest=false`, so the camera already ignores level geometry.
+- Setting `bodyInstance` (`collisionProfileName: Custom`, `collisionResponses.responseArray`) through `ObjectTools.set_properties`, after `bUseDefaultCollision=false`, does apply at runtime: the rig stopped at the wall.
+- Rig `endH` is relative to the rig actor. A rig placed 1 m up reads about −1.0 on the floor.
+- `B1Gym_WallStop` PIE: dist=28.30 disp=22.83 vmax=18.71 stuck=4.60 endH=−0.99, PASS.
+- `TextRenderComponent.textRenderColor` set through MCP was clamped to white (FColor JSON looks 0–1).
+
+### Open follow-ups
+- Mud physical materials on the patches (S1-17).
+- Patch exits are vertical 1 m tile edges. Once sinking is in (S1-19), a deeply sunk chassis may catch them; consider ramped exits.
+- Headless runs of `B1Mud_PatchSurface` and `B1Gym_WallStop` at the next editor close.
