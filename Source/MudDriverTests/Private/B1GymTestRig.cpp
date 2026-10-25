@@ -1,5 +1,6 @@
 #include "B1GymTestRig.h"
 #include "B1Log.h"
+#include "B1VehicleMovementComponent.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
@@ -57,9 +58,14 @@ void AB1GymTestRig::PrepareTest()
 
 	Vehicle = ResolveVehicle();
 	Movement = Vehicle ? Cast<UChaosWheeledVehicleMovementComponent>(Vehicle->GetVehicleMovementComponent()) : nullptr;
+	B1Movement = Cast<UB1VehicleMovementComponent>(Movement);
 	if (!Movement)
 	{
 		FinishTest(EFunctionalTestResult::Error, TEXT("no wheeled vehicle to drive"));
+	}
+	else if (TestForce != EB1TestForce::Off && !B1Movement)
+	{
+		FinishTest(EFunctionalTestResult::Error, TEXT("test force needs a UB1VehicleMovementComponent"));
 	}
 }
 
@@ -112,6 +118,14 @@ void AB1GymTestRig::StartTest()
 	TimeToStuck = -1.0f;
 	SettleTimeMeasured = 0.0f;
 	PeakOscillation = 0.0f;
+	TautTime = -1.0f;
+	StretchFirst = FFloatInterval();
+	StretchLast = FFloatInterval();
+
+	if (TestForce != EB1TestForce::Off)
+	{
+		B1Movement->SetTestForce(TestForce);
+	}
 
 	if (InputScript.Num() > 0)
 	{
@@ -134,6 +148,10 @@ void AB1GymTestRig::Tick(float DeltaSeconds)
 	ScriptTime += DeltaSeconds;
 	++NumFrames;
 	Sample(DeltaSeconds);
+	if (TestForce == EB1TestForce::Spring)
+	{
+		SampleSpring();
+	}
 
 	if (ScriptTime >= ScriptDuration)
 	{
@@ -184,13 +202,43 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 	}
 }
 
+void AB1GymTestRig::SampleSpring()
+{
+	const float Distance = FVector::Dist(LastLocation, B1Movement->GetTestForceAnchor()) / CmPerM;
+	const float Stretch = Distance - B1Movement->TestForceSettings.SpringRestLength;
+
+	if (TautTime < 0.0f && Stretch > 0.0f)
+	{
+		TautTime = ScriptTime;
+	}
+	if (TautTime >= 0.0f && ScriptTime <= TautTime + 1.0f)
+	{
+		StretchFirst.Include(Stretch);
+	}
+	if (ScriptTime >= ScriptDuration - 1.0f)
+	{
+		StretchLast.Include(Stretch);
+	}
+}
+
 void AB1GymTestRig::FinishScript()
 {
 	bScriptRunning = false;
 	ApplyInput(FB1GymInputStep());
+	if (TestForce != EB1TestForce::Off)
+	{
+		B1Movement->SetTestForce(EB1TestForce::Off);
+	}
 
 	const float Displacement = FVector::Dist(LastLocation, StartLocation) / CmPerM;
 	const float AvgDt = NumFrames > 0 ? ScriptTime / NumFrames : 0.0f;
+
+	// Still above the settle speed on the last sample means it never settled.
+	if (SettleTimeMeasured >= ScriptTime)
+	{
+		SettleTimeMeasured = -1.0f;
+	}
+	const bool bSettled = SettleTimeMeasured >= 0.0f;
 
 	TArray<FString> Failures;
 	if (Thresholds.MinDistance >= 0.0f && PathLength < Thresholds.MinDistance)
@@ -209,16 +257,38 @@ void AB1GymTestRig::FinishScript()
 	{
 		Failures.Add(FString::Printf(TEXT("peakOsc>%.3f"), Thresholds.MaxPeakOscillation));
 	}
-	if (Thresholds.MaxSettleTime >= 0.0f && SettleTimeMeasured > Thresholds.MaxSettleTime)
+	if (Thresholds.MaxSettleTime >= 0.0f && (!bSettled || SettleTimeMeasured > Thresholds.MaxSettleTime))
 	{
 		Failures.Add(FString::Printf(TEXT("settle>%.2f"), Thresholds.MaxSettleTime));
 	}
 
+	FString SpringMetrics;
+	if (TestForce == EB1TestForce::Spring)
+	{
+		const bool bTaut = TautTime >= 0.0f;
+		const float SettleAfterTaut = bTaut && bSettled ? FMath::Max(0.0f, SettleTimeMeasured - TautTime) : -1.0f;
+		const float AmpFirst = StretchFirst.IsValid() ? StretchFirst.Size() : 0.0f;
+		const float AmpLast = StretchLast.IsValid() ? StretchLast.Size() : 0.0f;
+		const float AmpGrowth = AmpFirst > 0.0f ? AmpLast / AmpFirst : 0.0f;
+
+		if (Thresholds.MaxSpringSettle >= 0.0f && (SettleAfterTaut < 0.0f || SettleAfterTaut > Thresholds.MaxSpringSettle))
+		{
+			Failures.Add(FString::Printf(TEXT("settleTaut>%.2f"), Thresholds.MaxSpringSettle));
+		}
+		if (Thresholds.MaxSpringAmpGrowth >= 0.0f && (!bTaut || AmpGrowth > Thresholds.MaxSpringAmpGrowth))
+		{
+			Failures.Add(FString::Printf(TEXT("growth>%.2f"), Thresholds.MaxSpringAmpGrowth));
+		}
+
+		SpringMetrics = FString::Printf(TEXT(" taut=%.2f settleTaut=%.2f ampFirst=%.3f ampLast=%.3f growth=%.2f"),
+			TautTime, SettleAfterTaut, AmpFirst, AmpLast, AmpGrowth);
+	}
+
 	const bool bPassed = Failures.Num() == 0;
 	const FString Name = TestLabel.IsEmpty() ? GetName() : TestLabel;
-	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f stuck=%.2f settle=%.2f peakOsc=%.3f avgDt=%.4f frames=%d%s%s"),
+	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f stuck=%.2f settle=%.2f peakOsc=%.3f avgDt=%.4f frames=%d%s%s%s"),
 		*Name, bPassed ? TEXT("PASS") : TEXT("FAIL"),
-		PathLength, Displacement, MaxSpeed, TimeToStuck, SettleTimeMeasured, PeakOscillation, AvgDt, NumFrames,
+		PathLength, Displacement, MaxSpeed, TimeToStuck, SettleTimeMeasured, PeakOscillation, AvgDt, NumFrames, *SpringMetrics,
 		bPassed ? TEXT("") : TEXT(" failed="), *FString::Join(Failures, TEXT(",")));
 
 	UE_LOG(LogB1Test, Display, TEXT("%s"), *Line);

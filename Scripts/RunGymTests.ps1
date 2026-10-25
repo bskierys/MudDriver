@@ -5,10 +5,13 @@ own exit code ignores test results, so the log is parsed instead.
 
   .\Scripts\RunGymTests.ps1
   .\Scripts\RunGymTests.ps1 -Map /Game/B1/Maps/Lvl_Gym_Mud -Filter FullThrottle
+  .\Scripts\RunGymTests.ps1 -LogName Async60 -ExtraArgs '-ini:Engine:[/Script/Engine.PhysicsSettings]:bTickPhysicsAsync=True'
 #>
 param(
     [string]$Map = "/Game/Variant_OffRoad/Maps/Lvl_Offroad",
     [string]$Filter = "",
+    [string[]]$ExtraArgs = @(),
+    [string]$LogName = "RunGymTests",
     [int]$TimeoutSec = 900,
     [string]$EngineDir = "C:\Program Files\UE_5.8"
 )
@@ -16,7 +19,7 @@ param(
 $ProjectDir = Resolve-Path (Join-Path $PSScriptRoot "..")
 $Project = Join-Path $ProjectDir "MudDriver.uproject"
 $Editor = Join-Path $EngineDir "Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
-$LogName = "RunGymTests.log"
+$LogName = "$LogName.log"
 $LogPath = Join-Path $ProjectDir "Saved\Logs\$LogName"
 
 if (Get-Process UnrealEditor -ErrorAction SilentlyContinue) {
@@ -35,7 +38,7 @@ $ArgList = @(
     "-ExecCmds=`"Automation RunTests $TestFilter; Quit`"",
     "-unattended", "-nullrhi", "-nosound", "-nosplash", "-nop4",
     "-log=`"$LogName`""
-)
+) + $ExtraArgs
 
 Write-Host "running '$TestFilter'"
 $Process = Start-Process -FilePath $Editor -ArgumentList $ArgList -PassThru -WindowStyle Hidden
@@ -50,7 +53,8 @@ if (-not (Test-Path $LogPath)) {
     exit 2
 }
 
-Select-String -Path $LogPath -Pattern 'LogB1Test:' | ForEach-Object { $_.Line -replace '^.*?LogB1Test: (Display: )?', '' }
+# the automation controller echoes failed lines as "LogAutomationController: LogB1Test: ..."; skip those
+Select-String -Path $LogPath -Pattern '\]LogB1Test:' | ForEach-Object { $_.Line -replace '^.*?LogB1Test: (Display: )?', '' }
 
 $Completed = @(Select-String -Path $LogPath -Pattern 'Test Completed\. Result=\{(\w+)\}')
 $Failed = @($Completed | Where-Object { $_.Matches[0].Groups[1].Value -ne 'Success' })

@@ -2,10 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "FunctionalTest.h"
+#include "B1VehicleSimInput.h"
 #include "B1GymTestRig.generated.h"
 
 class AWheeledVehiclePawn;
 class UChaosWheeledVehicleMovementComponent;
+class UB1VehicleMovementComponent;
 
 USTRUCT(BlueprintType)
 struct FB1GymInputStep
@@ -52,6 +54,14 @@ struct FB1GymThresholds
 	/** Time from script start until the speed last exceeded the settle speed */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "s"))
 	float MaxSettleTime = -1.0f;
+
+	/** Settle time measured from the moment the spring first goes taut */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "s"))
+	float MaxSpringSettle = -1.0f;
+
+	/** Stretch amplitude in the last second over the first second after going taut; above 1 means growing */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MaxSpringAmpGrowth = -1.0f;
 };
 
 /**
@@ -93,6 +103,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
 	TArray<FB1GymInputStep> InputScript;
 
+	/** Switched on when the script starts, anchored there; needs a UB1VehicleMovementComponent */
+	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
+	EB1TestForce TestForce = EB1TestForce::Off;
+
 	/** Sets t.MaxFPS for the run; 0 leaves it alone */
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
 	float MaxFPS = 0.0f;
@@ -119,6 +133,7 @@ private:
 	AWheeledVehiclePawn* ResolveVehicle();
 	void ApplyInput(const FB1GymInputStep& Step);
 	void Sample(float DeltaSeconds);
+	void SampleSpring();
 	void FinishScript();
 
 	UPROPERTY(Transient)
@@ -126,6 +141,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UChaosWheeledVehicleMovementComponent> Movement;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UB1VehicleMovementComponent> B1Movement;
 
 	bool bScriptRunning = false;
 	float ScriptTime = 0.0f;
@@ -140,4 +158,8 @@ private:
 	float TimeToStuck = -1.0f;
 	float SettleTimeMeasured = 0.0f;
 	float PeakOscillation = 0.0f;
+
+	float TautTime = -1.0f;
+	FFloatInterval StretchFirst;
+	FFloatInterval StretchLast;
 };

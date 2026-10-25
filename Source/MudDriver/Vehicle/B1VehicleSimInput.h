@@ -28,9 +28,9 @@ struct FB1TestForceSettings
 	UPROPERTY(EditAnywhere, Category = "TestForce|Config")
 	float SpringStiffness = 20000.0f;
 
-	/** N*s/m */
+	/** N*s/m. Near critical for the 1500 kg jeep; lower values make it bounce on the cable */
 	UPROPERTY(EditAnywhere, Category = "TestForce|Config")
-	float SpringDamping = 3000.0f;
+	float SpringDamping = 9000.0f;
 
 	UPROPERTY(EditAnywhere, Category = "TestForce|Config", meta = (Units = "N"))
 	float SpringMaxForce = 15000.0f;

@@ -9,7 +9,7 @@ class FB1VehicleSimulation;
 
 /** Wheeled movement that runs FB1VehicleSimulation on the physics thread */
 UCLASS(ClassGroup = (B1), meta = (BlueprintSpawnableComponent))
-class UB1VehicleMovementComponent : public UChaosWheeledVehicleMovementComponent
+class MUDDRIVER_API UB1VehicleMovementComponent : public UChaosWheeledVehicleMovementComponent
 {
 	GENERATED_BODY()
 
@@ -20,6 +20,7 @@ public:
 	/** Spring mode anchors at the vehicle's current location */
 	void SetTestForce(EB1TestForce Mode);
 	EB1TestForce GetTestForce() const { return TestForce; }
+	const FVector& GetTestForceAnchor() const { return TestForceAnchor; }
 
 	UPROPERTY(EditAnywhere, Category = "TestForce|Config")
 	FB1TestForceSettings TestForceSettings;
