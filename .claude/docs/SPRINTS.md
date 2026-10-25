@@ -127,7 +127,8 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
 
 ### Mud core (ADR-001, 002, 012)
 
-- [ ] **S1-17** `UB1PhysicalMaterial_Mud` + presets (1 h) _(requires S1-14)_
+- [x] **S1-17** `UB1PhysicalMaterial_Mud` + presets (1 h) _(requires S1-14)_ <!-- done: 2026-10-25 -->
+  Result: `Mud/B1PhysicalMaterial_Mud` (category `Mud|Config`). Units: depth in cm, `SinkRate` in cm/s at full wheelspin, `RiseRate` in cm per m rolled with grip; curves take normalized depth; rolling resistance is a fraction of wheel load; belly drag is a fraction of vehicle weight per m past clearance. Base `Friction` is the zero-depth grip: Chaos already feeds it to the tire (`SetSurfaceFriction`), so S1-20's curve multiplies on top. Presets (Friction / MaxSink / Sink / Rise / friction curve / RR curve): Shallow 0.6/15/10/8/1→0.8/0.03→0.12, Medium 0.5/35/20/5/1→0.6/0.05→0.3, Deep 0.45/70/30/2/1→0.45/0.08→0.5. The pit uses Deep. Verified: B1Wheels telemetry shows `PM_B1Mud_Shallow/Medium/Deep` on all four wheels of jeeps dropped on each patch. MCP can't create physical material assets: the user made `PM_B1Mud_Medium` by hand and the agent duplicated it.
   Params: `MaxSinkDepth`, `SinkRate`, `RiseRate`, friction curve and rolling-resistance curve vs normalized depth, `BellyDragCoefficient`. Assets `PM_B1Mud_Shallow`, `_Medium`, `_Deep`, assigned to the gym patches.
   **Done:** builds; the per-wheel table (S1-04) shows the mud material on the patches.
   **User check:** —

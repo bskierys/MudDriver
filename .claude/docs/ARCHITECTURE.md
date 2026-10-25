@@ -58,6 +58,15 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
   - `OnConstruction` sizes both from `Size` (cm).
 - `/Game/B1/Mud/BP_B1MudPatch` is the placeable child, with `M_B1Mud` (a `Color` vector parameter for per-depth tints). Tints: `MI_B1Mud_Shallow/Medium/Deep`, set as the `MudSurface` material override per instance. <!-- updated 2026-10-25 -->
 
+- `UB1PhysicalMaterial_Mud` (`Mud/B1PhysicalMaterial_Mud.h`, ADR-002) holds the mud tuning:
+  - `MaxSinkDepth` (cm), `SinkRate` (cm/s at full wheelspin), `RiseRate` (cm per m rolled with grip);
+  - `FrictionVsDepth` and `RollingResistanceVsDepth` (fraction of wheel load), both `FRuntimeFloatCurve` over normalized depth;
+  - `BellyDragCoefficient` (fraction of vehicle weight per m past clearance).
+  - Its base `Friction` is the grip at zero depth. Chaos feeds it to the tire through `SetSurfaceFriction`, so the depth curve multiplies on top.
+- Presets: `/Game/B1/Mud/PM_B1Mud_Shallow/Medium/Deep`, set as each gym patch's `MudMaterial`.
+
+<!-- updated 2026-10-25 -->
+
 ## Mud gym (ADR-009)
 
 `/Game/B1/Gym/Lvl_Gym_Mud` (WP/OFPA, game mode `BP_B1GymGameMode`, a child of `BP_OffRoadGameMode`).

@@ -20,7 +20,7 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 
 ## ADR-002 — Mud parameters live in a custom physical material
 
-**Status:** proposed (2026-10-25)
+**Status:** accepted (2026-10-25, built in S1-17)
 
 **Problem.** Mud parameters need to be per-surface and readable on the physics thread from the wheel contact.
 
@@ -31,6 +31,8 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 **Alternatives.** Mud overlap volumes (extra overlaps, and they don't follow the terrain shape). Data asset looked up by surface type (an extra indirection).
 
 **Amended 2026-10-25 by ADR-012.** The material goes on a separate mud surface mesh, not on a landscape paint layer. A landscape layer can't have its own collision channel, which sinking needs.
+
+**Implementation (2026-10-25, S1-17).** Chaos already applies `PhysMaterial->Friction` as the tire's surface friction. The mud material's base `Friction` is therefore the zero-depth grip, and the depth curve is a multiplier on top. The engine reads `HitResult.PhysMaterial` on the physics thread too; our own mud params still get copied into the sim input (S1-18 note), because ImGui edits them live.
 
 ---
 
