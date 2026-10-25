@@ -25,6 +25,14 @@ To give you an example, here is one of the situations in the game. This is what 
 - Finally the player reaches the ford on the river. They have two possible paths to cross the river. 1) First path is the deeper river: The player can go straight into a river, but the current will be strong and the car will be pushed sideways - the jeep will be very hard to navigate and player most likely will be pushed to the path 2. 2) Mud on shallow river. Mud will spring from the wheels, and the car will stop as it will get stuck in deep mud. This part is inspired by Uncharted 4 mud sections and Mudrunner.
 - Fortunatelly, we have a tool that can help us overcome these obstacles: A winch (as in Uncharted 4). Before crossing the river or after the car will get stuck in the mood, the player can get out of the car, go to the front of it, grab a winch and cross the river on foot. As we are still in the woods, the player can hood the winch's cable to the large tree. Now he can go back to the car, start the engine and try crossing now. They can use now the winch controlls, to increase the pull and together with car engine get out of the mud or fight the current of the river.
 
+### Clearing obstacles on foot
+
+The player can get out of the jeep and clear the way before driving on.
+- A log blocks the path. The player takes the winch hook, attaches it to the log, goes back to the jeep and winches the log off the path.
+- Branches block the path. The player cuts them with a machete before driving through. If they don't, the jeep still breaks them, but takes damage doing it.
+
+There is no scouting tool for the player. Obstacle parameters (integrity, break force, damage to the car) can be seen through debug tools (`ShowDebug`).
+
 So this will be physics-heavy driving system. My physics requirements:
 - Mud: Slows the car, sometimes to full halt. The wheels spins in it driving less progress the deeper we are burried in it. The mud springs from the car tires. When driving through mud, the car is leaving the trails in the mud with the tires.
 - Trees: Smaller trees and bushes can be knocked over with the car. Larger trees are hard obstacles that can damage car when we collide with more speed. The branches are reacting to car as well - smaller branches should bent when the car goes through bushes, they will also scratch the car and damage it if we go to fast. The larger baranches require more force to break (going faster so some damage).

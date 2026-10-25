@@ -46,7 +46,7 @@ Domain rules in [.claude/rules/](.claude/rules/) (loaded per-file by `applyTo` g
 
 | File | applyTo |
 |---|---|
-| [.claude/rules/cpp-ue.md](.claude/rules/cpp-ue.md) | `Source/**/*.cpp, Source/**/*.h` |
+| [.claude/rules/mcp-tools.md](.claude/rules/mcp-tools.md) | always (Unreal MCP usage) |
 
 ---
 
