@@ -29,6 +29,8 @@ Applies whenever you use the `unreal-mcp` server (Epic's ModelContextProtocol pl
 - **WP landscape isn't loaded in the editor**, so `SceneTools.trace_world` hits nothing there. Place actors relative to known actors (e.g. PlayerStart) and let PIE settle them.
 - **`ActorTools.set_actor_transform` resets omitted fields.** Despite the schema ("unset = don't change"), passing only `rotation` moved the actor to the origin. Always pass location, rotation and scale.
 - **Collision profiles on static mesh actors:** set `bUseDefaultCollision=false` on the component first, then `BodyInstance` `collisionProfileName`, `objectType` and `collisionEnabled`. With default collision on (BasicShapes do this), the mesh's BlockAll wins and the profile is silently ignored, even after a reload.
+- **New BP from a C++ class:** `BlueprintTools.create(folder_path, asset_name, asset_type={"refPath": "/Script/MudDriver.<Class>"})`.
+- **Viewport/asset captures** return base64 PNG that overflows the tool output. Decode the saved result file to a PNG in the scratchpad and Read it. `CaptureViewport` needs an `annotations` object; pass `gridSpacing: 0, maxLabelDistance: 0` to disable the overlays.
 - **ObjectTools arg names:** `list_properties(instance)`, `get_properties(instance, properties[])`, `set_properties(instance, values)` where `values` is a JSON string.
 
 ## Not available

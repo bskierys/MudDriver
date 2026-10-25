@@ -50,6 +50,14 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 - `UB1VehicleMovementComponent`'s constructor sets `WheelTraceCollisionResponses[B1Mud] = Block`. The chassis (`Vehicle`), pawns, physics bodies and the camera pass through.
 - Static mesh components must have `bUseDefaultCollision=false` (or use `SetCollisionProfileName`), or the mesh's own collision overrides the profile. <!-- updated 2026-10-25 -->
 
+## Mud
+
+- `AB1MudPatch` (`Mud/B1MudPatch.h`) has two components:
+  - `MudSurface`: a 10 cm slab, top at the actor origin, `B1MudSurface` profile, `MudMaterial` as its phys material override.
+  - `HardBottom`: a 1 m BlockAll slab, top `HardBottomDepth` below the surface. It's hidden and NoCollision when `bHardBottom` is off, for patches where the landscape is the bottom.
+  - `OnConstruction` sizes both from `Size` (cm).
+- `/Game/B1/Mud/BP_B1MudPatch` is the placeable child, with `M_B1Mud` (a `Color` vector parameter for per-depth tints). <!-- updated 2026-10-25 -->
+
 ## Debug tooling
 
 - `UB1ImGuiSubsystem` (GameInstance subsystem) owns the NetImGui main menu bar. New windows are registered with `RegisterWindow(Menu, Name, DrawFn)`. Vehicle Basics window (`B1ImGui::DrawVehicleBasics`) includes a per-wheel table; slipping/skidding cells are orange.
@@ -60,7 +68,7 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 ## Testing
 
 - `AB1GymTestRig : AFunctionalTest` (`MudDriverTests`): resolves a vehicle (explicit target, player's vehicle, or spawns `VehicleClass` with `SetRequiresControllerForInputs(false)`), waits `SettleTime`, plays an `InputScript` through the movement component setters, samples every tick and logs one line: `B1Test <name> PASS|FAIL dist= disp= vmax= stuck= settle= peakOsc= endH= avgDt= frames= [failed=...]`. `endH` is the vehicle's height above the rig actor at the end (optional `MinEndHeight` check). Optional `MaxFPS` forces `t.MaxFPS` for the run. `bAutoRun` runs it in a normal PIE session without the automation framework.
-- Rigs in `Lvl_Offroad`: `B1Gym_FullThrottle5s` (baseline ~85–88 m at 60 fps, MinDistance 50); `B1Step_Spring20/120` and `B1Step_Push20/120` (stepping checks, S1-12). Optional `TestForce` on the rig switches the jeep's test force on at script start. Spring runs log `taut`, `settleTaut`, stretch amplitude and growth. `settle=-1` means still moving at the end. `B1Mud_WheelsOnPlane` and `B1Mud_ChassisThroughRail` (folder `B1Tests/MudChannel`, on their own floors at Z≈5000) check the mud channel: wheels rest on a mud plane, and the chassis drives through a mud rail.
+- Rigs in `Lvl_Offroad`: `B1Gym_FullThrottle5s` (baseline ~85–88 m at 60 fps, MinDistance 50); `B1Step_Spring20/120` and `B1Step_Push20/120` (stepping checks, S1-12). Optional `TestForce` on the rig switches the jeep's test force on at script start. Spring runs log `taut`, `settleTaut`, stretch amplitude and growth. `settle=-1` means still moving at the end. `B1Mud_WheelsOnPlane` and `B1Mud_ChassisThroughRail` (folder `B1Tests/MudChannel`, on their own floors at Z≈5000) check the mud channel: wheels rest on a mud plane, and the chassis drives through a mud rail. `B1Mud_PatchSurface` drops the jeep on a `BP_B1MudPatch` (`B1MudTest_Patch`) and checks that it rests on the surface.
 - Headless: `Scripts/RunGymTests.ps1 [-Map] [-Filter]` runs `UnrealEditor-Cmd -nullrhi` with `Automation RunTests Project.Functional Tests.<map dotted>[.<label>]; Quit`. The editor exits 0 regardless, so the script parses `Test Completed. Result={...}` lines for its exit code. Needs the editor closed.
 - Agent-side, in-editor: place/configure rigs through MCP, `StartPIE`, read `LogB1Test` with `LogsToolset.GetLogEntries`.
 
