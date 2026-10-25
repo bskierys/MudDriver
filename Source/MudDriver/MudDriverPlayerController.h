@@ -66,6 +66,10 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UMudDriverUI> VehicleUI;
 		
+public:
+
+	AMudDriverPlayerController();
+
 protected:
 
 	/** Gameplay initialization */

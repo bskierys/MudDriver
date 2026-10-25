@@ -17,7 +17,8 @@ public class MudDriver : ModuleRules
 			"ChaosVehicles",
 			"PhysicsCore",
 			"UMG",
-			"Slate"
+			"Slate",
+			"NetImgui"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {
@@ -26,10 +27,11 @@ public class MudDriver : ModuleRules
 			"MudDriver/OffroadCar",
 			"MudDriver/Variant_OffRoad",
 			"MudDriver/Variant_TimeTrial",
-			"MudDriver/Variant_TimeTrial/UI"
+			"MudDriver/Variant_TimeTrial/UI",
+			"MudDriver/Debug"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Projects" });
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

@@ -43,6 +43,10 @@
 		{
 			"Name": "GameplayAbilities",
 			"Enabled": true
+		},
+		{
+			"Name": "NetImgui",
+			"Enabled": true
 		}
 	]
 }

@@ -27,6 +27,7 @@ Plugins/**/Intermediate/
 *.lib
 *.exp
 *.ilk
+!Plugins/NetImgui/NetImguiServer/netImguiServer.exe
 
 # Tool caches and local settings
 .gdep/cache/
