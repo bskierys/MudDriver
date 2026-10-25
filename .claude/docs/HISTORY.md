@@ -191,4 +191,22 @@ The mud patch actor (S1-14) was done. The mud core tasks (S1-17+) need a dedicat
 ### Open follow-ups
 - Mud physical materials on the patches (S1-17).
 - Patch exits are vertical 1 m tile edges. Once sinking is in (S1-19), a deeply sunk chassis may catch them; consider ramped exits.
-- Headless runs of `B1Mud_PatchSurface` and `B1Gym_WallStop` at the next editor close.
+- Headless runs of `B1Mud_PatchSurface` and `B1Gym_WallStop` at the next editor close. (Done in S1-16.)
+
+---
+
+## 2026-10-25 — S1-16 gym smoke test
+
+### Context
+The mud gym was built (S1-15) and the user signed off on the layout after the margin and walls were added. The ROADMAP Phase 0 "done when" needs a smoke test in the gym, both in PIE and headless.
+
+### What was built
+- Rig `B1Gym_FirmSmoke` in `Lvl_Gym_Mud` (folder `B1Tests`, at X 35 m on the firm lane, past the patches and clear of the player spawn). It runs 6 s at 50 % throttle, with MinDistance 20 m and endH ≥ −1.5.
+
+### What we learned
+- PIE: dist=42.82. Headless: dist=42.97. The headless gym ran at avgDt 0.0216 (about 46 fps, not 60), and the async fixed step still kept the distance within 0.4 %.
+- Gym headless: 2/2 PASS (`B1Gym_WallStop` stuck=4.21 endH=−1.01).
+- `Lvl_Offroad` headless: 8/8 PASS. FullThrottle 84.97 m, PatchSurface endH=−0.30 (the pending S1-14 headless run), springs settleTaut 3.04/3.00.
+
+### Open follow-ups
+- S1-17 next: `UB1PhysicalMaterial_Mud` + presets. It needs a full build with the editor closed.

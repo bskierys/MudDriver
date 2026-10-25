@@ -119,7 +119,8 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** a viewport capture of the layout; PIE spawns the jeep at the first spawn point.
   **User check:** walk or drive through the gym: is the layout good for testing, and can you tell the patches apart at a glance?
 
-- [ ] **S1-16** Gym smoke test (45 min) _(requires S1-11, S1-15)_
+- [x] **S1-16** Gym smoke test (45 min) _(requires S1-11, S1-15)_ <!-- done: 2026-10-25 -->
+  Result: rig `B1Gym_FirmSmoke` (folder `B1Tests`, X 35 m on the firm lane, 6 s at 50 % throttle, MinDistance 20, endH ≥ −1.5). PIE PASS dist=42.82; headless PASS dist=42.97 (avgDt 0.0216, the async fixed step keeps the result the same). `B1Gym_WallStop` headless PASS. `Lvl_Offroad` suite headless 8/8 PASS, which closes the pending `B1Mud_PatchSurface` headless run (endH=−0.30).
   A rig in `Lvl_Gym_Mud`: drive 20 m on the firm strip at 50 % throttle.
   **Done:** PASS in PIE (MCP) and headless (S1-11).
   **User check:** —
