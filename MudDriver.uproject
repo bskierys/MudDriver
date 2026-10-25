@@ -12,6 +12,11 @@
 				"Engine",
 				"UMG"
 			]
+		},
+		{
+			"Name": "MudDriverTests",
+			"Type": "DeveloperTool",
+			"LoadingPhase": "Default"
 		}
 	],
 	"Plugins": [
