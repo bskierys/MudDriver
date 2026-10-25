@@ -29,6 +29,7 @@ public class MudDriver : ModuleRules
 			"MudDriver/Variant_TimeTrial",
 			"MudDriver/Variant_TimeTrial/UI",
 			"MudDriver/Debug",
+			"MudDriver/Physics",
 			"MudDriver/Vehicle"
 		});
 

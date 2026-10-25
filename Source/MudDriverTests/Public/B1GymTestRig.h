@@ -62,6 +62,13 @@ struct FB1GymThresholds
 	/** Stretch amplitude in the last second over the first second after going taut; above 1 means growing */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	float MaxSpringAmpGrowth = -1.0f;
+
+	/** Vehicle height above the rig actor at script end; has a toggle since negative heights are valid */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m", EditCondition = "bCheckEndHeight"))
+	float MinEndHeight = 0.0f;
+
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (InlineEditConditionToggle))
+	bool bCheckEndHeight = false;
 };
 
 /**

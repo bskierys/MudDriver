@@ -207,6 +207,8 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 
 **Consequences.** Mud patches are authored as meshes on top of the landscape: a plane, a spline mesh, or a modelling-tools patch. The character walks through mud on the hard bottom; slowing the character in mud is a later polish item.
 
+**Implementation (2026-10-25, S1-13).** `B1Mud` is `ECC_GameTraceChannel1` with default Ignore. `B1MudSurface` is QueryOnly and blocks only `WorldDynamic`, the channel the Chaos suspension trace queries. `UB1VehicleMovementComponent` (not the jeep) makes its wheel traces block `B1Mud`.
+
 ---
 
 ## ADR-013 — Test rigs live in a separate `MudDriverTests` module

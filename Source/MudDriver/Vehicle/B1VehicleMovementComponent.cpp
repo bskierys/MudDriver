@@ -1,7 +1,14 @@
 #include "B1VehicleMovementComponent.h"
 #include "B1VehicleSimulation.h"
 #include "B1Log.h"
+#include "B1CollisionChannels.h"
 #include "DrawDebugHelpers.h"
+
+UB1VehicleMovementComponent::UB1VehicleMovementComponent(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	WheelTraceCollisionResponses.SetResponse(B1_ObjectChannel_Mud, ECR_Block);
+}
 
 TUniquePtr<Chaos::FSimpleWheeledVehicle> UB1VehicleMovementComponent::CreatePhysicsVehicle()
 {

@@ -231,6 +231,7 @@ void AB1GymTestRig::FinishScript()
 	}
 
 	const float Displacement = FVector::Dist(LastLocation, StartLocation) / CmPerM;
+	const float EndHeight = (LastLocation.Z - GetActorLocation().Z) / CmPerM;
 	const float AvgDt = NumFrames > 0 ? ScriptTime / NumFrames : 0.0f;
 
 	// Still above the settle speed on the last sample means it never settled.
@@ -261,6 +262,10 @@ void AB1GymTestRig::FinishScript()
 	{
 		Failures.Add(FString::Printf(TEXT("settle>%.2f"), Thresholds.MaxSettleTime));
 	}
+	if (Thresholds.bCheckEndHeight && EndHeight < Thresholds.MinEndHeight)
+	{
+		Failures.Add(FString::Printf(TEXT("endH<%.2f"), Thresholds.MinEndHeight));
+	}
 
 	FString SpringMetrics;
 	if (TestForce == EB1TestForce::Spring)
@@ -286,9 +291,9 @@ void AB1GymTestRig::FinishScript()
 
 	const bool bPassed = Failures.Num() == 0;
 	const FString Name = TestLabel.IsEmpty() ? GetName() : TestLabel;
-	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f stuck=%.2f settle=%.2f peakOsc=%.3f avgDt=%.4f frames=%d%s%s%s"),
+	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f avgDt=%.4f frames=%d%s%s%s"),
 		*Name, bPassed ? TEXT("PASS") : TEXT("FAIL"),
-		PathLength, Displacement, MaxSpeed, TimeToStuck, SettleTimeMeasured, PeakOscillation, AvgDt, NumFrames, *SpringMetrics,
+		PathLength, Displacement, MaxSpeed, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, AvgDt, NumFrames, *SpringMetrics,
 		bPassed ? TEXT("") : TEXT(" failed="), *FString::Join(Failures, TEXT(",")));
 
 	UE_LOG(LogB1Test, Display, TEXT("%s"), *Line);

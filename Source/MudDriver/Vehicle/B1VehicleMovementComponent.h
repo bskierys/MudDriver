@@ -15,6 +15,8 @@ class MUDDRIVER_API UB1VehicleMovementComponent : public UChaosWheeledVehicleMov
 
 public:
 
+	UB1VehicleMovementComponent(const FObjectInitializer& ObjectInitializer);
+
 	virtual TUniquePtr<Chaos::FSimpleWheeledVehicle> CreatePhysicsVehicle() override;
 
 	/** Spring mode anchors at the vehicle's current location */
