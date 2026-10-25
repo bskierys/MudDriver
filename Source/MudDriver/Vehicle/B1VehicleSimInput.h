@@ -44,6 +44,8 @@ struct FB1MudSimParams
 {
 	TWeakObjectPtr<UPhysicalMaterial> Material;
 	float MaxSinkDepth = 0.0f;
+	float StaticSinkDepth = 0.0f;
+	float SettleRate = 0.0f;
 	float SinkRate = 0.0f;
 	float RiseRate = 0.0f;
 	float FullSinkSlipSpeed = 1.0f;

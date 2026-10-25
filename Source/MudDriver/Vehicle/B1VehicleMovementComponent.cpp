@@ -89,6 +89,8 @@ void UB1VehicleMovementComponent::GatherMudParams(TArray<FB1MudSimParams>& OutPa
 		FB1MudSimParams& Params = OutParams.AddDefaulted_GetRef();
 		Params.Material = Mud;
 		Params.MaxSinkDepth = Mud->MaxSinkDepth;
+		Params.StaticSinkDepth = Mud->MaxSinkDepth * Mud->StaticSinkRatio;
+		Params.SettleRate = Mud->SettleRate;
 		Params.SinkRate = Mud->SinkRate;
 		Params.RiseRate = Mud->RiseRate;
 		Params.FullSinkSlipSpeed = Mud->FullSinkSlipSpeed;

@@ -8,7 +8,7 @@ UE 5.8, engine at `C:\Program Files\UE_5.8`.
 
 | Module | Type | Deps | Holds |
 |---|---|---|---|
-| `MudDriver` | Runtime | Core, CoreUObject, Engine, InputCore, EnhancedInput, ChaosVehicles, PhysicsCore, UMG, Slate, NetImgui, Projects | Game code |
+| `MudDriver` | Runtime | Core, CoreUObject, Engine, InputCore, EnhancedInput, ChaosVehicles, PhysicsCore, UMG, Slate, NetImgui; private Projects, ChaosVehiclesCore | Game code |
 | `MudDriverTests` | DeveloperTool (not in Shipping, ADR-013) | Core, CoreUObject, Engine, FunctionalTesting; private ChaosVehicles, MudDriver | Gym test rigs |
 
 Game-module symbols used by the tests need `MUDDRIVER_API` (the log categories already have it).
@@ -37,9 +37,17 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 - `FB1VehicleSimulation : UChaosWheeledVehicleSimulation` runs on the physics thread (`UpdateSimulation`). It never touches UObjects.
 - **Game → physics data:** `SetCurrentAsyncInputOutput` is non-virtual and always allocates the base async structs, so custom input can't ride the Chaos async input. The component's `Update(DeltaTime)` pushes a POD `FB1VehicleSimInput` through `SetGameThreadInput` into a `FCriticalSection`-guarded `PendingInput`; the physics step reads the latest copy.
 - **Physics → game data:** the sim copies its per-step results (`FB1VehicleSimOutput`) under a second lock. The component reads them in `Update` (`GetWheelSinkDepth`).
-- **Mud sinking (ADR-001):**
-  - Per wheel on mud, `SinkDepth` (cm) grows by `SinkRate·spin·dt` and drops by `RiseRate·rolled m·(1−spin)`, clamped to `MaxSinkDepth`.
-  - `spin = clamp(|slip speed| / FullSinkSlipSpeed)`. Non-mud contact resets the depth; airborne keeps it.
+- **Mud sinking (ADR-001):** per wheel on mud, `SinkDepth` (cm):
+  - settles at `SettleRate` to a floor of `MaxSinkDepth·StaticSinkRatio·load`, at any speed;
+  - digs below the floor at `SinkRate·spin·load`;
+  - climbs back toward the floor at `RiseRate·rolled m·(1−spin)`, never above it;
+  - is clamped to `MaxSinkDepth`.
+
+  Here `spin = clamp(|slip speed| / FullSinkSlipSpeed)` and `load` = wheel load / average load of the wheels in contact, capped at 1.5. Non-mud contact resets the depth; airborne keeps it.
+- **Sinking the vehicle (ADR-012):**
+  - `PerformSuspensionTraces` traces from a copy of the traces with each start raised by the wheel's `SinkOffset`. Chaos reads `Distance` from the real start, so the hit is `SinkOffset` deeper; `Location`/`ImpactPoint` are pushed down to match, clamped to full droop.
+  - Raising the start keeps the sweep above the thin mud slab when the chassis is low.
+  - `SinkOffset` follows `SinkDepth` instantly going down and at most 30 cm/s going up, so leaving mud doesn't pop.
   - The component keeps `KnownMudMaterials` (every mud material its wheels have touched) and sends copies of their params (`FB1MudSimParams`). The sim matches `TraceResult.PhysMaterial` by weak-pointer equality, so new mud reads as firm for about a frame.
 - Forces from the sim use `AddForce` in kg·cm/s² (N × 100).
 - **Test forces** (`EB1TestForce`: Off / Push / Spring, settings in `TestForceSettings`, category `TestForce|Config`): push = constant world +Y force; spring = one-sided spring-damper to an anchor captured at toggle time. While active, the component zeroes `SleepThreshold`, because a sleeping vehicle skips the simulation, and restores it on Off.
@@ -64,7 +72,7 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 - `/Game/B1/Mud/BP_B1MudPatch` is the placeable child, with `M_B1Mud` (a `Color` vector parameter for per-depth tints). Tints: `MI_B1Mud_Shallow/Medium/Deep`, set as the `MudSurface` material override per instance. <!-- updated 2026-10-25 -->
 
 - `UB1PhysicalMaterial_Mud` (`Mud/B1PhysicalMaterial_Mud.h`, ADR-002) holds the mud tuning:
-  - `MaxSinkDepth` (cm), `SinkRate` (cm/s at full wheelspin), `FullSinkSlipSpeed` (m/s slip that counts as full wheelspin), `RiseRate` (cm per m rolled with grip);
+  - `MaxSinkDepth` (cm), `StaticSinkRatio` (weight-only depth as a fraction of max), `SettleRate` (cm/s), `SinkRate` (extra cm/s at full wheelspin), `FullSinkSlipSpeed` (m/s slip that counts as full wheelspin), `RiseRate` (cm per m rolled with grip);
   - `FrictionVsDepth` and `RollingResistanceVsDepth` (fraction of wheel load), both `FRuntimeFloatCurve` over normalized depth;
   - `BellyDragCoefficient` (fraction of vehicle weight per m past clearance).
   - Its base `Friction` is the grip at zero depth. Chaos feeds it to the tire through `SetSurfaceFriction`, so the depth curve multiplies on top.
@@ -95,7 +103,13 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 ## Testing
 
 - `AB1GymTestRig : AFunctionalTest` (`MudDriverTests`): resolves a vehicle (explicit target, player's vehicle, or spawns `VehicleClass` with `SetRequiresControllerForInputs(false)`), waits `SettleTime`, plays an `InputScript` through the movement component setters, samples every tick and logs one line: `B1Test <name> PASS|FAIL dist= disp= vmax= stuck= settle= peakOsc= endH= avgDt= frames= [failed=...]`. `endH` is the vehicle's height above the rig actor at the end (optional `MinEndHeight` check). Optional `MaxFPS` forces `t.MaxFPS` for the run. `bAutoRun` runs it in a normal PIE session without the automation framework.
-- Rigs in `Lvl_Offroad`: `B1Gym_FullThrottle5s` (baseline ~85–88 m at 60 fps, MinDistance 50); `B1Step_Spring20/120` and `B1Step_Push20/120` (stepping checks, S1-12). Optional `TestForce` on the rig switches the jeep's test force on at script start. Spring runs log `taut`, `settleTaut`, stretch amplitude and growth. `settle=-1` means still moving at the end. `B1Mud_WheelsOnPlane` and `B1Mud_ChassisThroughRail` (folder `B1Tests/MudChannel`, on their own floors at Z≈5000) check the mud channel: wheels rest on a mud plane, and the chassis drives through a mud rail. `B1Mud_PatchSurface` drops the jeep on a `BP_B1MudPatch` (`B1MudTest_Patch`) and checks that it rests on the surface. With a B1 movement component the rig line also has `sink=a/b/c/d` (max cm per wheel), and so does the `B1Wheels` telemetry (current). `Lvl_Gym_Mud` has `B1Mud_SinkMedium` (2 s full throttle from the medium patch entry), `B1Gym_FirmSmoke` (6 s at 50 % throttle on the firm lane, ≥ 20 m; ~43 m) and `B1Gym_WallStop` (full throttle into the north wall; the jeep must stay on the floor). <!-- updated 2026-10-25 -->
+- Rigs in `Lvl_Offroad`: `B1Gym_FullThrottle5s` (baseline ~85–88 m at 60 fps, MinDistance 50); `B1Step_Spring20/120` and `B1Step_Push20/120` (stepping checks, S1-12). Optional `TestForce` on the rig switches the jeep's test force on at script start. Spring runs log `taut`, `settleTaut`, stretch amplitude and growth. `settle=-1` means still moving at the end. `B1Mud_WheelsOnPlane` and `B1Mud_ChassisThroughRail` (folder `B1Tests/MudChannel`, on their own floors at Z≈5000) check the mud channel: wheels rest on a mud plane, and the chassis drives through a mud rail. `B1Mud_PatchSurface` drops the jeep on a `BP_B1MudPatch` (`B1MudTest_Patch`) and checks that it rests on the surface. With a B1 movement component the rig line also has `sink=a/b/c/d` (max cm per wheel), and so does the `B1Wheels` telemetry (current). `Lvl_Gym_Mud` has the mud rigs:
+- `B1Mud_SinkMedium`: 2 s full throttle from the medium patch entry.
+- `B1Mud_CrossMedium`: 50 % across the medium patch, peakOsc ≤ 0.5.
+- `B1Mud_ExitMediumFull`: full throttle out of the medium patch, peakOsc ≤ 0.5.
+- `B1Mud_SinkDeepStop`: 1.5 s full throttle into deep, then brake.
+
+It also has `B1Gym_FirmSmoke` (6 s at 50 % throttle on the firm lane, ≥ 20 m; ~43 m) and `B1Gym_WallStop` (full throttle into the north wall; the jeep must stay on the floor). <!-- updated 2026-10-25 -->
 - Headless: `Scripts/RunGymTests.ps1 [-Map] [-Filter]` runs `UnrealEditor-Cmd -nullrhi` with `Automation RunTests Project.Functional Tests.<map dotted>[.<label>]; Quit`. The editor exits 0 regardless, so the script parses `Test Completed. Result={...}` lines for its exit code. Needs the editor closed.
 - Agent-side, in-editor: place/configure rigs through MCP, `StartPIE`, read `LogB1Test` with `LogsToolset.GetLogEntries`.
 

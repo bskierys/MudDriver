@@ -21,17 +21,24 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mud|Config", meta = (Units = "cm", ClampMin = "0"))
 	float MaxSinkDepth = 35.0f;
 
-	/** Sink speed at full wheelspin */
+	/** Depth a wheel settles to under its resting load, at any speed, as a fraction of MaxSinkDepth */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mud|Config", meta = (ClampMin = "0", ClampMax = "1"))
+	float StaticSinkRatio = 0.45f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mud|Config", meta = (Units = "cm/s", ClampMin = "0"))
-	float SinkRate = 20.0f;
+	float SettleRate = 25.0f;
+
+	/** Extra sink speed at full wheelspin, on top of settling */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mud|Config", meta = (Units = "cm/s", ClampMin = "0"))
+	float SinkRate = 30.0f;
 
 	/** Wheel surface speed over ground speed that counts as full wheelspin */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mud|Config", meta = (Units = "m/s", ClampMin = "0.1"))
-	float FullSinkSlipSpeed = 5.0f;
+	float FullSinkSlipSpeed = 3.0f;
 
-	/** Depth recovered per metre rolled with grip */
+	/** Depth recovered per metre rolled with grip, down to the static depth */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mud|Config", meta = (ClampMin = "0"))
-	float RiseRate = 5.0f;
+	float RiseRate = 2.0f;
 
 	/** Multiplies the tire friction */
 	UPROPERTY(EditAnywhere, Category = "Mud|Config")

@@ -31,6 +31,8 @@ Applies whenever you use the `unreal-mcp` server (Epic's ModelContextProtocol pl
 - **Collision profiles on static mesh actors:** set `bUseDefaultCollision=false` on the component first, then `BodyInstance` `collisionProfileName`, `objectType` and `collisionEnabled`. With default collision on (BasicShapes do this), the mesh's BlockAll wins and the profile is silently ignored, even after a reload.
 - **New BP from a C++ class:** `BlueprintTools.create(folder_path, asset_name, asset_type={"refPath": "/Script/MudDriver.<Class>"})`.
 - **Viewport/asset captures** return base64 PNG that overflows the tool output. Decode the saved result file to a PNG in the scratchpad and Read it. `CaptureViewport` needs an `annotations` object; pass `gridSpacing: 0, maxLabelDistance: 0` to disable the overlays.
+- **Capturing PIE/Simulate:** `CaptureViewport` with a `captureTransform` renders the editor world, not the play world. Set the camera with `SetCameraTransform` before `StartPIE` (Simulate keeps the editor camera), then use `CaptureEditorImage`.
+- **Array properties:** `set_properties` can't resize an array and change its existing elements in one call ("insertion points are ambiguous"). Set the elements at the current size first, then the full array.
 - **ObjectTools arg names:** `list_properties(instance)`, `get_properties(instance, properties[])`, `set_properties(instance, values)` where `values` is a JSON string.
 
 ## Not available

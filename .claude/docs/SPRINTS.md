@@ -145,7 +145,23 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds; a rig at full throttle on medium mud logs a rising `SinkDepth` per wheel.
   **User check:** —
 
-- [ ] **S1-19** Sinking via suspension trace offset (3 h) _(requires S1-18)_
+- [x] **S1-19** Sinking via suspension trace offset (3 h) _(requires S1-18)_ <!-- done: 2026-10-25 -->
+  Result: `FB1VehicleSimulation::PerformSuspensionTraces` traces from a copy of the traces with each start raised by the wheel's `SinkOffset`. Chaos reads `Distance` as from the real start, so the hit lands exactly `SinkOffset` deeper; `Location`/`ImpactPoint` move down to match, clamped to the real sweep length (full droop). Raising the start keeps the sweep above the 10 cm mud slab when the chassis is low. `SinkOffset` follows `SinkDepth` with a 50 cm/s rate limit. No distance-based entry ramp: depth always starts at 0 on mud entry, so the rate limit covers exits, landings and material changes.
+  - Visual (Simulate + `CaptureEditorImage`): jeep on the deep patch, front wheels down in the mud, z −35.8 cm vs +2.6 cm on firm ground.
+  - New rigs in `Lvl_Gym_Mud`: `B1Mud_ExitMediumFull` (full throttle from just before the medium patch; exits with the right front 25–29 cm deep at 50–60 km/h): PASS, peakOsc=0.204 vs 0.16 on firm, limit 0.5. `B1Mud_CrossMedium` (50 %, for S1-23; no slip, so no sink): peakOsc=0.163. `B1Mud_SinkDeepStop` (1.5 s full throttle then brake). `B1Mud_SinkMedium` now ends endH −1.04 (was −0.98).
+  - Found: an unloaded wheel at full droop (open diff, one wheel spinning at 16–19 m/s) keeps spinning and sinks to `MaxSinkDepth`. Sinking doesn't depend on wheel load yet → backlog. Brake at standstill engages reverse in the template, which matters for rig scripts.
+  - **Rework after the user's playtest** ("only fronts sink", "should sink from weight at any speed", "too little sinking"):
+    - Weight sets a static floor `StaticSinkDepth = MaxSinkDepth·StaticSinkRatio (0.45)·load`, reached at `SettleRate` (25 cm/s) at any speed. Wheelspin digs below it (`SinkRate·spin·load`); rolling with grip climbs back only to the floor.
+    - Load = wheel load / average load of the wheels in contact (Chaos's reported load sits around 0.6× `RestingForce` at rest), capped at 1.5. An unloaded wheel no longer digs (closes the S1-19 backlog item).
+    - Presets: SinkRate 15/30/45, RiseRate 4/2/1, FullSinkSlipSpeed 3 m/s.
+    - `SinkOffset` limits only rising, now at 30 cm/s (50 gave peakOsc 0.608 on the fast exit).
+    - `ChaosVehiclesCore` is now a private dependency (needed for `Setup()`).
+  - Headless after the rework (gym 6/6, `Lvl_Offroad` 8/8 PASS), sink per wheel F/F/R/R:
+    - User check ✅: "The mud sinking feels better now."
+    - CrossMedium (50 %): sink=16/16/20/20, peakOsc 0.361.
+    - SinkMedium (2 s full throttle): 35/35/24/24, endH −1.28 (30 cm lower).
+    - ExitMediumFull: 35/35/23/23, peakOsc 0.410 (limit 0.5).
+    - SinkDeepStop: 70×4, endH −1.63; the chassis rests on the hard bottom.
   Override `PerformSuspensionTraces`: on mud, offset the hit point down by `SinkDepth`, ramped in over the first ~0.5 m of the patch.
   ⚠️ Note: watch for suspension pops at patch edges and when `SinkDepth` changes quickly. Rate-limit the offset change.
   **Done:** builds; a viewport capture shows the jeep sitting visibly lower in deep mud; a rig records no suspension spike > threshold at the patch entry.
@@ -179,6 +195,10 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   You playtest `Lvl_Gym_Mud` and tune live. The agent writes the tuned values into the presets and re-runs S1-23 (thresholds get adjusted if your feel disagrees). You also check `stat unit` on the laptop.
   **Done:** the suite passes with the tuned values.
   **User check:** ✅ sign-off: "mud rewards driving slowly with intent".
+
+### Backlog (found during the sprint)
+
+- ~~Sinking ignores wheel load.~~ Fixed in the S1-19 rework: static depth and digging both scale with relative wheel load. _(found in S1-19)_
 
 ---
 

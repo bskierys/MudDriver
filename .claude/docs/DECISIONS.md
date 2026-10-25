@@ -16,6 +16,12 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 
 **Alternatives.** Authored fixed-depth zones (simpler, but wheelspin has no consequence). Layered authored and dynamic depth (more parameters, no clear gain for the prototype).
 
+**Amended 2026-10-25 (S1-19 playtest).** Slip-only sinking felt wrong: only the spinning front wheels sank, and careful driving didn't sink at all. Sinking now has two parts:
+- **Weight:** every wheel on mud settles to a static depth (`MaxSinkDepth·StaticSinkRatio`, scaled by the wheel's load relative to the average), at any speed.
+- **Wheelspin:** digs below that, up to `MaxSinkDepth`. Rolling with grip climbs back only to the static depth.
+
+Digging also scales with load, so an unloaded wheel spinning in the air doesn't dig. Slow, careful driving still pays off: it avoids the dig, not the settle.
+
 ---
 
 ## ADR-002 — Mud parameters live in a custom physical material
@@ -210,6 +216,8 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 **Consequences.** Mud patches are authored as meshes on top of the landscape: a plane, a spline mesh, or a modelling-tools patch. The character walks through mud on the hard bottom; slowing the character in mud is a later polish item.
 
 **Implementation (2026-10-25, S1-13).** `B1Mud` is `ECC_GameTraceChannel1` with default Ignore. `B1MudSurface` is QueryOnly and blocks only `WorldDynamic`, the channel the Chaos suspension trace queries. `UB1VehicleMovementComponent` (not the jeep) makes its wheel traces block `B1Mud`.
+
+**Implementation (2026-10-25, S1-19).** The offset is done by raising each trace start by the sink offset, not by moving the hit afterwards. A sunk chassis would otherwise start the sweep inside or below the 10 cm mud slab. Chaos measures `Distance` from the real start, so the hit lands the offset deeper. A rise-only rate limit (30 cm/s) replaces the planned entry ramp: depth starts at 0 on entry and only changes at the mud rates.
 
 ---
 

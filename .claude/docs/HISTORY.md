@@ -261,3 +261,41 @@ The mud presets were on the gym patches (S1-17). ADR-001 needs a per-wheel depth
 
 ### Open follow-ups
 - S1-19: offset the suspension hit by `SinkDepth` (`PerformSuspensionTraces`), with a rate limit and an entry ramp.
+
+---
+
+## 2026-10-25 — S1-19 sinking via suspension trace offset + weight sinking
+
+### Context
+Depth was tracked (S1-18) but didn't move the jeep. The first version (hit offset by `SinkDepth`, slip-only sinking) worked in the rigs. The user's playtest then found that only the front wheels sank, nothing sank without throttle, and the effect was too weak outside deep mud.
+
+### What was built
+- `FB1VehicleSimulation::PerformSuspensionTraces`: traces from starts raised by `SinkOffset`, then pushes `Location`/`ImpactPoint` down, clamped to full droop. `UpdateSinkOffset` has a rise-only limit of 30 cm/s.
+- Weight sinking: `StaticSinkRatio` (0.45) and `SettleRate` (25 cm/s) on `UB1PhysicalMaterial_Mud`. A per-wheel floor scaled by relative load; the dig is also scaled by load.
+- Presets retuned: SinkRate 15/30/45, RiseRate 4/2/1, FullSinkSlipSpeed 3 m/s.
+- Rigs in `Lvl_Gym_Mud`: `B1Mud_CrossMedium`, `B1Mud_ExitMediumFull`, `B1Mud_SinkDeepStop`.
+- `ChaosVehiclesCore` added as a private dependency of `MudDriver`.
+
+### Decisions made
+- ADR-001 amended: weight settles every wheel to a static depth, wheelspin digs deeper. ADR-012 implementation note: raised trace start; a rise-only limit instead of the entry ramp.
+- Load is relative to the average wheel load, not `RestingForce`.
+- The rig peakOsc limit for patch transitions is 0.5 m/s (firm driving is about 0.17).
+
+### What we learned
+- In 5.8 the suspension reads `HitResult.Distance` (length) and `Location`/`ImpactPoint` (constraint target, friction point); all three must move together.
+- A sunk chassis drags the sweep start into the 10 cm slab. Raising the start by the offset fixes it, and Chaos's `Distance` arithmetic does the rest.
+- Chaos's reported wheel load at rest is about 0.55–0.65× `RestingForce` (sprung mass × g); the constraint suspension carries the rest.
+- Open-diff behaviour: under full throttle the front axle unloads and one wheel spins at 16–19 m/s. With slip-only sinking that free wheel dug to the max.
+- Template: brake at a standstill engages reverse (matters for rig scripts).
+- MCP: `CaptureViewport` with a transform renders the editor world, so use `CaptureEditorImage` during Simulate; array properties can't be resized and edited in one `set_properties` call. Both are in `.claude/rules/mcp-tools.md`.
+- Headless after the rework (sink F/F/R/R):
+  - CrossMedium 16/16/20/20, peakOsc 0.361.
+  - SinkMedium 35/35/24/24, endH −1.28.
+  - ExitMediumFull 35/35/23/23, peakOsc 0.410 (0.608 with a 50 cm/s rise limit).
+  - SinkDeepStop 70×4, endH −1.63.
+  - Gym 6/6 and `Lvl_Offroad` 8/8 PASS.
+- User check: "The mud sinking feels better now."
+
+### Open follow-ups
+- S1-20: traction and rolling resistance vs depth. In deep mud the jeep currently rests on the hard bottom but can still drive out.
+- The visual capture used Simulate + `CaptureEditorImage`; there's no saved artifact in the repo.
