@@ -119,7 +119,7 @@ GitHub Copilot users: these are not slash commands in Copilot, they are conventi
 Permanent `dev` integration branch. `main` is release-only.
 
 - **`dev` is permanent.** All day-to-day work commits to `dev` (or a topic branch off `dev`). Never deleted, never merged away.
-- **`main` is release-only.** Advances only via a long-lived PR from `dev` → `main`. `/git-pr` creates or updates that single PR.
+- **`main` is release-only.**
 - **Never** commit directly to `main`.
 - **Never** push. We work locally.
 - **Never** use `git add -A` — always stage specific files.
