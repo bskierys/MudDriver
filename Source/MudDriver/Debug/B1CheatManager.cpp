@@ -2,6 +2,9 @@
 #include "B1Jeep.h"
 #include "B1Log.h"
 #include "B1VehicleMovementComponent.h"
+#include "B1PlayerState.h"
+#include "B1AbilitySystemComponent.h"
+#include "B1VehicleAttributeSet.h"
 #include "GameFramework/PlayerController.h"
 #include "MudDriver.h"
 #include "NetImguiModule.h"
@@ -72,4 +75,57 @@ void UB1CheatManager::B1TestForce(const FString& Mode)
 	}
 
 	Jeep->GetB1VehicleMovement()->SetTestForce(*NewMode);
+}
+
+UB1AbilitySystemComponent* UB1CheatManager::GetPlayerASC(const TCHAR* CheatName) const
+{
+	const AB1PlayerState* PlayerState = GetOuterAPlayerController()->GetPlayerState<AB1PlayerState>();
+	UB1AbilitySystemComponent* ASC = PlayerState ? PlayerState->GetB1AbilitySystemComponent() : nullptr;
+	if (!ASC)
+	{
+		UE_LOG(LogB1Vehicle, Warning, TEXT("%s: no B1 PlayerState ASC (game mode isn't AB1GameMode?)"), CheatName);
+	}
+	return ASC;
+}
+
+void UB1CheatManager::B1DamageVehicle(float Amount)
+{
+	UB1AbilitySystemComponent* ASC = GetPlayerASC(TEXT("B1DamageVehicle"));
+	if (!ASC)
+	{
+		return;
+	}
+
+	const float Before = ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute());
+	const bool bApplied = ASC->ApplyVehicleDamage(Amount);
+	UE_LOG(LogB1Vehicle, Display, TEXT("B1DamageVehicle %.1f: Condition %.1f -> %.1f%s"), Amount, Before,
+		ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute()), bApplied ? TEXT("") : TEXT(" (DamageEffect not set)"));
+}
+
+void UB1CheatManager::B1SetCondition(float Value)
+{
+	UB1AbilitySystemComponent* ASC = GetPlayerASC(TEXT("B1SetCondition"));
+	if (!ASC)
+	{
+		return;
+	}
+
+	const float Before = ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute());
+	const bool bApplied = ASC->SetVehicleCondition(Value);
+	UE_LOG(LogB1Vehicle, Display, TEXT("B1SetCondition %.1f: Condition %.1f -> %.1f%s"), Value, Before,
+		ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute()), bApplied ? TEXT("") : TEXT(" (DamageEffect not set)"));
+}
+
+void UB1CheatManager::B1AddFuel(float Litres)
+{
+	UB1AbilitySystemComponent* ASC = GetPlayerASC(TEXT("B1AddFuel"));
+	if (!ASC)
+	{
+		return;
+	}
+
+	const float Before = ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute());
+	const bool bApplied = ASC->AddVehicleFuel(Litres);
+	UE_LOG(LogB1Vehicle, Display, TEXT("B1AddFuel %.1f: Fuel %.1f -> %.1f%s"), Litres, Before,
+		ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute()), bApplied ? TEXT("") : TEXT(" (fuel effect not set)"));
 }

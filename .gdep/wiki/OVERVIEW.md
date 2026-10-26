@@ -16,8 +16,8 @@ stale: false
 
 | Metric | Value |
 |--------|-------|
-| Files | **34** |
-| Classes | **33** |
+| Files | **37** |
+| Classes | **36** |
 | Circular deps | **0** |
 | Dead code candidates | **0** |
 
@@ -39,10 +39,10 @@ stale: false
 - Abilities (C++): 0
 - Effects (C++): 0
 - AttributeSets: 1
-- GameplayTags (in assets): 0 high-confidence / 14 low
-- GAS .uassets — IS-A: GA 0 / GE 0 / AS 0 / ABP 1  |  Referencers: 7
+- GameplayTags (in assets): 0 high-confidence / 18 low
+- GAS .uassets — IS-A: GA 0 / GE 3 / AS 0 / ABP 1  |  Referencers: 7
 - Analysis confidence: **HIGH** (cpp_source_regex + binary_pattern_match)
-- Coverage: 123/123 assets (100.0%)
+- Coverage: 128/128 assets (100.0%)
 
 ---
 See [[index]] for the full wiki page catalog.

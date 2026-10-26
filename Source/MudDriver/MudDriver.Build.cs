@@ -21,7 +21,8 @@ public class MudDriver : ModuleRules
 			"NetImgui",
 			"GameplayAbilities",
 			"GameplayTags",
-			"GameplayTasks"
+			"GameplayTasks",
+			"DeveloperSettings"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {

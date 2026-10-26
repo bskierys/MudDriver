@@ -18,4 +18,18 @@ public:
 	/** off | push | spring. Spring anchors at the jeep's current location */
 	UFUNCTION(Exec)
 	void B1TestForce(const FString& Mode);
+
+	UFUNCTION(Exec)
+	void B1DamageVehicle(float Amount);
+
+	UFUNCTION(Exec)
+	void B1SetCondition(float Value);
+
+	/** Negative drains */
+	UFUNCTION(Exec)
+	void B1AddFuel(float Litres);
+
+private:
+
+	class UB1AbilitySystemComponent* GetPlayerASC(const TCHAR* CheatName) const;
 };

@@ -2,6 +2,9 @@
 #include "B1Log.h"
 #include "B1PhysicalMaterial_Mud.h"
 #include "B1VehicleMovementComponent.h"
+#include "B1VehicleAttributeSet.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemGlobals.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "HAL/IConsoleManager.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
@@ -17,6 +20,16 @@ namespace B1VehicleTelemetry
 		TEXT("b1.Mud.Telemetry"),
 		true,
 		TEXT("Write a 2 Hz per-wheel mud line to LogB1Physics while the vehicle touches mud."));
+
+	static TAutoConsoleVariable<bool> CVarStatusTelemetry(
+		TEXT("b1.Vehicle.StatusTelemetry"),
+		true,
+		TEXT("Write a 2 Hz condition/fuel/tags line to LogB1Vehicle for vehicles with an ASC."));
+
+	bool IsStatusEnabled()
+	{
+		return CVarStatusTelemetry.GetValueOnGameThread();
+	}
 
 	bool IsEnabled()
 	{
@@ -79,5 +92,25 @@ namespace B1VehicleTelemetry
 		}
 
 		UE_LOG(LogB1Physics, Log, TEXT("%s"), *Line);
+	}
+
+	void LogStatus(const AActor& Vehicle)
+	{
+		const UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(&Vehicle);
+		if (!ASC)
+		{
+			return;
+		}
+
+		FGameplayTagContainer Tags;
+		ASC->GetOwnedGameplayTags(Tags);
+
+		UE_LOG(LogB1Vehicle, Log, TEXT("B1Status %s cond=%.1f/%.0f fuel=%.2f/%.0f tags=%s"),
+			*Vehicle.GetName(),
+			ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute()),
+			ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetMaxConditionAttribute()),
+			ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute()),
+			ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetMaxFuelAttribute()),
+			*Tags.ToStringSimple());
 	}
 }

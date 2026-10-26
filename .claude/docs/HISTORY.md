@@ -533,3 +533,31 @@ Sprint 1 closed. Sprint 2 was a one-line placeholder in SPRINTS.md; detailed it,
 ### Open follow-ups
 - S2-01's tag-picker check moved to S2-05 (first GE BP).
 - Nothing uses `AB1PlayerState` until S2-03 sets it on `AB1GameMode`.
+
+---
+
+## 2026-10-26 — GAS wiring, effects and status window (S2-03..S2-06)
+
+### Context
+S2-01/02 had the tags, player state and attribute set, but no game mode used them. This session wired the ASC into play, added the first gameplay effects and a debug view of condition and fuel.
+
+### What was built
+- S2-03: `AB1GameMode` (player state class) and `AB1PlayerController` (`InitAbilityActorInfo` + `State.Avatar.InVehicle` loose tag). BPs `BP_B1GameMode` / `BP_B1PlayerController` in `/Game/B1/Player/`; `BP_B1GymGameMode` reparented, `Lvl_Offroad` uses `BP_B1GameMode`. The template controller now accepts any pawn and hides the vehicle UI on foot.
+- S2-04: `AB1Jeep` implements `IAbilitySystemInterface` via a weak pointer to the player state's ASC, set in `PossessedBy`.
+- S2-05: GEs `GE_B1Damage_Impact`, `GE_B1FuelDrain`, `GE_B1FuelAdd` (instant, SetByCaller); `UB1GASSettings` developer settings; ASC helpers; cheats `B1DamageVehicle`, `B1SetCondition`, `B1AddFuel`.
+- S2-06: Debug → Vehicle Status ImGui window and the `B1Status` telemetry line (`b1.Vehicle.StatusTelemetry`).
+- Gym 16/16 and `Lvl_Offroad` 8/8 after every task, numbers unchanged.
+
+### Decisions made
+- GE classes are looked up through a `UDeveloperSettings` (soft class refs in `DefaultGame.ini`), not hard-coded paths.
+- The jeep keeps its ASC pointer after unpossess, so its status stays readable when parked.
+- Fuel add and drain are separate GEs; the ASC helper picks by sign.
+
+### What we learned
+- MCP can author GE BPs: `BlueprintTools.create` with `asset_type=/Script/GameplayAbilities.GameplayEffect`, then `set_properties` on the CDO `Modifiers` with a SetByCaller magnitude JSON.
+- The template controller respawned `BP_OffroadCar_Pawn`; the B1 controller's `VehiclePawnClass` had to be set to `BP_B1Jeep`.
+- A local `bHidden` in the template controller shadowed `AActor::bHidden` (C4458) and failed the build.
+
+### Open follow-ups
+- Pre-existing `Lvl_Offroad` load error (missing dependent package on one external actor), logged in the backlog.
+- User check: S1-27 recenter retune.

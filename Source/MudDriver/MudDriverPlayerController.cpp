@@ -97,7 +97,19 @@ void AMudDriverPlayerController::Tick(float Delta)
 {
 	Super::Tick(Delta);
 
-	if (IsValid(VehiclePawn) && IsValid(VehicleUI))
+	if (!IsValid(VehicleUI))
+	{
+		return;
+	}
+
+	const bool bDriving = IsValid(VehiclePawn) && GetPawn() == VehiclePawn;
+	const bool bUIHidden = VehicleUI->GetVisibility() == ESlateVisibility::Collapsed;
+	if (bDriving == bUIHidden)
+	{
+		VehicleUI->SetVisibility(bDriving ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	}
+
+	if (bDriving)
 	{
 		VehicleUI->UpdateSpeed(VehiclePawn->GetChaosVehicleMovement()->GetForwardSpeed());
 		VehicleUI->UpdateGear(VehiclePawn->GetChaosVehicleMovement()->GetCurrentGear());
@@ -108,11 +120,13 @@ void AMudDriverPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	// get a pointer to the controlled pawn
-	VehiclePawn = CastChecked<AMudDriverPawn>(InPawn);
+	// any pawn can be possessed; only vehicles get the UI and respawn
+	VehiclePawn = Cast<AMudDriverPawn>(InPawn);
 
-	// subscribe to the pawn's OnDestroyed delegate
-	VehiclePawn->OnDestroyed.AddDynamic(this, &AMudDriverPlayerController::OnPawnDestroyed);
+	if (VehiclePawn)
+	{
+		VehiclePawn->OnDestroyed.AddUniqueDynamic(this, &AMudDriverPlayerController::OnPawnDestroyed);
+	}
 }
 
 void AMudDriverPlayerController::OnPawnDestroyed(AActor* DestroyedPawn)

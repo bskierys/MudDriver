@@ -332,6 +332,11 @@ void AMudDriverPawn::LogTelemetry()
 	{
 		B1VehicleTelemetry::LogMud(*B1Movement);
 	}
+
+	if (B1VehicleTelemetry::IsStatusEnabled())
+	{
+		B1VehicleTelemetry::LogStatus(*this);
+	}
 }
 
 void AMudDriverPawn::DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos)

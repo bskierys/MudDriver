@@ -316,25 +316,39 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds.
   **User check:** —
 
-- [ ] **S2-03** `AB1GameMode` + `AB1PlayerController` (2.5 h) _(requires S2-02)_
+- [x] **S2-03** `AB1GameMode` + `AB1PlayerController` (2.5 h) _(requires S2-02)_ <!-- done: 2026-10-26 -->
+  Result:
+  - C++ `Player/B1GameMode` (abstract, `PlayerStateClass` = `AB1PlayerState`) and `Player/B1PlayerController` (abstract; `OnPossess` → `InitAbilityActorInfo(PS, pawn)`, `State.Avatar.InVehicle` loose tag count 1 for `AWheeledVehiclePawn`, else 0).
+  - Template `AMudDriverPlayerController::OnPossess` uses `Cast` (was `CastChecked`) and binds respawn only for vehicles (`AddUniqueDynamic`). `Tick` collapses the vehicle UI when not driving and restores it (`SelfHitTestInvisible`) only if it was collapsed.
+  - Assets in `/Game/B1/Player/`: `BP_B1PlayerController` (duplicate of `BP_OffRoadPlayerController`, reparented; IMCs/UI unchanged; `VehiclePawnClass` → `BP_B1Jeep`, the template respawned the template car) and `BP_B1GameMode` (duplicate of `BP_OffRoadGameMode`, reparented, controller → `BP_B1PlayerController`). `BP_B1GymGameMode` reparented onto `BP_B1GameMode`. `Lvl_Offroad` WorldSettings `DefaultGameMode` → `BP_B1GameMode`.
+  - PIE `Lvl_Offroad`: inspector shows Condition 100, Fuel 60, MaxCondition 100, MaxFuel 60, Damage 0 on `B1PlayerState_0`; tags `State.Avatar.InVehicle`. Headless: gym 16/16, `Lvl_Offroad` 8/8 PASS, numbers as in Sprint 1.
+  - The `LoadErrors` line for external actor `ZNZM1Q9PKXHV07GMT8Q6NN` in `Lvl_Offroad` predates this (in every log since 2026-10-25) → backlog.
   - `AB1GameMode : AOffroadGameMode` (keeps the `Player0` start pick) sets `PlayerStateClass` and `PlayerControllerClass`. `BP_B1GymGameMode` and the `Lvl_Offroad` game mode get reparented to it via MCP.
   - `AB1PlayerController : AMudDriverPlayerController`. `OnPossess` works for any pawn: the vehicle cast may be null, the vehicle UI shows only while driving, respawn binds only to vehicles. It calls `InitAbilityActorInfo(PlayerState, NewPawn)` and sets `State.Avatar.InVehicle` (loose tag) for vehicles.
   - Recommendation: subclass the template controller instead of rewriting it; the template keeps its input/UI code, we fix only the vehicle-only assumptions in the base `OnPossess` (null-safe cast).
   **Done:** builds; both rig suites PASS headless; in PIE, the GAS inspector toolset shows the ASC with `UB1VehicleAttributeSet` on the PlayerState.
   **User check:** drive `Lvl_Gym_Mud` and `Lvl_Offroad`: everything works as before (UI, respawn, flip reset, cheats).
 
-- [ ] **S2-04** Jeep ↔ ASC link (1 h) _(requires S2-03)_
+- [x] **S2-04** Jeep ↔ ASC link (1 h) _(requires S2-03)_ <!-- done: 2026-10-26 -->
+  Result: `AB1Jeep : IAbilitySystemInterface`, `TWeakObjectPtr` to the driver's PlayerState ASC set in `PossessedBy` (via `UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(PlayerState)`), never cleared. `UnPossessed` zeroes `State.Avatar.InVehicle`. Headless log: `BP_B1Jeep_C_0 ASC link: AbilitySystemComponent` (the PS subobject). Gym 16/16, `Lvl_Offroad` 8/8 PASS.
   `AB1Jeep` implements `IAbilitySystemInterface` through a `TWeakObjectPtr` to the PlayerState ASC, set in `PossessedBy` and kept after unpossess (ADR-004). `UnPossessed` clears the `State.Avatar.InVehicle` tag; vehicle state tags stay owned by the jeep.
   **Done:** builds; `UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Jeep)` returns the PlayerState ASC in PIE (logged once to `LogB1Vehicle`).
   **User check:** —
 
-- [ ] **S2-05** Damage/fuel GEs + cheats (1.5 h) _(requires S2-04)_
+- [x] **S2-05** Damage/fuel GEs + cheats (1.5 h) _(requires S2-04)_ <!-- done: 2026-10-26 -->
+  Result:
+  - MCP can author GEs: `BlueprintTools.create(asset_type=GameplayEffect)` + `set_properties` on the CDO `Modifiers` (JSON: `Attribute{AttributeName, Attribute:"/Script/MudDriver.B1VehicleAttributeSet:Damage", AttributeOwner}`, `ModifierOp:"AddBase"`, `ModifierMagnitude{MagnitudeCalculationType:"SetByCaller", SetByCallerMagnitude{DataTag{TagName}}}`). The `Data.*` native tags resolved, which covers the S2-01 tag check.
+  - `/Game/B1/GAS/GE_B1Damage_Impact` (Damage += SetByCaller `Data.Damage`), `GE_B1FuelDrain` and `GE_B1FuelAdd` (Fuel += SetByCaller `Data.Fuel`, signed litres; drain passes a negative value). All instant.
+  - `UB1GASSettings` (`UDeveloperSettings`, Project Settings → B1 GAS, `DefaultGame.ini`) holds the three GE classes as soft refs; new module dep `DeveloperSettings`. `UB1AbilitySystemComponent::ApplySetByCallerEffectToSelf`.
+  - Cheats on `UB1CheatManager`: `B1DamageVehicle`, `B1SetCondition` (damage = current − value, negative repairs), `B1AddFuel` (negative drains). Each logs before → after to `LogB1Vehicle`.
+  - Headless `-game` with ExecCmds: Condition 100 → 75 → 90 (set) → 0 (damage 500, clamped); Fuel 60 → 10 → 60 (add 100, clamped to MaxFuel).
   `GE_B1Damage_Impact` (instant, SetByCaller `Data.Damage`), `GE_B1FuelDrain` / `GE_B1FuelAdd` (instant, SetByCaller `Data.Fuel`) in `/Game/B1/GAS/`. Cheats `B1DamageVehicle <amount>`, `B1SetCondition <value>`, `B1AddFuel <litres>` (negative drains).
   🔍 Research first: whether MCP can create a `UGameplayEffect` BP and set its modifiers array. Fallback: native GE subclasses (`UB1GE_Damage`, …) configured in the constructor.
   **Done:** builds; headless `-ExecCmds="EnableCheats,B1DamageVehicle 25"` logs Condition 100 → 75; the S2-01 tags show in the GE's tag picker.
   **User check:** `B1DamageVehicle 30`, `B1SetCondition 100`, `B1AddFuel -50`: the values change as expected (S2-06 window or `showdebug abilitysystem`).
 
-- [ ] **S2-06** NetImGui "Vehicle Status" + telemetry (2 h) _(requires S2-05)_
+- [x] **S2-06** NetImGui "Vehicle Status" + telemetry (2 h) _(requires S2-05)_ <!-- done: 2026-10-26 -->
+  Result: `Debug/B1ImGuiVehicleStatus` (Debug → Vehicle Status): avatar name, Condition/Fuel bars, buttons Refill / +10 L / −10 L / Empty / Damage 10 / Repair, owned-tag list. Reads the first player's `AB1PlayerState`, so it works on foot too. Damage/fuel logic moved to `UB1AbilitySystemComponent::ApplyVehicleDamage/SetVehicleCondition/AddVehicleFuel`, shared by cheats and buttons. CVar `b1.Vehicle.StatusTelemetry` (default on): `B1Status <vehicle> cond= fuel= tags=` to `LogB1Vehicle` at 2 Hz, from the pawn telemetry timer, only for vehicles with an ASC (rig-spawned jeeps skip it). Headless: after `B1DamageVehicle 30`, `B1AddFuel -45` → `B1Status BP_B1Jeep_C_0 cond=70.0/100 fuel=15.00/60 tags=State.Avatar.InVehicle`. Gym 16/16, `Lvl_Offroad` 8/8 PASS. Window untested on the agent side (no NetImGui client).
   New window `Debug/B1ImGuiVehicleStatus` (Debug → Vehicle Status): Condition and Fuel bars, active tags on the ASC, buttons for add fuel / refill / damage 10 / repair. CVar `b1.Vehicle.StatusTelemetry`: `B1Status cond= fuel= tags=` to `LogB1Vehicle` at 2 Hz. Fuel rate fields join in S2-07.
   **Done:** builds; the telemetry line appears in a headless run with the CVar on.
   **User check:** the window reads well while driving, and the buttons work.
@@ -409,4 +423,4 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
 
 ### Backlog (found during the sprint)
 
-- _(empty)_
+- `Lvl_Offroad` load logs `LoadErrors: ... /Lvl_Offroad/B/9M/ZNZM1Q9PKXHV07GMT8Q6NN, a dependent package None was not available`. Present since at least 2026-10-25; rigs pass. Find the actor and fix or delete its broken reference. _(found in S2-03)_
