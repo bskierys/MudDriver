@@ -167,10 +167,46 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds; a viewport capture shows the jeep sitting visibly lower in deep mud; a rig records no suspension spike > threshold at the patch entry.
   **User check:** drive in and out of the patches: does the jeep sink believably, with no pops?
 
-- [ ] **S1-20** Traction + rolling resistance vs depth (3 h) _(requires S1-18)_
+- [x] **S1-20** Traction + rolling resistance vs depth (3 h) _(requires S1-18)_ <!-- done: 2026-10-25 -->
+  Result: `FB1VehicleSimulation::ApplyWheelFrictionForces` override.
+  - **Traction:** before the base call, each mud wheel's `FrictionMultiplier` is scaled by `FrictionVsDepth`, then restored. The base call sets `SurfaceFriction` from the material itself, so the multiplier is the only hook.
+  - **Rolling resistance:** after the base call. Size is `RollingResistanceVsDepth` × the wheel's share of vehicle weight (mass·g / wheels in contact × relative load). It acts along the steered wheel forward at the contact point.
+    - It opposes motion; below 1 cm/s it opposes the tire's push, like static friction.
+    - It's capped at the tire's push + 0.4 × the stopping force, so a stuck jeep with spinning wheels sits still instead of creeping or jittering.
+  - Curves are copied to the physics thread as `FRichCurve`s in `FB1MudSimParams`; relative loads are shared with sinking.
+  - **Speed drag:** `SpeedDragCoefficient` × normalized depth × (wheel speed m/s)² is added to the resistance coefficient. It bites hard at speed and barely matters below ~10 km/h.
+  - **Climbing out:** `SinkOffset` rise is limited to max(30 cm/s, 0.5 × wheel speed), i.e. 0.5 cm per cm rolled, so a fast exit doesn't keep driving sunk into firm ground.
+  - Telemetry has `mu=` (curve value) and `rr=` (N, including speed drag) per wheel.
+  - First pass (stuck-within-2–4-s target, medium RR up to 0.55 W, `SinkRate` 8) failed the user's playtest:
+    - slow driving into medium got stuck for good, at any throttle;
+    - deep at full speed barely sank or slowed;
+    - after leaving deep the jeep stayed sunk into the firm tiles.
+  - Causes:
+    - From a standstill, 40 % throttle gives only ~290 Nm per wheel (~570 N at the tire, engine near idle). That was below medium's static rolling resistance at resting depth.
+    - Deep had no speed-dependent drag.
+    - The 30 cm/s rise limit spans metres at speed.
+  - **Design change (user's feel over the old criterion):** medium is a slog, not a trap. Grip at full depth stays above rolling resistance, and full-throttle wheelspin digs to full depth and caps speed via drag. Full stops are for deep (belly drag, S1-21). Rolling resistance values are now in the real-world mud range.
+  - Presets (friction curve end / RR curve / SpeedDrag; other params as S1-19):
+    - Shallow 0.8 / 0.02→0.08 / 0.006;
+    - Medium 0.5 / 0.02→0.12 / 0.018, `SinkRate` back to 30;
+    - Deep 0.4 / 0.03→0.25 / 0.03, `SettleRate` 25→60.
+  - New rigs in `Lvl_Gym_Mud` (`B1Tests`), headless results:
+    - `B1Mud_DigInMedium`: 4 s full throttle from rest in medium, ≤ 15 m. dist 13.6, vmax 4.4 m/s (~16 km/h, wheels spinning at full depth).
+    - `B1Mud_RestartMedium`: 6 s at 40 % from rest in medium, ≥ 5 m. dist 10.9.
+    - `B1Mud_RecoverMedium`: 2 s full, then 6 s at 35 %, ≥ 6 m. dist 19.2.
+    - `B1Mud_CrawlIntoMedium`: 14 s at 30 % from firm, ≥ 25 m. dist 25.7, crosses.
+    - `B1Mud_DeepRunUp`: full throttle with a 22 m run-up into deep, ≤ 42 m (the patch end). Enters at 66 km/h and stops inside at 40.1 m, sunk to 70 cm.
+    - `B1Mud_ExitDeep`: 50 % from 4 m before the deep exit, ≥ 8 m, endH ≥ −1.05. dist 10.4, endH −1.01 (back at firm height).
+  - CrossMedium (50 %) vmax 6.5 m/s, faster than full throttle. Gym 12/12 and `Lvl_Offroad` 8/8 PASS headless.
+  - peakOsc on mud exits is higher with the faster climb-out: ExitDeep 0.92, ExitMediumFull 0.38 (limit 0.5). Exit at 5 m/s from 35–47 cm deep is a real step bump. For the user's playtest.
+  - **Follow-up (user request): four sizes S/M/L/XL.**
+    - Shallow (S) 15→25 cm (patch `HardBottomDepth` 25).
+    - New Heavy (L) 50 cm: `PM_B1Mud_Heavy` / `MI_B1Mud_Heavy`, values between medium and deep: Friction 0.47, SettleRate 40, SinkRate 38, RiseRate 1.5, friction curve 1→0.45, RR 0.025→0.18, SpeedDrag 0.024.
+    - Gym: Heavy takes the old deep slot (Y 42); Deep (XL) and its label, spawn and rigs move to Y 55. Ground re-cut: `G_Start_Deep`, `G_End_Deep`, `G_Edge_Deep`, `G_Margin_East` shrunk to Y 63–80. Labels/spawns renumbered (4 Heavy, 5 Deep, 6 Pit) and labels show the size.
+    - New rig `B1Mud_RestartHeavy` (40 % from rest, ≥ 5 m): dist 6.3, vmax 1.7 m/s. Gym 13/13, `Lvl_Offroad` 8/8 PASS headless; the moved deep rigs are unchanged.
   Per wheel: friction multiplier from the curve, and a rolling-resistance force opposing wheel velocity at the contact.
-  **Done:** builds; rig: full throttle on medium mud digs in within 2–4 s.
-  **User check:** —
+  **Done:** builds; rig: full throttle on medium mud digs in within 2–4 s. → replaced by the bog-down / restart / recover rigs above.
+  **User check:** drive slowly into medium, stop, and drive on with a little throttle; floor it in medium; hit deep at speed; drive out of deep.
 
 - [ ] **S1-21** Belly drag (2 h) _(requires S1-19, S1-20)_
   Analytic drag when the average `SinkDepth` > ground clearance, growing with the excess.
@@ -183,8 +219,8 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **User check:** edit `SinkRate` live while driving: the effect is immediate and saving persists it.
 
 - [ ] **S1-23** Mud rig test suite (2.5 h) _(requires S1-16, S1-21)_
-  - full throttle, medium: stuck within 2–4 s
-  - ≤ 50 % throttle crosses a 20 m medium strip
+  - full throttle, medium: bogs down (speed capped well below firm), not stuck (changed in S1-20 after the user's playtest)
+  - ≤ 50 % throttle crosses a 20 m medium strip; restarts from a stop in medium at low throttle
   - deep: stuck
   - stuck + zero throttle: creep < 5 cm in 10 s (Chaos low-speed check)
   - patch-entry pop check

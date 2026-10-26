@@ -23,14 +23,34 @@ public:
 	/** Sinking (ADR-012): moves each wheel's hit down by its sink offset, so the suspension extends */
 	virtual void PerformSuspensionTraces(const TArray<Chaos::FSuspensionTrace>& SuspensionTrace, FCollisionQueryParams& TraceParams, FCollisionResponseContainer& CollisionResponse, TArray<FWheelTraceParams>& WheelTraceParams) override;
 
+	/** Mud traction and rolling resistance vs sink depth (ADR-001) */
+	virtual void ApplyWheelFrictionForces(float DeltaTime) override;
+
 private:
 
 	void ApplyTestForce(const FB1VehicleSimInput& Input);
-	void UpdateSinkDepth(float DeltaTime, const FB1VehicleSimInput& Input);
+	void UpdateRelativeLoads();
+	void UpdateSinkDepth(float DeltaTime);
+	float GetNormalizedDepth(int32 WheelIdx, const FB1MudSimParams& Mud) const;
 	void UpdateSinkOffset(int32 NumWheels);
+	void ApplyRollingResistance(float DeltaTime);
+
+	/** Null when the wheel is airborne or not on a known mud material */
+	const FB1MudSimParams* FindContactMud(int32 WheelIdx) const;
 
 	FCriticalSection InputLock;
 	FB1VehicleSimInput PendingInput;
+
+	/** Copy of PendingInput for the current step */
+	FB1VehicleSimInput StepInput;
+
+	/** Per wheel, load over the average load of the wheels in contact, capped */
+	TArray<float> RelativeLoad;
+
+	int32 NumWheelsInContact = 0;
+
+	TArray<float> MudFrictionScale;
+	TArray<float> RollingResistance;
 
 	mutable FCriticalSection OutputLock;
 	FB1VehicleSimOutput LatestOutput;

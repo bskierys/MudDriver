@@ -39,7 +39,10 @@ namespace B1VehicleTelemetry
 
 			if (B1Movement)
 			{
-				Line.Appendf(TEXT(" sink=%.1f"), B1Movement->GetWheelSinkDepth(WheelIndex));
+				Line.Appendf(TEXT(" sink=%.1f mu=%.2f rr=%.0f"),
+					B1Movement->GetWheelSinkDepth(WheelIndex),
+					B1Movement->GetWheelMudFrictionScale(WheelIndex),
+					B1Movement->GetWheelRollingResistance(WheelIndex));
 			}
 		}
 

@@ -73,6 +73,16 @@ float UB1VehicleMovementComponent::GetWheelSinkDepth(int32 WheelIndex) const
 	return SimOutput.SinkDepth.IsValidIndex(WheelIndex) ? SimOutput.SinkDepth[WheelIndex] : 0.0f;
 }
 
+float UB1VehicleMovementComponent::GetWheelMudFrictionScale(int32 WheelIndex) const
+{
+	return SimOutput.MudFrictionScale.IsValidIndex(WheelIndex) ? SimOutput.MudFrictionScale[WheelIndex] : 1.0f;
+}
+
+float UB1VehicleMovementComponent::GetWheelRollingResistance(int32 WheelIndex) const
+{
+	return SimOutput.RollingResistance.IsValidIndex(WheelIndex) ? SimOutput.RollingResistance[WheelIndex] : 0.0f;
+}
+
 void UB1VehicleMovementComponent::GatherMudParams(TArray<FB1MudSimParams>& OutParams)
 {
 	for (int32 WheelIndex = 0; WheelIndex < GetNumWheels(); ++WheelIndex)
@@ -94,6 +104,9 @@ void UB1VehicleMovementComponent::GatherMudParams(TArray<FB1MudSimParams>& OutPa
 		Params.SinkRate = Mud->SinkRate;
 		Params.RiseRate = Mud->RiseRate;
 		Params.FullSinkSlipSpeed = Mud->FullSinkSlipSpeed;
+		Params.FrictionVsDepth = *Mud->FrictionVsDepth.GetRichCurveConst();
+		Params.RollingResistanceVsDepth = *Mud->RollingResistanceVsDepth.GetRichCurveConst();
+		Params.SpeedDragCoefficient = Mud->SpeedDragCoefficient;
 	}
 }
 

@@ -299,3 +299,41 @@ Depth was tracked (S1-18) but didn't move the jeep. The first version (hit offse
 ### Open follow-ups
 - S1-20: traction and rolling resistance vs depth. In deep mud the jeep currently rests on the hard bottom but can still drive out.
 - The visual capture used Simulate + `CaptureEditorImage`; there's no saved artifact in the repo.
+
+---
+
+## 2026-10-26 — S1-20 traction, rolling resistance and speed drag + S/M/L/XL mud
+
+### Context
+Sinking worked (S1-19), but depth didn't affect grip or resistance yet. The first pass aimed at the sprint criterion "full throttle on medium digs in within 2–4 s". It passed the rigs, but the user's playtest found three problems: driving slowly into medium got stuck for good, deep at full speed barely slowed or sank, and after leaving deep the jeep drove on sunk into the firm tiles. After the rework, the user asked for a deeper shallow preset and a new size between medium and deep.
+
+### What was built
+- `FB1VehicleSimulation::ApplyWheelFrictionForces` override:
+  - scales each mud wheel's `FrictionMultiplier` by `FrictionVsDepth` around the base call;
+  - adds rolling resistance plus speed drag at the contact point, static-friction style at a standstill, capped so it never reverses the wheel.
+- `UB1PhysicalMaterial_Mud::SpeedDragCoefficient`: × normalized depth × v².
+- Curves are copied to the physics thread as `FRichCurve`; `StepInput` is read at the start of the step; relative loads are shared with sinking.
+- The `SinkOffset` rise limit is distance-based: max(30 cm/s, 0.5 × wheel speed).
+- Telemetry shows `mu=` and `rr=` per wheel; the component exposes `GetWheelMudFrictionScale` and `GetWheelRollingResistance`.
+- Presets retuned. New `PM_B1Mud_Heavy` (50 cm) with tint `MI_B1Mud_Heavy`; Shallow 15→25 cm.
+- Gym: Heavy lane at Y 42; the Deep lane moved to Y 55 with ground tiles re-cut around it; labels and spawns renumbered.
+- Seven new rigs (listed in ARCHITECTURE Testing).
+
+### Decisions made
+- ADR-001 amended: medium is a slog, not a trap, and full stops come from belly drag in deep (S1-21). The S1-20 and S1-23 "stuck within 2–4 s" criterion became "bogs down" (the user's feel wins).
+- Speed drag is quadratic so slow, careful driving is barely affected. Full throttle in medium (~16 km/h, wheels spinning) is slower than 50 % throttle (~23 km/h).
+- The new size is named Heavy (L), so existing assets didn't need renaming.
+
+### What we learned
+- The jeep's wheel `FrictionForceMultiplier` is 4. Effective grip is about 0.83 × the friction-curve value × weight share.
+- From a standstill, 40 % throttle gives only ~290 Nm per wheel (~570 N), because the engine sits near idle. Static rolling resistance above that traps the jeep.
+- If resistance can exceed grip at full depth, the jeep is trapped for good: rising needs rolling, and rolling needs grip > resistance.
+- With resistance that only opposes motion, a spinning stuck wheel creeps at ~15 cm/s. Opposing the tire push at a standstill fixes it.
+- Chaos rebuilds `SurfaceFriction` from the phys material inside `ApplyWheelFrictionForces`; the per-wheel `FrictionMultiplier` is the only hook.
+- `RigidHandle->M()` needs the Chaos module to link; `PWheel.MassPerWheel` (set by Chaos) avoids that.
+- Headless: gym 13/13, `Lvl_Offroad` 8/8 PASS. DeepRunUp enters at 66 km/h and stops at 40.1 m inside the patch. ExitDeep ends at endH −1.01.
+
+### Open follow-ups
+- User playtest of the reworked mud and the four sizes. Pending: medium slog feel, Heavy restart (6.3 m in 6 s at 40 %), and climb-out bumps (ExitDeep peakOsc 0.92).
+- S1-21 belly drag should make full-depth deep a real stop.
+- The material constructor defaults (curves 1→0.6, RR 0.05→0.3) no longer match the tuned ranges; they only affect new assets.

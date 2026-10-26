@@ -49,6 +49,7 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
   - Raising the start keeps the sweep above the thin mud slab when the chassis is low.
   - `SinkOffset` follows `SinkDepth` instantly going down and at most 30 cm/s going up, so leaving mud doesn't pop.
   - The component keeps `KnownMudMaterials` (every mud material its wheels have touched) and sends copies of their params (`FB1MudSimParams`). The sim matches `TraceResult.PhysMaterial` by weak-pointer equality, so new mud reads as firm for about a frame.
+- **Traction and resistance (ADR-001):** `ApplyWheelFrictionForces` scales each mud wheel's `FrictionMultiplier` by `FrictionVsDepth` around the base call. After the call, it adds a rolling resistance force along the steered wheel forward at the contact point: (`RollingResistanceVsDepth` + `SpeedDragCoefficient`·depth·v²) × the wheel's weight share. Below 1 cm/s it opposes the tire's push, like static friction, and it's capped at the tire push plus 0.4 × the stopping force. `SinkOffset` rises at max(30 cm/s, 0.5 × wheel speed). Telemetry shows `mu=` and `rr=`. <!-- updated 2026-10-26 -->
 - Forces from the sim use `AddForce` in kg·cm/s² (N × 100).
 - **Test forces** (`EB1TestForce`: Off / Push / Spring, settings in `TestForceSettings`, category `TestForce|Config`): push = constant world +Y force; spring = one-sided spring-damper to an anchor captured at toggle time. While active, the component zeroes `SleepThreshold`, because a sleeping vehicle skips the simulation, and restores it on Off.
 - Steps at a fixed 1/60 s (see Physics settings).
@@ -76,7 +77,7 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
   - `FrictionVsDepth` and `RollingResistanceVsDepth` (fraction of wheel load), both `FRuntimeFloatCurve` over normalized depth;
   - `BellyDragCoefficient` (fraction of vehicle weight per m past clearance).
   - Its base `Friction` is the grip at zero depth. Chaos feeds it to the tire through `SetSurfaceFriction`, so the depth curve multiplies on top.
-- Presets: `/Game/B1/Mud/PM_B1Mud_Shallow/Medium/Deep`, set as each gym patch's `MudMaterial`.
+- Presets (S/M/L/XL): `/Game/B1/Mud/PM_B1Mud_Shallow` (25 cm), `_Medium` (35), `_Heavy` (50), `_Deep` (70), set as each gym patch's `MudMaterial`. Tints `MI_B1Mud_*`. Gym lanes: Shallow Y 16, Medium Y 29, Heavy Y 42, Deep Y 55. <!-- updated 2026-10-26 -->
 
 <!-- updated 2026-10-25 -->
 
@@ -108,6 +109,12 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 - `B1Mud_CrossMedium`: 50 % across the medium patch, peakOsc ≤ 0.5.
 - `B1Mud_ExitMediumFull`: full throttle out of the medium patch, peakOsc ≤ 0.5.
 - `B1Mud_SinkDeepStop`: 1.5 s full throttle into deep, then brake.
+- `B1Mud_DigInMedium`: 4 s full throttle from rest in medium, ≤ 15 m (bogs down).
+- `B1Mud_RestartMedium` / `B1Mud_RestartHeavy`: 6 s at 40 % from rest, ≥ 5 m.
+- `B1Mud_RecoverMedium`: 2 s full, then 6 s at 35 %, ≥ 6 m.
+- `B1Mud_CrawlIntoMedium`: 14 s at 30 % from firm ground, ≥ 25 m.
+- `B1Mud_DeepRunUp`: full throttle with a 22 m run-up into deep, ≤ 42 m (stops inside the patch).
+- `B1Mud_ExitDeep`: 50 % out of deep, ≥ 8 m, endH ≥ −1.05 (back at firm height). <!-- updated 2026-10-26 -->
 
 It also has `B1Gym_FirmSmoke` (6 s at 50 % throttle on the firm lane, ≥ 20 m; ~43 m) and `B1Gym_WallStop` (full throttle into the north wall; the jeep must stay on the floor). <!-- updated 2026-10-25 -->
 - Headless: `Scripts/RunGymTests.ps1 [-Map] [-Filter]` runs `UnrealEditor-Cmd -nullrhi` with `Automation RunTests Project.Functional Tests.<map dotted>[.<label>]; Quit`. The editor exits 0 regardless, so the script parses `Test Completed. Result={...}` lines for its exit code. Needs the editor closed (`Scripts/StopEditor.ps1`).

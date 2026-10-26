@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/WeakObjectPtrTemplates.h"
+#include "Curves/RichCurve.h"
 #include "B1VehicleSimInput.generated.h"
 
 class UPhysicalMaterial;
@@ -49,6 +50,9 @@ struct FB1MudSimParams
 	float SinkRate = 0.0f;
 	float RiseRate = 0.0f;
 	float FullSinkSlipSpeed = 1.0f;
+	FRichCurve FrictionVsDepth;
+	FRichCurve RollingResistanceVsDepth;
+	float SpeedDragCoefficient = 0.0f;
 };
 
 /** Game thread → physics thread data, copied once per game frame */
@@ -65,4 +69,10 @@ struct FB1VehicleSimOutput
 {
 	/** Per wheel, cm */
 	TArray<float> SinkDepth;
+
+	/** Per wheel, mud friction curve value; 1 off mud */
+	TArray<float> MudFrictionScale;
+
+	/** Per wheel, N */
+	TArray<float> RollingResistance;
 };

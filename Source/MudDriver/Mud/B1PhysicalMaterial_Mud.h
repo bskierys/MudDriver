@@ -48,6 +48,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Mud|Config")
 	FRuntimeFloatCurve RollingResistanceVsDepth;
 
+	/** Extra resistance per (m/s)^2 of wheel speed at full depth, as a fraction of the wheel load. Scales with normalized depth */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mud|Config", meta = (ClampMin = "0"))
+	float SpeedDragCoefficient = 0.018f;
+
 	/** Drag per metre of sink past ground clearance, as a fraction of vehicle weight */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mud|Config", meta = (ClampMin = "0"))
 	float BellyDragCoefficient = 2.0f;

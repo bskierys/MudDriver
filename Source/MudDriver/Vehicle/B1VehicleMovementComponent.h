@@ -31,6 +31,12 @@ public:
 	/** cm, from the latest physics step; 0 off mud */
 	float GetWheelSinkDepth(int32 WheelIndex) const;
 
+	/** Mud friction curve value from the latest physics step; 1 off mud */
+	float GetWheelMudFrictionScale(int32 WheelIndex) const;
+
+	/** N, from the latest physics step */
+	float GetWheelRollingResistance(int32 WheelIndex) const;
+
 protected:
 
 	/** Game thread, while the async input for the next physics step is open */

@@ -22,6 +22,8 @@ ADRs. Each entry: problem / decision / rationale / alternatives. Newest at the b
 
 Digging also scales with load, so an unloaded wheel spinning in the air doesn't dig. Slow, careful driving still pays off: it avoids the dig, not the settle.
 
+**Amended 2026-10-26 (S1-20 playtest).** Medium mud is a slog, not a trap. Grip at full depth stays above rolling resistance, so the jeep can always crawl out, and full stops are left to belly drag in deep mud. Rolling resistance is low (0.02–0.25 × load). A speed drag (`SpeedDragCoefficient` × normalized depth × v²) slows fast driving hard and barely touches slow driving. At a standstill, rolling resistance acts like static friction, so spinning wheels don't creep. Presets come in four sizes: Shallow (S, 25 cm), Medium (M, 35), Heavy (L, 50) and Deep (XL, 70).
+
 ---
 
 ## ADR-002 — Mud parameters live in a custom physical material
