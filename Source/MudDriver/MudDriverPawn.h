@@ -96,11 +96,11 @@ protected:
 
 	/** Time without look input before the back camera swings back behind the vehicle */
 	UPROPERTY(EditAnywhere, Category="Camera", meta = (Units = "s", ClampMin = "0"))
-	float CameraRecenterDelay = 2.0f;
+	float CameraRecenterDelay = 1.0f;
 
-	/** FInterpTo speed of the swing back; lower is slower */
+	/** FInterpTo speed of the swing back; lower is slower (template: 1.0, no delay) */
 	UPROPERTY(EditAnywhere, Category="Camera", meta = (ClampMin = "0"))
-	float CameraRecenterSpeed = 0.5f;
+	float CameraRecenterSpeed = 0.75f;
 
 	float TimeSinceLookInput = 0.0f;
 

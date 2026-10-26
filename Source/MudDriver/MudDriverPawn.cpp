@@ -262,7 +262,12 @@ void AMudDriverPawn::DoLookAround(float YawDelta)
 {
 	// rotate the spring arm
 	BackSpringArm->AddLocalRotation(FRotator(0.0f, YawDelta * CameraYawRate, 0.0f));
-	TimeSinceLookInput = 0.0f;
+
+	// The look action can trigger every frame with a zero delta; only real input delays the recenter.
+	if (!FMath::IsNearlyZero(YawDelta, 0.01f))
+	{
+		TimeSinceLookInput = 0.0f;
+	}
 }
 
 void AMudDriverPawn::DoToggleCamera()
