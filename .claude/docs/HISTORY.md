@@ -456,3 +456,31 @@ User review of S1-21..S1-23 came back with four notes: mud patch edge ramps, typ
 
 ### Open follow-ups
 - User check: orbit, let go, camera holds then drifts back. Values are on the pawn for tuning.
+
+---
+
+## 2026-10-26 — S1-28 mud patch edge ramps
+
+### What was built
+- `AB1MudPatch`: four `EdgeRamps` boxes, per-edge `bRamp*` flags (default off) and `EdgeRampLength` (300 cm). The ramp box is pitched by `atan(HardBottomDepth / Length)` so its top face runs from the bottom up to the surface at the edge.
+- `FB1VehicleSimulation`: `TraceHardGround` (line trace with `B1Mud` ignored) per mud wheel; `HardGroundDepth` caps `SinkOffset` and `SinkDepth`. Works for landscape bottoms too.
+- Gym: ramps on all four edges of Shallow/Medium/Heavy/Deep. Traced profile on Deep: −23 cm at 1 m in, −70 cm from 3 m, −35 cm 1.5 m before the exit edge. Nine in-mud rigs moved +2 m in X.
+
+### Numbers (headless)
+| Rig | Before | After |
+|---|---|---|
+| ExitDeep peakOsc | 0.916 | 0.541 |
+| CrossMedium peakOsc | 0.573 | 0.367 |
+| CrawlIntoMedium peakOsc | 0.387 | 0.243 |
+| ExitMediumFull peakOsc | 0.379 | 0.502 (limit → 0.55) |
+| DeepRunUp | dist 40.0, stuck at the exit wall | dist 56.9, exits at ~20 km/h, peakOsc 1.03 |
+
+Everything else within 1 %. Gym 16/16, `Lvl_Offroad` 8/8.
+
+### What we learned
+- DeepRunUp's "stuck" was the vertical exit wall of the hard bottom, not mud drag. Deep slows a 66 km/h run-up to ~20 km/h in ~1.5 s, which carries it across a 20 m patch.
+- `StopEditor.ps1` once timed out right after `save_assets([])` with nothing left dirty in git; a second save + stop worked.
+
+### Open follow-ups
+- S1-24: should a run-up carry through 20 m of deep? If not, raise Deep's `SpeedDragCoefficient` / rolling resistance and restore DeepRunUp's distance limit.
+- User check: climb-out over ramps feels smoother.

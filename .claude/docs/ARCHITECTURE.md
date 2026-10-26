@@ -48,6 +48,7 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
   - `PerformSuspensionTraces` traces from a copy of the traces with each start raised by the wheel's `SinkOffset`. Chaos reads `Distance` from the real start, so the hit is `SinkOffset` deeper; `Location`/`ImpactPoint` are pushed down to match, clamped to full droop.
   - Raising the start keeps the sweep above the thin mud slab when the chassis is low.
   - `SinkOffset` follows `SinkDepth` instantly going down and at most 30 cm/s going up, so leaving mud doesn't pop.
+  - **Hard ground cap:** for a wheel whose hit is on mud, a line trace (`WorldDynamic`, wheel responses with `B1Mud` ignored) from 2 cm above the hit down to `MaxSinkDepth` finds the hard surface below. `HardGroundDepth` caps both `SinkOffset` (same step) and `SinkDepth` (in `UpdateSinkDepth`), so edge ramps and shallow landscape under a patch push the wheel back up. One extra line trace per mud wheel per step. <!-- updated 2026-10-26 -->
   - The component keeps `KnownMudMaterials` (every mud material its wheels have touched) and sends copies of their params (`FB1MudSimParams`). The sim matches `TraceResult.PhysMaterial` by weak-pointer equality, so new mud reads as firm for about a frame.
 - **Traction and resistance (ADR-001):** `ApplyWheelFrictionForces` scales each mud wheel's `FrictionMultiplier` by `FrictionVsDepth` around the base call. After the call, it adds a rolling resistance force along the steered wheel forward at the contact point: (`RollingResistanceVsDepth` + `SpeedDragCoefficient`·depth·v²) × the wheel's weight share. Below 1 cm/s it opposes the tire's push, like static friction, and it's capped at the tire push plus 0.4 × the stopping force. `SinkOffset` rises at max(30 cm/s, 0.5 × wheel speed). The `B1Mud` telemetry shows `mu=` and `rr=`. <!-- updated 2026-10-26 -->
 - **Belly drag (ADR-012):** after rolling resistance, `ApplyBellyDrag` takes the average `SinkDepth` of all wheels minus `BellyClearance` (component, 45 cm = axle height; the body underside measures 60–64 cm, logged once per vehicle). Drag = mean `BellyDragCoefficient` of the mud wheels × excess (m) × weight, at the centre of mass against ground velocity, with the same standstill and no-reversal rules as rolling resistance. Only Heavy and Deep reach it. Telemetry `belly=<cm>/<N>`. <!-- updated 2026-10-26 -->
@@ -67,10 +68,12 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 
 ## Mud
 
-- `AB1MudPatch` (`Mud/B1MudPatch.h`) has two components:
+- `AB1MudPatch` (`Mud/B1MudPatch.h`) has these components:
   - `MudSurface`: a 10 cm slab, top at the actor origin, `B1MudSurface` profile, `MudMaterial` as its phys material override.
   - `HardBottom`: a 1 m BlockAll slab, top `HardBottomDepth` below the surface. It's hidden and NoCollision when `bHardBottom` is off, for patches where the landscape is the bottom.
-  - `OnConstruction` sizes both from `Size` (cm).
+  - `EdgeRamps` (+X, −X, +Y, −Y): 1 m BlockAll boxes pitched so the top face climbs from the hard bottom to the surface over `EdgeRampLength` (default 300 cm) at the patch edge. On per edge with `bRampPlusX/MinusX/PlusY/MinusY` (default off, so patches butt together); only with `bHardBottom`. They take the hard bottom's material. Corners are the union of two ramps.
+  - `OnConstruction` sizes all of them from `Size` (cm).
+- Gym strips (Shallow/Medium/Heavy/Deep) have ramps on all four edges, 300 cm. <!-- updated 2026-10-26 -->
 - `/Game/B1/Mud/BP_B1MudPatch` is the placeable child, with `M_B1Mud` (a `Color` vector parameter for per-depth tints). Tints: `MI_B1Mud_Shallow/Medium/Deep`, set as the `MudSurface` material override per instance. <!-- updated 2026-10-25 -->
 
 - `UB1PhysicalMaterial_Mud` (`Mud/B1PhysicalMaterial_Mud.h`, ADR-002) holds the mud tuning:

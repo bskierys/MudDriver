@@ -38,6 +38,10 @@ private:
 
 	/** Null when the wheel is airborne or not on a known mud material */
 	const FB1MudSimParams* FindContactMud(int32 WheelIdx) const;
+	const FB1MudSimParams* FindMud(const TWeakObjectPtr<UPhysicalMaterial>& Material) const;
+
+	/** Distance from the mud surface down to the first hard surface, or MAX_flt if none within MaxDepth */
+	float TraceHardGround(const FVector& SurfacePoint, const FVector& Down, float MaxDepth, const FCollisionQueryParams& TraceParams, const FCollisionResponseParams& ResponseParams) const;
 
 	FCriticalSection InputLock;
 	FB1VehicleSimInput PendingInput;
@@ -63,6 +67,9 @@ private:
 
 	/** Per wheel, cm. SinkDepth with a rise limit, so leaving mud doesn't pop the suspension */
 	TArray<float> SinkOffset;
+
+	/** Per wheel, cm below the mud surface. Caps sinking where the bottom ramps up or the landscape is shallow */
+	TArray<float> HardGroundDepth;
 
 	float LastDeltaTime = 0.0f;
 

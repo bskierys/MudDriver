@@ -223,6 +223,8 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 
 **Implementation (2026-10-26, S1-21).** "Clearance" for belly drag is the axle height (`BellyClearance` 45 cm on the movement component), not the physics body's underside (60–64 cm measured). Axles and diffs plough mud first, and the body height would leave only the last 8 cm of deep for drag. The drag is applied at the centre of mass.
 
+**Implementation (2026-10-26, S1-28).** Sink depth is capped by the hard ground under each wheel, found by an extra line trace that ignores `B1Mud`. The hard bottom no longer has to be flat: patches get optional edge ramps (puddle-like exits), and a landscape bottom shallower than `MaxSinkDepth` works the same way. Before this, a wheel kept its offset over a raised bottom and only the chassis collided with it.
+
 ---
 
 ## ADR-013 — Test rigs live in a separate `MudDriverTests` module

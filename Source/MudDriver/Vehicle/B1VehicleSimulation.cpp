@@ -1,5 +1,7 @@
 #include "B1VehicleSimulation.h"
 #include "B1Log.h"
+#include "B1CollisionChannels.h"
+#include "Engine/World.h"
 
 namespace
 {
@@ -16,6 +18,7 @@ namespace
 	constexpr float MaxStopForceFraction = 0.4f;
 	/** cm/s */
 	constexpr float StandstillSpeed = 1.0f;
+	constexpr float HardGroundTraceLift = 2.0f;
 }
 
 void FB1VehicleSimulation::SetGameThreadInput(const FB1VehicleSimInput& Input)
@@ -75,20 +78,39 @@ void FB1VehicleSimulation::PerformSuspensionTraces(const TArray<Chaos::FSuspensi
 
 	UChaosWheeledVehicleSimulation::PerformSuspensionTraces(RaisedTrace, TraceParams, CollisionResponse, WheelTraceParams);
 
+	HardGroundDepth.Init(MAX_flt, RaisedTrace.Num());
+	FCollisionResponseParams GroundResponse(CollisionResponse);
+	GroundResponse.CollisionResponse.SetResponse(B1_ObjectChannel_Mud, ECR_Ignore);
+
 	for (int32 WheelIdx = 0; WheelIdx < RaisedTrace.Num(); ++WheelIdx)
 	{
 		FHitResult& Hit = WheelState.TraceResult[WheelIdx];
-		const float Offset = SinkOffset[WheelIdx];
-		if (!Hit.bBlockingHit || Offset <= 0.0f)
+		if (!Hit.bBlockingHit)
 		{
 			continue;
 		}
 
-		// Past full droop the wheel keeps contact at max length and the chassis settles on the hard bottom.
 		const FVector Down = (RaisedTrace[WheelIdx].End - RaisedTrace[WheelIdx].Start).GetSafeNormal();
-		const float RealSweepLength = (Hit.TraceEnd - Hit.TraceStart).Size() - Offset;
-		const float SurfaceDistance = Hit.Distance - Offset;
-		Hit.Distance = FMath::Min(Hit.Distance, RealSweepLength);
+		const float RaisedBy = SinkOffset[WheelIdx];
+		const float SurfaceDistance = Hit.Distance - RaisedBy;
+
+		// Where the bottom ramps up (or the landscape is shallow) the wheel can't sink past it.
+		if (const FB1MudSimParams* Mud = FindMud(Hit.PhysMaterial))
+		{
+			HardGroundDepth[WheelIdx] = TraceHardGround(Hit.ImpactPoint, Down, Mud->MaxSinkDepth, TraceParams, GroundResponse);
+			SinkOffset[WheelIdx] = FMath::Min(SinkOffset[WheelIdx], HardGroundDepth[WheelIdx]);
+		}
+
+		const float Offset = SinkOffset[WheelIdx];
+		if (Offset <= 0.0f)
+		{
+			Hit.Distance = SurfaceDistance;
+			continue;
+		}
+
+		// Past full droop the wheel keeps contact at max length and the chassis settles on the hard bottom.
+		const float RealSweepLength = (Hit.TraceEnd - Hit.TraceStart).Size() - RaisedBy;
+		Hit.Distance = FMath::Min(SurfaceDistance + Offset, RealSweepLength);
 
 		const float Push = Hit.Distance - SurfaceDistance;
 		Hit.Location += Down * Push;
@@ -313,11 +335,29 @@ const FB1MudSimParams* FB1VehicleSimulation::FindContactMud(int32 WheelIdx) cons
 		return nullptr;
 	}
 
-	const TWeakObjectPtr<UPhysicalMaterial>& ContactMaterial = WheelState.TraceResult[WheelIdx].PhysMaterial;
-	return StepInput.MudMaterials.FindByPredicate([&ContactMaterial](const FB1MudSimParams& Params)
+	return FindMud(WheelState.TraceResult[WheelIdx].PhysMaterial);
+}
+
+const FB1MudSimParams* FB1VehicleSimulation::FindMud(const TWeakObjectPtr<UPhysicalMaterial>& Material) const
+{
+	return StepInput.MudMaterials.FindByPredicate([&Material](const FB1MudSimParams& Params)
 	{
-		return Params.Material == ContactMaterial;
+		return Params.Material == Material;
 	});
+}
+
+float FB1VehicleSimulation::TraceHardGround(const FVector& SurfacePoint, const FVector& Down, float MaxDepth, const FCollisionQueryParams& TraceParams, const FCollisionResponseParams& ResponseParams) const
+{
+	// Starts a little above the surface, so a ramp that meets the surface still counts as depth 0.
+	const FVector Start = SurfacePoint - Down * HardGroundTraceLift;
+	const FVector End = SurfacePoint + Down * MaxDepth;
+
+	FHitResult GroundHit;
+	if (World && World->LineTraceSingleByChannel(GroundHit, Start, End, ECC_WorldDynamic, TraceParams, ResponseParams))
+	{
+		return FMath::Max(GroundHit.Distance - HardGroundTraceLift, 0.0f);
+	}
+	return MAX_flt;
 }
 
 float FB1VehicleSimulation::GetNormalizedDepth(int32 WheelIdx, const FB1MudSimParams& Mud) const
@@ -366,6 +406,7 @@ void FB1VehicleSimulation::UpdateSinkDepth(float DeltaTime)
 		{
 			Depth = FMath::Max(Depth - Mud->RiseRate * RolledDistance * (1.0f - Spin), Floor);
 		}
-		SinkDepth[WheelIdx] = FMath::Clamp(Depth, 0.0f, Mud->MaxSinkDepth);
+		const float HardGround = HardGroundDepth.IsValidIndex(WheelIdx) ? HardGroundDepth[WheelIdx] : MAX_flt;
+		SinkDepth[WheelIdx] = FMath::Clamp(Depth, 0.0f, FMath::Min(Mud->MaxSinkDepth, HardGround));
 	}
 }

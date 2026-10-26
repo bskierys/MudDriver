@@ -30,6 +30,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mud|Components")
 	TObjectPtr<UStaticMeshComponent> HardBottom;
 
+	/** +X, -X, +Y, -Y */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mud|Components")
+	TArray<TObjectPtr<UStaticMeshComponent>> EdgeRamps;
+
 	UPROPERTY(EditAnywhere, Category = "Mud|Config", meta = (Units = "cm", ClampMin = "10"))
 	FVector2D Size = FVector2D(2000.0f, 2000.0f);
 
@@ -44,4 +48,25 @@ protected:
 	/** Hard bottom top, below the mud surface */
 	UPROPERTY(EditAnywhere, Category = "Mud|Config", meta = (Units = "cm", ClampMin = "0", EditCondition = "bHardBottom"))
 	float HardBottomDepth = 50.0f;
+
+	/** The hard bottom climbs back to the surface at these edges. Leave an edge open to butt another patch against it */
+	UPROPERTY(EditAnywhere, Category = "Mud|Config", meta = (EditCondition = "bHardBottom"))
+	bool bRampPlusX = false;
+
+	UPROPERTY(EditAnywhere, Category = "Mud|Config", meta = (EditCondition = "bHardBottom"))
+	bool bRampMinusX = false;
+
+	UPROPERTY(EditAnywhere, Category = "Mud|Config", meta = (EditCondition = "bHardBottom"))
+	bool bRampPlusY = false;
+
+	UPROPERTY(EditAnywhere, Category = "Mud|Config", meta = (EditCondition = "bHardBottom"))
+	bool bRampMinusY = false;
+
+	/** Horizontal length of an edge ramp, from the bottom to the surface */
+	UPROPERTY(EditAnywhere, Category = "Mud|Config", meta = (Units = "cm", ClampMin = "10", EditCondition = "bHardBottom"))
+	float EdgeRampLength = 300.0f;
+
+private:
+
+	void UpdateEdgeRamp(UStaticMeshComponent& Ramp, const FVector2D& Outward, bool bEnabled);
 };

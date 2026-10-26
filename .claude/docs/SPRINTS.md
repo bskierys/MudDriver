@@ -267,7 +267,11 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds; the rig suite still passes (camera doesn't touch physics).
   **User check:** orbit to the side of the jeep in mud, let go: the camera stays a moment, then drifts back slowly.
 
-- [ ] **S1-28** Mud patch edge ramps (2.5 h) _(requires S1-19)_
+- [x] **S1-28** Mud patch edge ramps (2.5 h) _(requires S1-19)_ <!-- done: 2026-10-26 -->
+  Result: `AB1MudPatch` `EdgeRamps` + `bRampPlusX/MinusX/PlusY/MinusY` + `EdgeRampLength` (300 cm). The sim caps sinking by a hard-ground trace under each mud wheel (ADR-012 note). Gym strips have ramps on all four edges; the 9 rigs that start in mud moved 2 m further in (X 1200/1300 → 1400/1500) so they still start at full depth.
+  - Gym 16/16 and `Lvl_Offroad` 8/8 PASS headless. Exit bumps drop: ExitDeep peakOsc 0.92 → 0.54, CrossMedium 0.57 → 0.37, CrawlIntoMedium 0.39 → 0.24.
+  - **DeepRunUp changed meaning:** it used to stop at 40 m because the jeep hit the vertical exit wall, not because of the mud. With the ramp it enters deep at 66 km/h, is down to ~20 km/h in ~1.5 s, and drives out the far side (dist 57, peakOsc 1.03 on the ramp). Threshold now `maxPeakOscillation` 1.2 only. Whether a run-up should carry through 20 m of deep is a tuning call for S1-24.
+  - ExitMediumFull peakOsc 0.379 → 0.502 (limit 0.5 → 0.55): full-throttle entry down the ramp while digging; same level as DigInMedium (0.47).
   Real puddles climb back out at the edges instead of ending in a step. Per patch edge (+X, −X, +Y, −Y) the hard bottom can ramp up to the surface over `EdgeRampLength`; edges without a ramp stay open, so patches can be placed edge to edge. Sinking is capped by the hard ground under each wheel (an extra trace that ignores the mud surface), so it works the same when the landscape is the bottom.
   **Done:** builds; gym patches get ramps where the jeep drives out; the rig suite passes (thresholds updated where the exit bumps drop).
   **User check:** drive out of deep and heavy over a ramp: the climb-out is smoother and easier than the old step.
