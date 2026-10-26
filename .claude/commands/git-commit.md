@@ -55,6 +55,6 @@ Examples:
 
 ## Then tell the user
 
-"Committed `<message>` to `dev`. Run `/git-pr` to update the long-lived `dev` → `main` PR."
+"Committed `<message>` to `dev`"
 
-Do NOT touch `main`. Ever. Do NOT open a PR — that's `/git-pr`.
+Do NOT touch `main`. Ever. Do NOT open a PR.
