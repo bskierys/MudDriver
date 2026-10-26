@@ -442,3 +442,17 @@ User review of S1-21..S1-23 came back with four notes: mud patch edge ramps, typ
 
 ### Open follow-ups
 - User check: floor it in medium; RPM climbs while speed stays low.
+
+---
+
+## 2026-10-26 — S1-27 chase camera
+
+### What was built
+- `AMudDriverPawn`: `CameraYawRate` 1.5, `CameraRecenterDelay` 2 s, `CameraRecenterSpeed` 0.5 (category `Camera`). Recentering waits for the delay after the last look input; yaw is normalized to ±180 so it swings back the short way.
+- Back spring arm 850 cm (was 650), socket Z 180 (was 150). `BP_B1Jeep` has no overrides.
+
+### What we learned
+- The template's 30–45° limit wasn't a clamp: `FInterpTo(Yaw, 0, dt, 1)` every frame balanced the look input at a small angle.
+
+### Open follow-ups
+- User check: orbit, let go, camera holds then drifts back. Values are on the pawn for tuning.

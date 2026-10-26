@@ -39,8 +39,8 @@ AMudDriverPawn::AMudDriverPawn(const FObjectInitializer& ObjectInitializer)
 	// construct the back camera boom
 	BackSpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("Back Spring Arm"));
 	BackSpringArm->SetupAttachment(GetMesh());
-	BackSpringArm->TargetArmLength = 650.0f;
-	BackSpringArm->SocketOffset.Z = 150.0f;
+	BackSpringArm->TargetArmLength = 850.0f;
+	BackSpringArm->SocketOffset.Z = 180.0f;
 	BackSpringArm->bDoCollisionTest = false;
 	BackSpringArm->bInheritPitch = false;
 	BackSpringArm->bInheritRoll = false;
@@ -130,9 +130,13 @@ void AMudDriverPawn::Tick(float Delta)
 	bool bMovingOnGround = ChaosVehicleMovement->IsMovingOnGround();
 	GetMesh()->SetAngularDamping(bMovingOnGround ? 0.0f : 3.0f);
 
-	// realign the camera yaw to face front
-	float CameraYaw = BackSpringArm->GetRelativeRotation().Yaw;
-	CameraYaw = FMath::FInterpTo(CameraYaw, 0.0f, Delta, 1.0f);
+	// realign the camera yaw to face front, once the player stops looking around
+	TimeSinceLookInput += Delta;
+	float CameraYaw = FRotator::NormalizeAxis(BackSpringArm->GetRelativeRotation().Yaw);
+	if (TimeSinceLookInput >= CameraRecenterDelay)
+	{
+		CameraYaw = FMath::FInterpTo(CameraYaw, 0.0f, Delta, CameraRecenterSpeed);
+	}
 
 	BackSpringArm->SetRelativeRotation(FRotator(0.0f, CameraYaw, 0.0f));
 }
@@ -257,7 +261,8 @@ void AMudDriverPawn::DoHandbrakeStop()
 void AMudDriverPawn::DoLookAround(float YawDelta)
 {
 	// rotate the spring arm
-	BackSpringArm->AddLocalRotation(FRotator(0.0f, YawDelta, 0.0f));
+	BackSpringArm->AddLocalRotation(FRotator(0.0f, YawDelta * CameraYawRate, 0.0f));
+	TimeSinceLookInput = 0.0f;
 }
 
 void AMudDriverPawn::DoToggleCamera()

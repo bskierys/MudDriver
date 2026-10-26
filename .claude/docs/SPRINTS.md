@@ -261,7 +261,8 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds.
   **User check:** floor it in medium: RPM climbs while speed stays low.
 
-- [ ] **S1-27** Chase camera: full orbit, delayed weak recenter, further back (1 h)
+- [x] **S1-27** Chase camera: full orbit, delayed weak recenter, further back (1 h) <!-- done: 2026-10-26 -->
+  Result: `AMudDriverPawn` `Camera` properties: `CameraYawRate` 1.5 (look input multiplier), `CameraRecenterDelay` 2 s, `CameraRecenterSpeed` 0.5 (template: 1.0, no delay). Yaw is normalized, so a full orbit recenters the short way. Back arm 650→850 cm, socket Z 150→180. The old 30–45° limit was the template's recenter pulling against the input every frame. Builds; PIE capture shows the new distance. Suite rerun with S1-28.
   Look input can turn the camera all the way around the jeep, a bit faster than now. Recentering starts only after a delay without look input, and is slower. The camera sits further back. All values are `Camera` properties on the pawn.
   **Done:** builds; the rig suite still passes (camera doesn't touch physics).
   **User check:** orbit to the side of the jeep in mud, let go: the camera stays a moment, then drifts back slowly.

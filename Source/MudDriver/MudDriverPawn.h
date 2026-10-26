@@ -90,6 +90,20 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Flip Check")
 	float FlipCheckMinDot = -0.2f;
 
+	/** Multiplier on look input yaw */
+	UPROPERTY(EditAnywhere, Category="Camera", meta = (ClampMin = "0"))
+	float CameraYawRate = 1.5f;
+
+	/** Time without look input before the back camera swings back behind the vehicle */
+	UPROPERTY(EditAnywhere, Category="Camera", meta = (Units = "s", ClampMin = "0"))
+	float CameraRecenterDelay = 2.0f;
+
+	/** FInterpTo speed of the swing back; lower is slower */
+	UPROPERTY(EditAnywhere, Category="Camera", meta = (ClampMin = "0"))
+	float CameraRecenterSpeed = 0.5f;
+
+	float TimeSinceLookInput = 0.0f;
+
 	/** Flip check timer */
 	FTimerHandle FlipCheckTimer;
 
