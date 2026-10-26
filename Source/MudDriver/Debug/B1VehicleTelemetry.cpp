@@ -3,6 +3,7 @@
 #include "B1PhysicalMaterial_Mud.h"
 #include "B1VehicleMovementComponent.h"
 #include "B1VehicleAttributeSet.h"
+#include "B1Jeep.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -105,12 +106,17 @@ namespace B1VehicleTelemetry
 		FGameplayTagContainer Tags;
 		ASC->GetOwnedGameplayTags(Tags);
 
-		UE_LOG(LogB1Vehicle, Log, TEXT("B1Status %s cond=%.1f/%.0f fuel=%.2f/%.0f tags=%s"),
+		const AB1Jeep* Jeep = Cast<AB1Jeep>(&Vehicle);
+		UE_LOG(LogB1Vehicle, Log, TEXT("B1Status %s cond=%.1f/%.0f fuel=%.2f/%.0f lph=%.1f l100=%.2f pow=%.2f strain=%.2f tags=%s"),
 			*Vehicle.GetName(),
 			ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute()),
 			ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetMaxConditionAttribute()),
 			ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute()),
 			ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetMaxFuelAttribute()),
+			Jeep ? Jeep->GetFuelRate() : 0.0f,
+			Jeep ? Jeep->GetFuelPer100m() : -1.0f,
+			Jeep ? Jeep->GetB1VehicleMovement()->GetNormalizedEnginePower() : 0.0f,
+			Jeep ? Jeep->GetMudStrain() : 0.0f,
 			*Tags.ToStringSimple());
 	}
 }

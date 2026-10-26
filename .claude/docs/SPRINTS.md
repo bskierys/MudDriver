@@ -355,7 +355,8 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
 
 ### Fuel (ADR-010)
 
-- [ ] **S2-07** `UB1VehicleTuningData` + fuel consumption (3 h) _(requires S2-05)_
+- [x] **S2-07** `UB1VehicleTuningData` + fuel consumption (3 h) _(requires S2-05)_ <!-- done: 2026-10-26 -->
+  Result: `Vehicle/B1VehicleTuningData` (`IdleRate` 6 L/h, `WorkRate` 240 L/h, `DrainInterval` 0.25 s; placeholder values for S2-15), asset `/Game/B1/Vehicles/DA_B1JeepTuning` on `BP_B1Jeep`. Research: 5.8 exposes no engine torque on the game thread; Chaos engine torque = throttle² × curve(RPM), so `UB1VehicleMovementComponent::GetNormalizedEnginePower` rebuilds it from the same throttle (rate control function) and `GetEngineRotationSpeed`, over the curve's peak torque×RPM. `AB1Jeep::Tick` accumulates and applies one drain GE per interval, only while possessed. Status window: power %, L/h, rolling 5 s L/100 m, editable rates + Save to asset (save code moved to `Debug/B1ImGuiAssetSave`, shared with the Mud window). `B1Status` gains `lph= l100= pow=`. Headless: 6.0 L/h at standstill, 20–50 L/h at 50 % throttle (pow 0.06–0.19).
   - Data asset `UB1VehicleTuningData` (`Fuel|Config`): `IdleRate`, `WorkRate` (L/h, readable for tuning), `DrainInterval` (0.25 s). Asset `/Game/B1/Vehicles/DA_B1JeepTuning`, referenced by `AB1Jeep`.
   - Jeep ticks: consumption += (`IdleRate` + `WorkRate`·`NormalizedEnginePower`)·dt, applies `GE_B1FuelDrain` every `DrainInterval`. `NormalizedEnginePower` = engine torque × ω / max power (from the torque curve), clamped [0, 1].
   - Vehicle Status window: live L/h, L/100 m (rolling), and editable rates with "save to asset" (same pattern as the Mud window). `B1Status` gets `lph=`.
@@ -363,13 +364,15 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds; telemetry shows idle consumption at standstill and higher consumption at full throttle.
   **User check:** —
 
-- [ ] **S2-08** Out of fuel → no torque (1.5 h) _(requires S2-07)_
+- [x] **S2-08** Out of fuel → no torque (1.5 h) _(requires S2-07)_ <!-- done: 2026-10-26 -->
+  Result: Zeroing `ThrottleInput` in `UB1VehicleMovementComponent::Update` (before `Super`) picked: engine torque is throttle-scaled, so there's no idle creep to remove. `AB1Jeep` listens to the Fuel attribute change delegate (bound in `PossessedBy`, checked once there, removed in `UnPossessed`): at 0 sets the movement's fuel cut-off and the loose `Vehicle.State.OutOfFuel`, above 0 clears both; logs `out of fuel, throttle cut` / `refuelled, throttle back`. No consumption while cut off. Reverse is blocked too (Chaos drives reverse through `ThrottleInput`).
   At Fuel = 0 the jeep adds `Vehicle.State.OutOfFuel` and the movement component forces the throttle to 0 (brake, steering and handbrake still work). Refuelling above 0 removes the tag. Not a fail state.
   🔍 Research first: zeroing throttle in `UB1VehicleMovementComponent::Update` vs scaling engine max torque; pick the one that also stops the idle creep from the torque curve.
   **Done:** builds; covered by the S2-09 rig.
   **User check:** `B1AddFuel -100`, then floor it: the jeep doesn't move; `B1AddFuel 20` and it drives again.
 
-- [ ] **S2-09** Fuel rigs (2.5 h) _(requires S2-08)_
+- [x] **S2-09** Fuel rigs (2.5 h) _(requires S2-08)_ <!-- done: 2026-10-26 -->
+  Result: rig options `bPossessWithPlayer` and `StartFuel` (negative = full); the rig possesses its jeep with player 0 and, in `FinishTest`, unbinds the template respawn and re-possesses the previous pawn. Thresholds `MinFuelPer100m`/`MaxFuelPer100m`; line gains `fuelUsed= fuelPer100m= cond=`. Rigs: `B1Fuel_Firm` (X −45 m, Y 68 m, clear of the parked player jeep; 11 s at 50 % → 137 m, 0.085 L/100 m), `B1Fuel_Medium` (X 7 m on the medium lane, 4.5 s at 50 %, stays in mud → 15.8 m, 0.158 L/100 m, guard `MinFuelPer100m` 0.15), `B1Fuel_Empty` (0 L, 5 s full throttle → 0.08 m). **Medium is 1.86× firm, short of the 2× target:** at 50 % the jeep doesn't slip in medium, and engine power ignores load, so mud only costs more per metre by being slower. Raising `IdleRate` to ~10 L/h would reach 2×; left for S2-15. Gym 19/19 (one run had `B1Mud_RestartHeavy` failed by an MCP `server/discover` error log from a client reconnecting to the headless editor; its line was PASS and it passes alone), `Lvl_Offroad` 8/8, existing numbers unchanged.
   - Rig option `bPossessWithPlayer`: the rig's spawned jeep is possessed by player 0, so it gets the ASC. Fuel is refilled at script start.
   - New metrics `fuelUsed=` (L), `fuelPer100m=` and thresholds; `B1Test` line also prints `cond=`.
   - Rigs in `Lvl_Gym_Mud`: `B1Fuel_Firm` (50 % on firm, 100 m), `B1Fuel_Medium` (50 % across medium), `B1Fuel_Empty` (fuel 0, 5 s full throttle, disp < 1 m).
@@ -377,6 +380,11 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   ⚠️ Note: PIE has one player 0, so rigs with `bPossessWithPlayer` run one per round.
   **Done:** all three PASS headless; both suites still PASS.
   **User check:** —
+
+- [x] **S2-17** Mud strain fuel term + typed ImGui fields (added mid-sprint after the S2-07..09 playtest) <!-- done: 2026-10-26 -->
+  Why: user playtest showed fast firm driving burned more than full throttle in mud (engine power ignores load), and the fuel drags had no typed input.
+  Result: ADR-010 amended. Consumption = `IdleRate + WorkRate·power + MudWorkRate·MudStrain`, `MudStrain = throttle × clamp(avg sink / MudFullStrainDepth)`; `MudWorkRate` 300 L/h, `MudFullStrainDepth` 50 cm on `UB1VehicleTuningData`, editable in Vehicle Status (which also shows strain and average sink). `B1Status` gains `strain=`. `B1ImGui::DragFloatTyped` moved to `Debug/B1ImGuiWidgets` and used by both windows; rule `.claude/rules/imgui.md` makes it mandatory for tunables. Rig metric `fuelPerHour=` + `MinFuelPerHour`. New rigs `B1Fuel_FirmFull` (6 s full throttle, 74 L/h) and `B1Fuel_DeepFull` (7 s full throttle stuck in deep, 344 L/h, guard ≥ 150). `B1Fuel_Medium` now 0.37 L/100 m = 4.3× firm (guard back to the 2× target, 0.17). Gym 21/21, `Lvl_Offroad` 8/8.
+  **User check:** full throttle in medium/deep burns visibly more (Vehicle Status L/h) than fast driving on firm; type values into the fuel fields.
 
 ### Mud polish (Phase 1)
 

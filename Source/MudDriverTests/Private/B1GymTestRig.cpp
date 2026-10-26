@@ -1,6 +1,9 @@
 #include "B1GymTestRig.h"
 #include "B1Log.h"
+#include "B1AbilitySystemComponent.h"
+#include "B1VehicleAttributeSet.h"
 #include "B1VehicleMovementComponent.h"
+#include "AbilitySystemGlobals.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
@@ -90,9 +93,19 @@ AWheeledVehiclePawn* AB1GymTestRig::ResolveVehicle()
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 	AWheeledVehiclePawn* Spawned = GetWorld()->SpawnActor<AWheeledVehiclePawn>(VehicleClass, GetActorTransform(), Params);
-	if (Spawned)
+	if (!Spawned)
 	{
-		RegisterAutoDestroyActor(Spawned);
+		return nullptr;
+	}
+
+	RegisterAutoDestroyActor(Spawned);
+	if (APlayerController* PC = bPossessWithPlayer ? GetWorld()->GetFirstPlayerController() : nullptr)
+	{
+		PreviousPlayerPawn = PC->GetPawn();
+		PC->Possess(Spawned);
+	}
+	else
+	{
 		// Nobody possesses the spawned vehicle, so Chaos must accept inputs without a controller.
 		Spawned->GetVehicleMovementComponent()->SetRequiresControllerForInputs(false);
 	}
@@ -132,10 +145,38 @@ void AB1GymTestRig::StartTest()
 		B1Movement->SetTestForce(TestForce);
 	}
 
+	AbilitySystem = Cast<UB1AbilitySystemComponent>(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Vehicle));
+	if (bPossessWithPlayer)
+	{
+		if (!AbilitySystem)
+		{
+			FinishTest(EFunctionalTestResult::Error, TEXT("bPossessWithPlayer but the vehicle has no B1 ASC (game mode isn't AB1GameMode?)"));
+			return;
+		}
+		const float MaxFuel = AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetMaxFuelAttribute());
+		const float TargetFuel = StartFuel < 0.0f ? MaxFuel : FMath::Min(StartFuel, MaxFuel);
+		AbilitySystem->AddVehicleFuel(TargetFuel - AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute()));
+		FuelAtStart = AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute());
+	}
+
 	if (InputScript.Num() > 0)
 	{
 		ApplyInput(InputScript[0]);
 	}
+}
+
+void AB1GymTestRig::FinishTest(EFunctionalTestResult TestResult, const FString& Message)
+{
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (PC && PreviousPlayerPawn && Vehicle && PC->GetPawn() == Vehicle)
+	{
+		// The template controller respawns a vehicle when its pawn is destroyed; the rig's jeep is about to be.
+		Vehicle->OnDestroyed.RemoveAll(PC);
+		PC->Possess(PreviousPlayerPawn);
+	}
+	PreviousPlayerPawn = nullptr;
+
+	Super::FinishTest(TestResult, Message);
 }
 
 void AB1GymTestRig::Tick(float DeltaSeconds)
@@ -329,11 +370,36 @@ void AB1GymTestRig::FinishScript()
 		SinkMetrics = TEXT(" sink=") + FString::Join(PerWheel, TEXT("/")) + FString::Printf(TEXT(" belly=%.0f"), MaxBellyDrag);
 	}
 
+	FString FuelMetrics;
+	if (AbilitySystem)
+	{
+		const float FuelUsed = FuelAtStart - AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute());
+		const float FuelPer100m = PathLength > 0.0f ? FuelUsed / PathLength * 100.0f : -1.0f;
+		const float FuelPerHour = ScriptTime > 0.0f ? FuelUsed / ScriptTime * 3600.0f : 0.0f;
+
+		if (Thresholds.MinFuelPer100m >= 0.0f && FuelPer100m < Thresholds.MinFuelPer100m)
+		{
+			Failures.Add(FString::Printf(TEXT("fuelPer100m<%.3f"), Thresholds.MinFuelPer100m));
+		}
+		if (Thresholds.MaxFuelPer100m >= 0.0f && FuelPer100m > Thresholds.MaxFuelPer100m)
+		{
+			Failures.Add(FString::Printf(TEXT("fuelPer100m>%.3f"), Thresholds.MaxFuelPer100m));
+		}
+
+		if (Thresholds.MinFuelPerHour >= 0.0f && FuelPerHour < Thresholds.MinFuelPerHour)
+		{
+			Failures.Add(FString::Printf(TEXT("fuelPerHour<%.1f"), Thresholds.MinFuelPerHour));
+		}
+
+		FuelMetrics = FString::Printf(TEXT(" fuelUsed=%.3f fuelPer100m=%.3f fuelPerHour=%.1f cond=%.1f"), FuelUsed, FuelPer100m, FuelPerHour,
+			AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute()));
+	}
+
 	const bool bPassed = Failures.Num() == 0;
 	const FString Name = TestLabel.IsEmpty() ? GetName() : TestLabel;
-	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f avgDt=%.4f frames=%d%s%s%s%s"),
+	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f avgDt=%.4f frames=%d%s%s%s%s%s"),
 		*Name, bPassed ? TEXT("PASS") : TEXT("FAIL"),
-		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics,
+		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics, *FuelMetrics,
 		bPassed ? TEXT("") : TEXT(" failed="), *FString::Join(Failures, TEXT(",")));
 
 	UE_LOG(LogB1Test, Display, TEXT("%s"), *Line);

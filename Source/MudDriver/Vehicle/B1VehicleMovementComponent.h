@@ -43,6 +43,19 @@ public:
 	/** N */
 	float GetBellyDrag() const { return SimOutput.BellyDrag; }
 
+	/** Engine throttle × torque(RPM) × RPM over the curve's peak power, [0, 1]; updated each game frame */
+	float GetNormalizedEnginePower() const { return NormalizedEnginePower; }
+
+	/** Throttle as the engine sees it this frame, after rise/fall rates and the fuel cut-off */
+	float GetEffectiveThrottle() const { return EffectiveThrottle; }
+
+	/** cm, mean over all wheels */
+	float GetAverageSinkDepth() const;
+
+	/** Out of fuel: throttle is forced to 0, brake/steering/handbrake still work */
+	void SetFuelCutOff(bool bCutOff) { bFuelCutOff = bCutOff; }
+	bool IsFuelCutOff() const { return bFuelCutOff; }
+
 	/** Belly drag starts once the average sink depth passes it. Axle height, below the jeep body's ~62 cm underside */
 	UPROPERTY(EditAnywhere, Category = "Mud|Config", meta = (Units = "cm", ClampMin = "0"))
 	float BellyClearance = 45.0f;
@@ -68,6 +81,16 @@ private:
 	TArray<TObjectPtr<UB1PhysicalMaterial_Mud>> KnownMudMaterials;
 
 	FB1VehicleSimOutput SimOutput;
+
+	void UpdateEnginePower();
+
+	float NormalizedEnginePower = 0.0f;
+	float EffectiveThrottle = 0.0f;
+
+	/** torque × RPM at the torque curve's best point; the curve doesn't change at runtime */
+	float PeakEnginePower = 0.0f;
+
+	bool bFuelCutOff = false;
 
 	EB1TestForce TestForce = EB1TestForce::Off;
 	FVector TestForceAnchor = FVector::ZeroVector;

@@ -15,6 +15,7 @@ public class MudDriverTests : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
 			"ChaosVehicles",
+			"GameplayAbilities",
 			"MudDriver"
 		});
 	}

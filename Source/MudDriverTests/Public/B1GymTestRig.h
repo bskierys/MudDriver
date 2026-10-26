@@ -8,6 +8,7 @@
 class AWheeledVehiclePawn;
 class UChaosWheeledVehicleMovementComponent;
 class UB1VehicleMovementComponent;
+class UB1AbilitySystemComponent;
 
 USTRUCT(BlueprintType)
 struct FB1GymInputStep
@@ -71,6 +72,17 @@ struct FB1GymThresholds
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	float MaxSpringAmpGrowth = -1.0f;
 
+	/** Fuel used per 100 m of path; needs bPossessWithPlayer */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MinFuelPer100m = -1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MaxFuelPer100m = -1.0f;
+
+	/** L/h averaged over the script; needs bPossessWithPlayer */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MinFuelPerHour = -1.0f;
+
 	/** Vehicle height above the rig actor at script end; has a toggle since negative heights are valid */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m", EditCondition = "bCheckEndHeight"))
 	float MinEndHeight = 0.0f;
@@ -100,6 +112,7 @@ protected:
 	virtual void PrepareTest() override;
 	virtual bool IsReady_Implementation() override;
 	virtual void StartTest() override;
+	virtual void FinishTest(EFunctionalTestResult TestResult, const FString& Message) override;
 
 	/** Used if set; otherwise the player's vehicle (bUsePlayerVehicle) or a VehicleClass spawned at the rig */
 	UPROPERTY(EditInstanceOnly, Category = "B1Test|Config")
@@ -110,6 +123,14 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
 	TSubclassOf<AWheeledVehiclePawn> VehicleClass;
+
+	/** Player 0 possesses the spawned vehicle, so it gets the PlayerState ASC (fuel, tags). One such rig per PIE round */
+	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
+	bool bPossessWithPlayer = false;
+
+	/** Litres set at script start; negative fills the tank */
+	UPROPERTY(EditAnywhere, Category = "B1Test|Config", meta = (EditCondition = "bPossessWithPlayer"))
+	float StartFuel = -1.0f;
 
 	/** Time for the vehicle to settle on its suspension before the script starts */
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config", meta = (Units = "s"))
@@ -159,6 +180,15 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UB1VehicleMovementComponent> B1Movement;
+
+	/** Player 0's pawn before bPossessWithPlayer took over; possessed again when the test finishes */
+	UPROPERTY(Transient)
+	TObjectPtr<APawn> PreviousPlayerPawn;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UB1AbilitySystemComponent> AbilitySystem;
+
+	float FuelAtStart = 0.0f;
 
 	bool bScriptRunning = false;
 	float ScriptTime = 0.0f;

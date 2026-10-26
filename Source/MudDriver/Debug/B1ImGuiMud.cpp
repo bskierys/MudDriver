@@ -7,36 +7,12 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "UObject/UObjectIterator.h"
-#if WITH_EDITOR
-#include "Misc/PackageName.h"
-#include "UObject/SavePackage.h"
-#endif
+#include "B1ImGuiAssetSave.h"
+#include "B1ImGuiWidgets.h"
 
 namespace B1ImGui
 {
 #if NETIMGUI_ENABLED
-	static constexpr float TypeFieldWidth = 70.0f;
-
-	/** Drag plus a text field for typing an exact value */
-	static bool DragFloatTyped(const char* Label, float* Value, float Speed, float Min, float Max, const char* Format = "%.2f")
-	{
-		ImGui::PushID(Label);
-		const float DragWidth = FMath::Max(ImGui::CalcItemWidth() - TypeFieldWidth - ImGui::GetStyle().ItemInnerSpacing.x, 50.0f);
-		ImGui::SetNextItemWidth(DragWidth);
-		bool bChanged = ImGui::DragFloat("##drag", Value, Speed, Min, Max, Format, ImGuiSliderFlags_AlwaysClamp);
-		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-		ImGui::SetNextItemWidth(TypeFieldWidth);
-		if (ImGui::InputFloat("##type", Value, 0.0f, 0.0f, Format))
-		{
-			*Value = FMath::Clamp(*Value, Min, Max);
-			bChanged = true;
-		}
-		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-		ImGui::TextUnformatted(Label);
-		ImGui::PopID();
-		return bChanged;
-	}
-
 	static void DrawWheelTable(const UB1VehicleMovementComponent& Movement)
 	{
 		constexpr ImGuiTableFlags Flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
@@ -120,16 +96,8 @@ namespace B1ImGui
 
 	static void SavePreset(UB1PhysicalMaterial_Mud& Mud)
 	{
-#if WITH_EDITOR
-		UPackage* Package = Mud.GetPackage();
-		const FString Filename = FPackageName::LongPackageNameToFilename(Package->GetName(), FPackageName::GetAssetPackageExtension());
-
-		FSavePackageArgs Args;
-		Args.TopLevelFlags = RF_Public | RF_Standalone;
-		Args.SaveFlags = SAVE_NoError;
-		const bool bSaved = UPackage::SavePackage(Package, &Mud, *Filename, Args);
-		UE_LOG(LogB1Physics, Log, TEXT("Mud preset %s %s to %s"), *Mud.GetName(), bSaved ? TEXT("saved") : TEXT("FAILED to save"), *Filename);
-#endif
+		const bool bSaved = SaveAssetPackage(Mud);
+		UE_LOG(LogB1Physics, Log, TEXT("Mud preset %s %s"), *Mud.GetPathName(), bSaved ? TEXT("saved") : TEXT("FAILED to save"));
 	}
 
 	/** Returns true when any value changed */

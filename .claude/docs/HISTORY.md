@@ -561,3 +561,30 @@ S2-01/02 had the tags, player state and attribute set, but no game mode used the
 ### Open follow-ups
 - Pre-existing `Lvl_Offroad` load error (missing dependent package on one external actor), logged in the backlog.
 - User check: S1-27 recenter retune.
+
+---
+
+## 2026-10-26 — Fuel: consumption, out of fuel, rigs, mud strain (S2-07..09, S2-17)
+
+### Context
+S2-03..06 committed (`0d9b191`). This session built the fuel loop from ADR-010, then reworked it after the user's playtest.
+
+### What was built
+- S2-07: `UB1VehicleTuningData` + `DA_B1JeepTuning`; the jeep accumulates consumption and applies a drain GE every 0.25 s; engine power rebuilt from throttle² × torque curve(RPM) × RPM. Vehicle Status shows L/h, L/100 m, power; `B1Status` gets `lph= l100= pow=`.
+- S2-08: Fuel attribute delegate → `Vehicle.State.OutOfFuel` + throttle cut-off in the movement component.
+- S2-09: rig `bPossessWithPlayer` / `StartFuel`, fuel metrics and thresholds, rigs `B1Fuel_Firm/Medium/Empty`.
+- S2-17 (from playtest): mud strain term `MudWorkRate × throttle × sink/MudFullStrainDepth`; `fuelPerHour=` metric; rigs `B1Fuel_FirmFull`, `B1Fuel_DeepFull`. `DragFloatTyped` moved to `Debug/B1ImGuiWidgets`, save code to `Debug/B1ImGuiAssetSave`; rule `.claude/rules/imgui.md` (listed in CLAUDE.md).
+- Gym 21/21, `Lvl_Offroad` 8/8.
+
+### Decisions made
+- ADR-010 amended: mud strain term, because Chaos engine power ignores load.
+- Fuel cut-off zeroes `ThrottleInput` before `Super::Update`; no idle creep exists since engine torque is throttle-scaled.
+- Every tunable ImGui float pairs a drag with a typed field (user asked twice).
+
+### What we learned
+- Chaos engine torque = throttle² × curve(RPM); at 50 % throttle the jeep doesn't slip in medium mud, so power-only consumption made mud cheaper per hour than fast firm driving (1.86× per 100 m only from being slower).
+- A client reconnecting to the MCP port during a headless run logs `Call to unknown method "server/discover"` as an error and fails whichever test is running.
+- `StopEditor.ps1` stalls on a save dialog if the user's playtest left dirty packages; ask before saving or discarding.
+
+### Open follow-ups
+- S2-15 fuel playtest: tune the placeholder rates (6 / 240 / 300 L/h, 50 cm).

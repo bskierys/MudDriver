@@ -53,6 +53,7 @@ Domain rules in [.claude/rules/](.claude/rules/) (loaded per-file by `applyTo` g
 |---|---|
 | [.claude/rules/mcp-tools.md](.claude/rules/mcp-tools.md) | always (Unreal MCP usage) |
 | [.claude/rules/editor-lifecycle.md](.claude/rules/editor-lifecycle.md) | always (closing, opening and rebuilding the editor) |
+| [.claude/rules/imgui.md](.claude/rules/imgui.md) | `Source/MudDriver/Debug/B1ImGui*` (typed fields for tunables, save to asset) |
 
 ---
 

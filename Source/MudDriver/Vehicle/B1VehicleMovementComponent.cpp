@@ -39,9 +39,47 @@ void UB1VehicleMovementComponent::SetTestForce(EB1TestForce Mode)
 		*UEnum::GetValueAsString(Mode), *GetNameSafe(GetOwner()), *TestForceAnchor.ToCompactString());
 }
 
+float UB1VehicleMovementComponent::GetAverageSinkDepth() const
+{
+	const int32 NumWheels = GetNumWheels();
+	float Sum = 0.0f;
+	for (int32 WheelIndex = 0; WheelIndex < NumWheels; ++WheelIndex)
+	{
+		Sum += GetWheelSinkDepth(WheelIndex);
+	}
+	return NumWheels > 0 ? Sum / NumWheels : 0.0f;
+}
+
+void UB1VehicleMovementComponent::UpdateEnginePower()
+{
+	if (PeakEnginePower <= 0.0f)
+	{
+		constexpr int32 NumSamples = 64;
+		for (int32 Sample = 1; Sample <= NumSamples; ++Sample)
+		{
+			const float RPM = EngineSetup.MaxRPM * Sample / NumSamples;
+			PeakEnginePower = FMath::Max(PeakEnginePower, EngineSetup.GetTorqueFromRPM(RPM) * RPM);
+		}
+	}
+
+	// Same throttle the physics engine gets: the rate config's control function, squared by the wheeled sim.
+	EffectiveThrottle = ThrottleInputRate.CalcControlFunction(ThrottleInput);
+	const float RPM = GetEngineRotationSpeed();
+	const float Power = EffectiveThrottle * EffectiveThrottle * EngineSetup.GetTorqueFromRPM(RPM) * RPM;
+	NormalizedEnginePower = PeakEnginePower > 0.0f ? FMath::Clamp(Power / PeakEnginePower, 0.0f, 1.0f) : 0.0f;
+}
+
 void UB1VehicleMovementComponent::Update(float DeltaTime)
 {
+	// Chaos engine torque is throttle × curve(RPM), so a zero throttle also removes idle torque.
+	if (bFuelCutOff)
+	{
+		ThrottleInput = 0.0f;
+	}
+
 	Super::Update(DeltaTime);
+
+	UpdateEnginePower();
 
 	FB1VehicleSimulation* Simulation = GetB1Simulation();
 	if (!CurAsyncInput || !Simulation)

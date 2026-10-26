@@ -177,6 +177,8 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 
 **Alternatives.** Distance-based consumption (doesn't punish wheelspin). A periodic infinite GE with a dynamic magnitude (harder to drive from per-frame engine state).
 
+**Amendment (2026-10-26): mud strain term.** The rationale above didn't hold: Chaos engine torque is throttle² × curve(RPM) and ignores load, and the jeep rarely spins in medium mud, so a slow jeep in mud burned less per hour than a fast one on firm ground (user playtest). Consumption is now `IdleRate + WorkRate * NormalizedEnginePower + MudWorkRate * MudStrain`, with `MudStrain = throttle * clamp(average wheel sink depth / MudFullStrainDepth, 0, 1)`. Both new values sit on `UB1VehicleTuningData` and are editable in the Vehicle Status window. Alternative considered: resistive power (rolling resistance + belly drag × speed), rejected because it's ~0 when stuck at full throttle, which is exactly when the engine strains most.
+
 ---
 
 ## ADR-011 — Low-end render budget
