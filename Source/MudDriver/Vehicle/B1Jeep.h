@@ -8,6 +8,7 @@
 class UB1VehicleMovementComponent;
 class UAbilitySystemComponent;
 class UB1VehicleTuningData;
+class UB1MudSprayComponent;
 struct FOnAttributeChangeData;
 
 /** The player's jeep: the template offroad car running on UB1VehicleMovementComponent */
@@ -46,6 +47,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Fuel|Config")
 	TObjectPtr<UB1VehicleTuningData> TuningData;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mud|Components")
+	TObjectPtr<UB1MudSprayComponent> MudSpray;
 
 	virtual void DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos) override;
 

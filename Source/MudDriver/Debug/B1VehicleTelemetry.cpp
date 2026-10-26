@@ -4,6 +4,7 @@
 #include "B1VehicleMovementComponent.h"
 #include "B1VehicleAttributeSet.h"
 #include "B1Jeep.h"
+#include "B1MudSprayComponent.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -80,16 +81,18 @@ namespace B1VehicleTelemetry
 		Line.Appendf(TEXT("B1Mud %s v=%.1fkmh belly=%.1fcm/%.0fN"), *GetNameSafe(Movement.GetOwner()), Movement.GetForwardSpeed() * 0.036f,
 			Movement.GetBellyDepth(), Movement.GetBellyDrag());
 
+		const UB1MudSprayComponent* Spray = Movement.GetOwner()->FindComponentByClass<UB1MudSprayComponent>();
 		for (int32 WheelIndex = 0; WheelIndex < Movement.GetNumWheels(); ++WheelIndex)
 		{
 			const FWheelStatus& Status = Movement.GetWheelState(WheelIndex);
-			Line.Appendf(TEXT(" | w%d mat=%s sink=%.1f slip=%.2f mu=%.2f rr=%.0f"),
+			Line.Appendf(TEXT(" | w%d mat=%s sink=%.1f slip=%.2f mu=%.2f rr=%.0f spray=%.0f"),
 				WheelIndex,
 				*GetNameSafe(Status.PhysMaterial.Get()),
 				Movement.GetWheelSinkDepth(WheelIndex),
 				Status.SlipMagnitude,
 				Movement.GetWheelMudFrictionScale(WheelIndex),
-				Movement.GetWheelRollingResistance(WheelIndex));
+				Movement.GetWheelRollingResistance(WheelIndex),
+				Spray ? Spray->GetWheelSpawnRate(WheelIndex) : 0.0f);
 		}
 
 		UE_LOG(LogB1Physics, Log, TEXT("%s"), *Line);

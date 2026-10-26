@@ -55,4 +55,8 @@ public:
 	/** Drag per metre of sink past ground clearance, as a fraction of vehicle weight */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mud|Config", meta = (ClampMin = "0"))
 	float BellyDragCoefficient = 2.0f;
+
+	/** Colour of the mud thrown by spinning wheels */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mud|Spray")
+	FLinearColor SprayColor = FLinearColor(0.12f, 0.08f, 0.04f);
 };

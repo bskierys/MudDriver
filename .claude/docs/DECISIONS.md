@@ -159,6 +159,8 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 
 **Alternatives.** Ruts that store depth and affect sinking and steering (memory per mud zone, much more work).
 
+**Amendment (2026-10-26, user decision after S2-14).** Darkening alone reads flat, worst on Heavy/Deep. Ruts stay visual only, but must look dug in: the per-patch trail target stores rut depth (the wheel's sink depth, max-blended), a dense visual surface mesh is displaced down by it in the vertex shader with a raised lip, and normals come from the depth gradient (no shadow maps, ADR-011). Rejected: parallax-only (breaks at the low chase-camera angle and at patch edges), Nanite tessellation (experimental, too heavy for the low-end target), physics ruts (not wanted).
+
 ---
 
 ## ADR-009 — Mechanics are built in test gyms before the scenario level

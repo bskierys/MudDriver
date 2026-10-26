@@ -649,3 +649,27 @@ Sprint 2 `/work` from S2-10 up to the S2-12 user check. GAS and fuel were done; 
 
 ### Open follow-ups
 - S2-13 Niagara spray, S2-14 trails, S2-15 fuel tuning, S2-16 Phase 1 close.
+
+---
+
+## 2026-10-26 — Niagara mud spray (S2-13), first trails pass (S2-14)
+
+### Context
+`/work` through S2-13 and S2-14. The user signed off the spray. The trails worked but looked flat, so the user asked for ruts that look dug in (still visual only) as a new task, S2-14b.
+
+### What was built
+- S2-13: `UB1MudSprayComponent` on the jeep, `/Game/B1/FX/NS_B1MudSpray` + `M_B1MudSpray`, `SprayColor` per mud preset, `spray=` in the `B1Mud` telemetry, CVar `b1.Mud.Spray`. Committed.
+- S2-14 (first pass, not committed yet): per-patch 512² trail render targets, `UB1MudTrailSubsystem` + `UB1MudTrailComponent`, `M_B1Mud` darkens and glosses along the trail. Two clear tracks after a rig drive, but flat.
+
+### Decisions made
+- ADR-008 amended: visual ruts get real depth (depth-encoded trail target, dense displaced surface mesh, lip, normals from the gradient). Parallax-only, Nanite tessellation and physics ruts were rejected.
+
+### What we learned
+- The MCP Niagara toolset can build a system end to end (template system/emitter, modules, user params, linked and HLSL stack inputs, renderer data, stack-issue fixes). MaterialTools builds material graphs node by node.
+- The Collision module's `Kill Occluded Particles` (default on) silently killed every particle born behind the tire. Particles spawned at the wheel hit sit under the visible mud surface, because the hit is sunk (ADR-012).
+- The default Niagara sprite material reads as glowing dots; mud needs a lit masked material.
+- `CaptureEditorImage` after `StartPIE(bSimulate)` with an auto-run rig and a preset camera is a workable visual check for effects.
+- With no shadow maps (ADR-011), depth on the ground has to come from normals and geometry; colour and roughness changes alone read flat.
+
+### Open follow-ups
+- S2-14b ruts with depth; S2-14 code is committed with it.

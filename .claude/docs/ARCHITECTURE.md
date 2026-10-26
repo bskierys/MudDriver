@@ -8,7 +8,7 @@ UE 5.8, engine at `C:\Program Files\UE_5.8`.
 
 | Module | Type | Deps | Holds |
 |---|---|---|---|
-| `MudDriver` | Runtime | Core, CoreUObject, Engine, InputCore, EnhancedInput, ChaosVehicles, PhysicsCore, UMG, Slate, NetImgui, GameplayAbilities, GameplayTags, GameplayTasks; private Projects, ChaosVehiclesCore | Game code |
+| `MudDriver` | Runtime | Core, CoreUObject, Engine, InputCore, EnhancedInput, ChaosVehicles, PhysicsCore, UMG, Slate, NetImgui, GameplayAbilities, GameplayTags, GameplayTasks, DeveloperSettings; private Projects, ChaosVehiclesCore, Niagara | Game code |
 | `MudDriverTests` | DeveloperTool (not in Shipping, ADR-013) | Core, CoreUObject, Engine, FunctionalTesting; private ChaosVehicles, MudDriver | Gym test rigs |
 
 Game-module symbols used by the tests need `MUDDRIVER_API` (the log categories already have it).
@@ -87,6 +87,15 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
   - `FrictionVsDepth` and `RollingResistanceVsDepth` (fraction of wheel load), both `FRuntimeFloatCurve` over normalized depth;
   - `BellyDragCoefficient` (fraction of vehicle weight per m past clearance).
   - Its base `Friction` is the grip at zero depth. Chaos feeds it to the tire through `SetSurfaceFriction`, so the depth curve multiplies on top.
+  - `SprayColor` (`Mud|Spray`) colours the wheel spray; set per preset, lighter for Shallow, darker for Deep. <!-- updated 2026-10-26 -->
+
+## Mud spray
+
+- `UB1MudSprayComponent` (`Mud/`, on `AB1Jeep` as `MudSpray`) creates one `UNiagaraComponent` per wheel (lazily, once the wheels exist) with `/Game/B1/FX/NS_B1MudSpray`.
+- Each tick, for a wheel in contact with a `UB1PhysicalMaterial_Mud`, sink > 0 and |`SlipMagnitude`| > `MinSlipSpeed` (0.5 m/s): `User.SpawnRate` = 60/s per m/s of excess slip (max 400), `User.SprayVelocity` = 250–900 cm/s backward (sign of the wheel's drive torque) and 35° up, in component space; `User.Color` = the material's `SprayColor`. Otherwise the rate is 0.
+- The emitter sits 20 cm above the visible mud surface (hit + sink depth, ADR-012) and behind the tread, so depth-buffer collision doesn't catch particles at birth.
+- `NS_B1MudSpray`: one GPU emitter (Fountain template), fixed bounds, cone velocity from `SprayVelocity`, 0.4–0.9 s life, 10–25 cm sprites, gravity, drag, GPU depth-buffer collision with Kill Occluded off. `M_B1MudSpray`: masked, lit, base colour = particle colour, round cutout.
+- CVar `b1.Mud.Spray`; the `B1Mud` telemetry line has `spray=` per wheel. <!-- updated 2026-10-26 -->
 - Presets (S/M/L/XL): `/Game/B1/Mud/PM_B1Mud_Shallow` (25 cm), `_Medium` (35), `_Heavy` (50), `_Deep` (70), set as each gym patch's `MudMaterial`. Tints `MI_B1Mud_*`. Gym lanes: Shallow Y 16, Medium Y 29, Heavy Y 42, Deep Y 55. <!-- updated 2026-10-26 -->
 
 <!-- updated 2026-10-25 -->
@@ -111,7 +120,7 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 - Vehicle Status window (`B1ImGui::DrawVehicleStatus`, Debug → Vehicle Status): avatar, Condition/Fuel bars, owned tags, and Refill / ±10 L / Empty / Damage 10 / Repair buttons. A "Fuel use" section shows engine power, mud strain, average sink, L/h and a rolling 5 s L/100 m, with the tuning-asset rates editable and "Save to asset". CVar `b1.Vehicle.StatusTelemetry` logs `B1Status <vehicle> cond= fuel= lph= l100= pow= strain= tags=` at 2 Hz for vehicles with an ASC. <!-- updated 2026-10-26 -->
 - Shared ImGui helpers: `B1ImGui::DragFloatTyped` (`Debug/B1ImGuiWidgets`; drag plus typed field, required for every tunable float by `.claude/rules/imgui.md`) and `B1ImGui::SaveAssetPackage` (`Debug/B1ImGuiAssetSave`, editor only). <!-- updated 2026-10-26 -->
 - Mud window (`B1ImGui::DrawMud`, Debug → Mud): belly readout, live `BellyClearance`, a per-wheel mud table, and live editing of every loaded `UB1PhysicalMaterial_Mud` (scalars and curve keys) on the asset objects themselves. "Save to asset" (`WITH_EDITOR`) calls `UPackage::SavePackage`.
-- Telemetry: CVar `b1.Vehicle.Telemetry` logs one `B1Wheels ...` line per vehicle every 0.5 s to `LogB1Vehicle` (`B1VehicleTelemetry`). CVar `b1.Mud.Telemetry` logs `B1Mud ... belly= | w<i> mat= sink= slip= mu= rr=` to `LogB1Physics` at the same rate, only while touching mud. <!-- updated 2026-10-26 -->
+- Telemetry: CVar `b1.Vehicle.Telemetry` logs one `B1Wheels ...` line per vehicle every 0.5 s to `LogB1Vehicle` (`B1VehicleTelemetry`). CVar `b1.Mud.Telemetry` logs `B1Mud ... belly= | w<i> mat= sink= slip= mu= rr= spray=` to `LogB1Physics` at the same rate, only while touching mud. <!-- updated 2026-10-26 -->
 - ShowDebug: `ShowDebug B1Vehicle` draws vehicle text above the actor (`B1VehicleShowDebug`, bound via `AHUD::OnShowDebugInfo` in `AMudDriverPawn`, whose `DrawShowDebug` is virtual). `ShowDebug B1Mud` (`B1MudShowDebug`): `AB1Jeep` adds InMud, belly and per-wheel material / sink / max / mu / rr below the B1Vehicle anchor; each `AB1MudPatch` binds its own handler and draws its material, max sink, size, hard bottom and ramps when the viewer's camera is within 50 m. <!-- updated 2026-10-26 -->
 
 ## Testing

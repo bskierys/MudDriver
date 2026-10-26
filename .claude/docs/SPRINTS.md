@@ -407,19 +407,30 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds.
   **User check:** `ShowDebug B1Mud` in the gym: readable over the jeep and the patches, toggles off. ✅ signed off 2026-10-26.
 
-- [ ] **S2-13** Niagara mud spray (3 h)
+- [x] **S2-13** Niagara mud spray (3 h) <!-- done: 2026-10-26 -->
+  Result: research: the MCP Niagara toolset builds systems end to end (create from template, add emitter/modules, user vars, linked/HLSL stack inputs, renderer data, stack-issue fixes); MaterialTools builds the material graph. `/Game/B1/FX/NS_B1MudSpray` (Fountain emitter, GPU, fixed bounds): `SpawnRate` ← `User.SpawnRate`; Add Velocity cone axis ← `User.SprayVelocity`, speed = `length(User.SprayVelocity)`, 25°; colour ← `User.Color`; 0.4–0.9 s, 10–25 cm sprites; gravity, drag 1; GPU depth-buffer collision (restitution 0.05, friction 0.9, **Kill Occluded Particles off**, or particles born behind the tire die). `M_B1MudSpray`: masked, lit, base colour = particle colour, round SphereMask cutout. C++ `Mud/UB1MudSprayComponent` on `AB1Jeep` (Niagara as a private module dep): one Niagara component per wheel, created lazily; per tick, on a mud wheel in contact with sink > 0 and |slip| > 0.5 m/s: rate = 60/s per m/s of excess slip (max 400), velocity 250–900 cm/s backward (by drive-torque sign) and 35° up, spawned 20 cm above the visible mud surface and behind the tread (the hit is sunk, ADR-012). Uses `FWheelStatus::SlipMagnitude`, the same slip the sink model uses. CVar `b1.Mud.Spray`. `SprayColor` on `UB1PhysicalMaterial_Mud`, set per preset (lighter for Shallow, darker for Deep). `B1Mud` telemetry gains `spray=` per wheel. The spec's `SpinDir` param became `SprayVelocity` (direction plus slip-scaled speed). Simulate + `CaptureEditorImage` with `B1Mud_DigInMedium`: brown clumps thrown back off the slipping wheels; telemetry `spray=160..210` on medium, `0` on firm. Gym 22/22, `Lvl_Offroad` 8/8.
   `NS_B1MudSpray`: GPU sprites, spawn rate ∝ slip speed × (sink depth > 0), velocity backward and up from the contact along the wheel spin direction, gravity, depth-buffer collision, short lifetime. One `UNiagaraComponent` per wheel on `AB1Jeep`, driven from `Tick` via user params (`SpawnRate`, `SpinDir`, `Color`). Mud wheels only; off on firm ground. Colour from a new `SprayColor` on `UB1PhysicalMaterial_Mud` (cheap stretch item).
   🔍 Research first: what the MCP Niagara toolset can author (emitter modules, user params). If it can't build the system, the agent writes the C++ side and you make the system by hand from a short spec.
   **Done:** builds; Simulate + `CaptureEditorImage` with a rig digging in medium shows spray on the mud wheels only.
-  **User check:** floor it in medium: the spray reads as mud and scales with wheelspin; crawling barely sprays.
+  **User check:** floor it in medium: the spray reads as mud and scales with wheelspin; crawling barely sprays. ✅ signed off 2026-10-26.
 
-- [ ] **S2-14** Visual trails (ADR-008) (3.5 h)
+- [x] **S2-14** Visual trails (ADR-008) (3.5 h) <!-- done: 2026-10-26 -->
+  Result: per-patch RT, no blocker found (RVT not needed). Each `AB1MudPatch` creates a 512² R8 render target at BeginPlay (game worlds only), puts it on a dynamic instance of its surface material as `TrailMask`, and registers with `UB1MudTrailSubsystem` (`UTickableWorldSubsystem`, Game/PIE). `M_B1Mud`: UV = surface object-space XY / 100 + 0.5 (World→Local transform; handles rotation, no patch params), mask lerps base colour to 0.45× and roughness 1 → 0.4. `UB1MudTrailComponent` on `AB1Jeep` sends each mud wheel's contact path (width = `WheelWidth` × 1.3) as segments; the subsystem splits them into stamps every 5 cm and draws one additive canvas batch per patch per frame with a procedural soft brush (64², 0.5 per stamp). No fade, no physics. CVar `b1.Mud.Trails`. Simulate + `CaptureEditorImage` after `B1Mud_CrossMedium`: two solid dark tracks along the lane. Gym 22/22, `Lvl_Offroad` 8/8.
   - Each `AB1MudPatch` owns a render target (512², world-mapped over `Size`) created at BeginPlay. `M_B1Mud` samples it: darker and slightly glossier where driven.
   - The jeep stamps a soft brush at each mud wheel's contact every ~10 cm travelled (`DrawMaterialToRenderTarget` with a brush material, or a canvas draw batch per frame), width from the wheel.
   - Trails don't fade and don't touch physics.
   🔍 Research first: per-patch render targets vs one RVT for all mud. Per-patch RT is the simple default; RVT only if per-patch has a blocker.
   **Done:** builds; a viewport capture after a rig drive through medium shows two clear tracks.
-  **User check:** trails look acceptable; decide whether physics ruts are worth it (ADR-008 revisit → backlog or a new ADR).
+  **User check:** trails look acceptable; decide whether physics ruts are worth it (ADR-008 revisit → backlog or a new ADR). ❌ 2026-10-26: trails look flat, no depth (worst on Heavy/Deep). No physics ruts wanted, but they must look 3D → S2-14b.
+
+- [ ] **S2-14b** Deformed-looking ruts (4–6 h) _(requires S2-14)_
+  Visual only (ADR-008 amendment). Builds on the S2-14 trail render targets.
+  - Stamps write the wheel's sink depth (normalized to the patch's mud `MaxSinkDepth`), max-blended, so Deep digs deep ruts and Shallow barely marks.
+  - The patch gets a dense visual surface (subdivided plane, ~10 cm grid) for vertex displacement; the 10 cm slab stays for collision and is hidden.
+  - `M_B1Mud`: World Position Offset pushes vertices down by rut depth and raises a lip beside the rut (mud pushed aside); normals rebuilt from the rut height gradient, so walls shade without shadow maps (ADR-011); wet darkening kept.
+  - Ruts don't recover when the sink model does.
+  **Done:** builds; both suites PASS; a viewport capture after rigs drive through medium and deep shows ruts with visible depth and lips.
+  **User check:** ruts on Heavy/Deep look dug into the mud from the chase camera.
 
 ### Close
 
@@ -428,7 +439,7 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** fuel rigs PASS with the tuned values.
   **User check:** sign-off on fuel pressure (Phase G).
 
-- [ ] **S2-16** Phase 1 close playtest (user + agent, 1 h) _(requires S2-10..S2-14)_
+- [ ] **S2-16** Phase 1 close playtest (user + agent, 1 h) _(requires S2-10..S2-14b)_
   Mud checklist (ROADMAP Phase 1) plus spray, trails, `ShowDebug B1Mud`, `B1Unstuck`. You also check `stat unit` on the laptop (sanity only).
   **Done:** both suites PASS; ROADMAP Phase 1 and Phase G ticked.
   **User check:** sign-off on Phase 1.
