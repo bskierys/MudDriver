@@ -66,6 +66,12 @@ struct FB1VehicleSimInput
 
 	/** cm, from the wheel contact to the underside of the chassis */
 	float BellyClearance = 0.0f;
+
+	/** One-shot sink reset: the sim clears SinkDepth/SinkOffset once per new value. A counter, since input is latest-wins */
+	uint32 SinkResetSerial = 0;
+
+	/** N, world, at the centre of mass. B1Unstuck's push window */
+	FVector UnstuckAssistForce = FVector::ZeroVector;
 };
 
 /** Physics thread → game thread, latest step */
@@ -85,4 +91,7 @@ struct FB1VehicleSimOutput
 
 	/** N */
 	float BellyDrag = 0.0f;
+
+	/** Last FB1VehicleSimInput::SinkResetSerial the sim applied */
+	uint32 SinkResetSerial = 0;
 };

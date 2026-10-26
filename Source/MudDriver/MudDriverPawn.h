@@ -215,7 +215,7 @@ protected:
 
 	void LogTelemetry();
 
-	void DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos);
+	virtual void DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos);
 
 public:
 	/** Returns the front spring arm subobject */

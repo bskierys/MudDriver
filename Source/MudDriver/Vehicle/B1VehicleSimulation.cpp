@@ -40,10 +40,21 @@ void FB1VehicleSimulation::UpdateSimulation(float DeltaTime, const FChaosVehicle
 		StepInput = PendingInput;
 	}
 
+	if (StepInput.SinkResetSerial != AppliedSinkResetSerial)
+	{
+		AppliedSinkResetSerial = StepInput.SinkResetSerial;
+		SinkDepth.Init(0.0f, SinkDepth.Num());
+		SinkOffset.Init(0.0f, SinkOffset.Num());
+	}
+
 	UChaosWheeledVehicleSimulation::UpdateSimulation(DeltaTime, InputData, Handle);
 
 	LastDeltaTime = DeltaTime;
 	ApplyTestForce(StepInput);
+	if (!StepInput.UnstuckAssistForce.IsZero())
+	{
+		AddForce(StepInput.UnstuckAssistForce * NewtonsToUnreal);
+	}
 	UpdateSinkDepth(DeltaTime);
 
 	{
@@ -53,6 +64,7 @@ void FB1VehicleSimulation::UpdateSimulation(float DeltaTime, const FChaosVehicle
 		LatestOutput.RollingResistance = RollingResistance;
 		LatestOutput.BellyDepth = BellyDepth;
 		LatestOutput.BellyDrag = BellyDrag;
+		LatestOutput.SinkResetSerial = AppliedSinkResetSerial;
 	}
 
 	if (!bLoggedFirstTick)

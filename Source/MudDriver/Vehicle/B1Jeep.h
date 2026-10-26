@@ -40,10 +40,14 @@ public:
 	/** Over the last few seconds; negative until the jeep has moved at least a metre in that window */
 	float GetFuelPer100m() const;
 
+	bool IsInMud() const { return bInMud; }
+
 protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Fuel|Config")
 	TObjectPtr<UB1VehicleTuningData> TuningData;
+
+	virtual void DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos) override;
 
 private:
 
@@ -54,6 +58,12 @@ private:
 	void UpdateOutOfFuel(float Fuel);
 	void OnFuelChanged(const FOnAttributeChangeData& Data);
 	FDelegateHandle FuelChangedHandle;
+
+	/** Vehicle.State.InMud while any wheel touches mud, held MudTagReleaseDelay after the last contact */
+	void UpdateInMud(float DeltaSeconds);
+	void SetInMud(bool bNewInMud);
+	bool bInMud = false;
+	float TimeSinceMudContact = 0.0f;
 
 	TWeakObjectPtr<UAbilitySystemComponent> AbilitySystem;
 

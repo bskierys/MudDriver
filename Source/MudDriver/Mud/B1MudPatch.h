@@ -6,6 +6,9 @@
 
 class UPhysicalMaterial;
 class UStaticMeshComponent;
+class AHUD;
+class UCanvas;
+class FDebugDisplayInfo;
 
 /**
  * Mud patch per ADR-012: a wheel-trace-only surface slab with its top at the actor origin,
@@ -22,7 +25,20 @@ public:
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 
+	UPhysicalMaterial* GetMudMaterial() const { return MudMaterial; }
+	const FVector2D& GetSize() const { return Size; }
+	bool HasHardBottom() const { return bHardBottom; }
+	float GetHardBottomDepth() const { return HardBottomDepth; }
+	float GetEdgeRampLength() const { return EdgeRampLength; }
+
+	/** e.g. "+X -X", or "none" */
+	FString DescribeRamps() const;
+
 protected:
+
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mud|Components")
 	TObjectPtr<UStaticMeshComponent> MudSurface;
@@ -67,6 +83,10 @@ protected:
 	float EdgeRampLength = 300.0f;
 
 private:
+
+	/** `ShowDebug B1Mud`, only within B1MudShowDebug::PatchDrawDistance of the viewer */
+	void DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos);
+	FDelegateHandle ShowDebugHandle;
 
 	void UpdateEdgeRamp(UStaticMeshComponent& Ramp, const FVector2D& Outward, bool bEnabled);
 };

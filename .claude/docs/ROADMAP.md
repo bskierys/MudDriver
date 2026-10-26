@@ -39,7 +39,7 @@ Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md]
 **Scope (minimum).**
 - [x] `UB1PhysicalMaterial_Mud`, per-wheel sinking via trace offset, traction/resistance curves, belly drag (Sprint 1)
 - [x] Mud NetImGui window with live tuning (Sprint 1)
-- [ ] `Vehicle.State.InMud` tag, `B1Unstuck`, `ShowDebug B1Mud` (Sprint 2, needs GAS)
+- [x] `Vehicle.State.InMud` tag, `B1Unstuck`, `ShowDebug B1Mud` (Sprint 2, needs GAS) <!-- done: 2026-10-26 -->
 - [ ] Niagara mud spray (GPU sprites, depth-buffer collision) (Sprint 2)
 - [ ] Visual tire trails (ADR-008) (Sprint 2)
 

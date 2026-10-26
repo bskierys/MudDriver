@@ -624,3 +624,28 @@ The user reordered the phases after Phase 1/G to prove mud + winch first: On foo
 - Sprint 2 still open (S2-10..S2-16); Sprint 3 starts after it closes.
 - Sprint 4 needs a `/sprint` refinement after the S3-16 checkpoint.
 - Slope angle, hold curve and anchor distances are picked in S3-05; if no angle in 15–30° separates firm from medium, ask the user about a per-material slope grip factor.
+
+---
+
+## 2026-10-26 — Mud state, unstuck, ShowDebug B1Mud (S2-10..S2-12)
+
+### Context
+Sprint 2 `/work` from S2-10 up to the S2-12 user check. GAS and fuel were done; the mud polish tasks needed the ASC on the jeep (S2-04).
+
+### What was built
+- S2-10: `Vehicle.State.InMud` loose tag from `AB1Jeep::UpdateInMud` (any wheel on mud, 0.5 s release, cleared on unpossess). Rig metric `inMud=`, threshold `MinInMudTime` (set to 2 s on `B1Fuel_Medium`), error log if the tag survives unpossess.
+- S2-11: `B1Unstuck` cheat → `UB1VehicleMovementComponent::Unstuck()`: teleports level with wheel bottoms 50 cm above the `B1Mud` surface, zeroes velocity, one-shot sink reset through `FB1VehicleSimInput::SinkResetSerial`. After the user's playtest (the jeep sank right back): a 4 s assist window, 15 kN × (raw throttle − raw brake) along the heading, applied in the sim. Rig step flag `bUnstuck`, new rig `B1Mud_UnstuckDeep`.
+- S2-12: `ShowDebug B1Mud` (`Debug/B1MudShowDebug`): per-wheel mud state, belly and InMud over the jeep (`AMudDriverPawn::DrawShowDebug` is now virtual); preset, depth, bottom and ramps over each `AB1MudPatch` within 50 m (each patch binds `AHUD::OnShowDebugInfo`).
+- Gym 22/22, `Lvl_Offroad` 8/8. The user checked S2-11 and S2-12 in the editor and signed them off.
+
+### Decisions made
+- One-shot game→physics commands use a counter in `FB1VehicleSimInput`, not a bool: input is latest-wins, so a one-frame bool can be overwritten before a physics step reads it. The sim echoes the applied serial in its output.
+- The unstuck assist reads `RawThrottleInput`/`RawBrakeInput`, so it ignores the fuel cut-off (it's a cheat) and brake works as reverse.
+
+### What we learned
+- A plain teleport out of deep mud isn't enough: the jeep re-sinks from its weight within seconds and can't get going at 50 % throttle (3.4 m in 3 s). With the assist it does 14.2 m.
+- `AssetTools.save_assets` needs `asset_paths` (not `assets`); `save_actor` failed on an existing gym rig actor ("Asset does not exist"), but `save_assets([])` saved it.
+- An agent `-game` run can confirm a ShowDebug category draws without errors, but the start camera faces the sky, so readability stays a user check.
+
+### Open follow-ups
+- S2-13 Niagara spray, S2-14 trails, S2-15 fuel tuning, S2-16 Phase 1 close.

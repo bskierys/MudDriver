@@ -1,6 +1,7 @@
 #include "B1GymTestRig.h"
 #include "B1Log.h"
 #include "B1AbilitySystemComponent.h"
+#include "B1GameplayTags.h"
 #include "B1VehicleAttributeSet.h"
 #include "B1VehicleMovementComponent.h"
 #include "AbilitySystemGlobals.h"
@@ -145,6 +146,7 @@ void AB1GymTestRig::StartTest()
 		B1Movement->SetTestForce(TestForce);
 	}
 
+	TimeInMud = 0.0f;
 	AbilitySystem = Cast<UB1AbilitySystemComponent>(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Vehicle));
 	if (bPossessWithPlayer)
 	{
@@ -159,9 +161,25 @@ void AB1GymTestRig::StartTest()
 		FuelAtStart = AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute());
 	}
 
+	CurrentStep = INDEX_NONE;
 	if (InputScript.Num() > 0)
 	{
+		EnterStep(0);
 		ApplyInput(InputScript[0]);
+	}
+}
+
+void AB1GymTestRig::EnterStep(int32 StepIndex)
+{
+	if (StepIndex == CurrentStep)
+	{
+		return;
+	}
+
+	CurrentStep = StepIndex;
+	if (InputScript[StepIndex].bUnstuck && B1Movement)
+	{
+		B1Movement->Unstuck();
 	}
 }
 
@@ -173,6 +191,11 @@ void AB1GymTestRig::FinishTest(EFunctionalTestResult TestResult, const FString& 
 		// The template controller respawns a vehicle when its pawn is destroyed; the rig's jeep is about to be.
 		Vehicle->OnDestroyed.RemoveAll(PC);
 		PC->Possess(PreviousPlayerPawn);
+
+		if (AbilitySystem && AbilitySystem->HasMatchingGameplayTag(B1GameplayTags::Vehicle_State_InMud))
+		{
+			UE_LOG(LogB1Test, Error, TEXT("%s: Vehicle.State.InMud still on the ASC after unpossess"), *GetName());
+		}
 	}
 	PreviousPlayerPawn = nullptr;
 
@@ -211,6 +234,7 @@ void AB1GymTestRig::Tick(float DeltaSeconds)
 		StepEnd += InputScript[StepIndex].Duration;
 		if (ScriptTime < StepEnd)
 		{
+			EnterStep(StepIndex);
 			ApplyInput(InputScript[StepIndex]);
 			if (!bInLastStep && StepIndex == InputScript.Num() - 1)
 			{
@@ -254,6 +278,10 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 	if (B1Movement)
 	{
 		MaxBellyDrag = FMath::Max(MaxBellyDrag, B1Movement->GetBellyDrag());
+	}
+	if (AbilitySystem && AbilitySystem->HasMatchingGameplayTag(B1GameplayTags::Vehicle_State_InMud))
+	{
+		TimeInMud += DeltaSeconds;
 	}
 
 	StuckTimer = Speed < StuckSpeed ? StuckTimer + DeltaSeconds : 0.0f;
@@ -391,8 +419,13 @@ void AB1GymTestRig::FinishScript()
 			Failures.Add(FString::Printf(TEXT("fuelPerHour<%.1f"), Thresholds.MinFuelPerHour));
 		}
 
-		FuelMetrics = FString::Printf(TEXT(" fuelUsed=%.3f fuelPer100m=%.3f fuelPerHour=%.1f cond=%.1f"), FuelUsed, FuelPer100m, FuelPerHour,
-			AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute()));
+		if (Thresholds.MinInMudTime >= 0.0f && TimeInMud < Thresholds.MinInMudTime)
+		{
+			Failures.Add(FString::Printf(TEXT("inMud<%.2f"), Thresholds.MinInMudTime));
+		}
+
+		FuelMetrics = FString::Printf(TEXT(" fuelUsed=%.3f fuelPer100m=%.3f fuelPerHour=%.1f cond=%.1f inMud=%.2f"), FuelUsed, FuelPer100m, FuelPerHour,
+			AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute()), TimeInMud);
 	}
 
 	const bool bPassed = Failures.Num() == 0;

@@ -29,6 +29,10 @@ struct FB1GymInputStep
 
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	bool bHandbrake = false;
+
+	/** Runs B1Unstuck when the step starts; needs a UB1VehicleMovementComponent */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	bool bUnstuck = false;
 };
 
 /** Pass criteria. Negative values disable a check */
@@ -82,6 +86,10 @@ struct FB1GymThresholds
 	/** L/h averaged over the script; needs bPossessWithPlayer */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	float MinFuelPerHour = -1.0f;
+
+	/** Seconds the ASC had Vehicle.State.InMud; needs bPossessWithPlayer */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "s"))
+	float MinInMudTime = -1.0f;
 
 	/** Vehicle height above the rig actor at script end; has a toggle since negative heights are valid */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m", EditCondition = "bCheckEndHeight"))
@@ -168,6 +176,7 @@ private:
 
 	AWheeledVehiclePawn* ResolveVehicle();
 	void ApplyInput(const FB1GymInputStep& Step);
+	void EnterStep(int32 StepIndex);
 	void Sample(float DeltaSeconds);
 	void SampleSpring();
 	void FinishScript();
@@ -190,7 +199,11 @@ private:
 
 	float FuelAtStart = 0.0f;
 
+	/** s with Vehicle.State.InMud on the ASC */
+	float TimeInMud = 0.0f;
+
 	bool bScriptRunning = false;
+	int32 CurrentStep = INDEX_NONE;
 	float ScriptTime = 0.0f;
 	float ScriptDuration = 0.0f;
 	int32 NumFrames = 0;

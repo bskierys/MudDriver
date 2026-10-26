@@ -29,6 +29,10 @@ public:
 	UFUNCTION(Exec)
 	void B1AddFuel(float Litres);
 
+	/** Lifts the jeep level above the mud under it and clears its sink state */
+	UFUNCTION(Exec)
+	void B1Unstuck();
+
 private:
 
 	class UB1AbilitySystemComponent* GetPlayerASC(const TCHAR* CheatName) const;

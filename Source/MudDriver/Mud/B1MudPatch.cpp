@@ -1,6 +1,10 @@
 #include "B1MudPatch.h"
 #include "B1CollisionChannels.h"
+#include "B1MudShowDebug.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Components/StaticMeshComponent.h"
+#include "GameFramework/HUD.h"
+#include "GameFramework/PlayerController.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/StaticMesh.h"
 #include "UObject/ConstructorHelpers.h"
@@ -65,6 +69,47 @@ void AB1MudPatch::OnConstruction(const FTransform& Transform)
 	{
 		UpdateEdgeRamp(*EdgeRamps[Edge], Outward[Edge], bRampEnabled[Edge]);
 	}
+}
+
+void AB1MudPatch::BeginPlay()
+{
+	Super::BeginPlay();
+
+	ShowDebugHandle = AHUD::OnShowDebugInfo.AddUObject(this, &AB1MudPatch::DrawShowDebug);
+}
+
+void AB1MudPatch::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	AHUD::OnShowDebugInfo.Remove(ShowDebugHandle);
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void AB1MudPatch::DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos)
+{
+	const APlayerCameraManager* Camera = HUD && HUD->PlayerOwner ? HUD->PlayerOwner->PlayerCameraManager.Get() : nullptr;
+	if (!Camera || GetWorld() != HUD->GetWorld()
+		|| FVector::Dist(Camera->GetCameraLocation(), GetActorLocation()) > B1MudShowDebug::PatchDrawDistance)
+	{
+		return;
+	}
+
+	B1MudShowDebug::DrawPatch(Canvas, DisplayInfo, *this);
+}
+
+FString AB1MudPatch::DescribeRamps() const
+{
+	TArray<FString> Edges;
+	const bool bRampEnabled[] = { bRampPlusX, bRampMinusX, bRampPlusY, bRampMinusY };
+	const TCHAR* Names[] = { TEXT("+X"), TEXT("-X"), TEXT("+Y"), TEXT("-Y") };
+	for (int32 Edge = 0; Edge < UE_ARRAY_COUNT(Names); ++Edge)
+	{
+		if (bRampEnabled[Edge])
+		{
+			Edges.Add(Names[Edge]);
+		}
+	}
+	return Edges.Num() > 0 ? FString::Join(Edges, TEXT(" ")) : FString(TEXT("none"));
 }
 
 void AB1MudPatch::UpdateEdgeRamp(UStaticMeshComponent& Ramp, const FVector2D& Outward, bool bEnabled)

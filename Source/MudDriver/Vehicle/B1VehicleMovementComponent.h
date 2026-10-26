@@ -52,6 +52,19 @@ public:
 	/** cm, mean over all wheels */
 	float GetAverageSinkDepth() const;
 
+	/** B1Unstuck: teleports the vehicle level, wheels 50 cm above the mud under it, stops it and clears every wheel's sink.
+	 *  Then for UnstuckAssistDuration, throttle/brake push the vehicle along its heading */
+	void Unstuck();
+
+	bool IsUnstuckAssistActive() const { return UnstuckAssistTimeLeft > 0.0f; }
+
+	/** Push at full throttle during the B1Unstuck window, along the flattened heading */
+	UPROPERTY(EditAnywhere, Category = "Mud|Unstuck", meta = (Units = "N", ClampMin = "0"))
+	float UnstuckAssistForce = 15000.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Mud|Unstuck", meta = (Units = "s", ClampMin = "0"))
+	float UnstuckAssistDuration = 4.0f;
+
 	/** Out of fuel: throttle is forced to 0, brake/steering/handbrake still work */
 	void SetFuelCutOff(bool bCutOff) { bFuelCutOff = bCutOff; }
 	bool IsFuelCutOff() const { return bFuelCutOff; }
@@ -91,6 +104,14 @@ private:
 	float PeakEnginePower = 0.0f;
 
 	bool bFuelCutOff = false;
+
+	uint32 SinkResetSerial = 0;
+
+	/** Logs the per-wheel sink once the sim has applied the latest reset */
+	bool bLogSinkReset = false;
+
+	float UnstuckAssistTimeLeft = 0.0f;
+	FVector GetUnstuckAssistForce(float DeltaTime);
 
 	EB1TestForce TestForce = EB1TestForce::Off;
 	FVector TestForceAnchor = FVector::ZeroVector;

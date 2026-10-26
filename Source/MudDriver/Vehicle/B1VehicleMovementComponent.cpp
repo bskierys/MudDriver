@@ -4,6 +4,16 @@
 #include "B1CollisionChannels.h"
 #include "B1PhysicalMaterial_Mud.h"
 #include "DrawDebugHelpers.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "ChaosVehicleWheel.h"
+
+namespace
+{
+	/** cm, wheel bottoms above the mud surface after B1Unstuck */
+	constexpr float UnstuckLift = 50.0f;
+	constexpr float UnstuckTraceUp = 300.0f;
+	constexpr float UnstuckTraceDown = 300.0f;
+}
 
 UB1VehicleMovementComponent::UB1VehicleMovementComponent(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -37,6 +47,72 @@ void UB1VehicleMovementComponent::SetTestForce(EB1TestForce Mode)
 
 	UE_LOG(LogB1Physics, Log, TEXT("TestForce %s on %s, anchor %s"),
 		*UEnum::GetValueAsString(Mode), *GetNameSafe(GetOwner()), *TestForceAnchor.ToCompactString());
+}
+
+void UB1VehicleMovementComponent::Unstuck()
+{
+	AActor* Owner = GetOwner();
+	const USkeletalMeshComponent* Mesh = Cast<USkeletalMeshComponent>(UpdatedPrimitive);
+	if (!Owner || !Mesh)
+	{
+		return;
+	}
+
+	FRotator Rotation = Owner->GetActorRotation();
+	Rotation.Pitch = 0.0f;
+	Rotation.Roll = 0.0f;
+	const FTransform Level(Rotation, Owner->GetActorLocation());
+
+	// Lowest wheel bottom relative to the actor, as if it were already level.
+	float WheelBottom = GetNumWheels() > 0 ? MAX_flt : 0.0f;
+	for (int32 WheelIndex = 0; WheelIndex < GetNumWheels(); ++WheelIndex)
+	{
+		const FVector Local = Owner->GetActorTransform().InverseTransformPosition(Mesh->GetSocketLocation(WheelSetups[WheelIndex].BoneName));
+		WheelBottom = FMath::Min(WheelBottom, static_cast<float>(Local.Z) - Wheels[WheelIndex]->GetWheelRadius());
+	}
+
+	const FVector Location = Owner->GetActorLocation();
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(B1Unstuck), false, Owner);
+	FHitResult Hit;
+	const bool bMud = GetWorld()->LineTraceSingleByObjectType(Hit, Location + FVector(0, 0, UnstuckTraceUp), Location - FVector(0, 0, UnstuckTraceDown),
+		FCollisionObjectQueryParams(B1_ObjectChannel_Mud), Params);
+
+	FVector NewLocation = Location + FVector(0, 0, UnstuckLift);
+	if (bMud)
+	{
+		NewLocation.Z = Hit.ImpactPoint.Z + UnstuckLift - WheelBottom;
+	}
+
+	Owner->SetActorLocationAndRotation(NewLocation, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+	UpdatedPrimitive->SetPhysicsLinearVelocity(FVector::ZeroVector);
+	UpdatedPrimitive->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+
+	++SinkResetSerial;
+	bLogSinkReset = true;
+	UnstuckAssistTimeLeft = UnstuckAssistDuration;
+
+	UE_LOG(LogB1Physics, Display, TEXT("B1Unstuck %s: %s, lifted %.0f cm to %s, sink before %.1f cm avg"), *GetNameSafe(Owner),
+		bMud ? *FString::Printf(TEXT("mud surface Z=%.0f"), Hit.ImpactPoint.Z) : TEXT("no mud below"),
+		NewLocation.Z - Location.Z, *NewLocation.ToCompactString(), GetAverageSinkDepth());
+}
+
+FVector UB1VehicleMovementComponent::GetUnstuckAssistForce(float DeltaTime)
+{
+	if (UnstuckAssistTimeLeft <= 0.0f)
+	{
+		return FVector::ZeroVector;
+	}
+
+	UnstuckAssistTimeLeft -= DeltaTime;
+	if (UnstuckAssistTimeLeft <= 0.0f)
+	{
+		UE_LOG(LogB1Physics, Display, TEXT("B1Unstuck %s: assist over, sink %.1f cm avg"), *GetNameSafe(GetOwner()), GetAverageSinkDepth());
+		return FVector::ZeroVector;
+	}
+
+	// Raw inputs: brake is reverse at standstill, and the fuel cut-off doesn't block the cheat.
+	const float Drive = FMath::Clamp(RawThrottleInput - RawBrakeInput, -1.0f, 1.0f);
+	return GetOwner()->GetActorForwardVector().GetSafeNormal2D() * Drive * UnstuckAssistForce;
 }
 
 float UB1VehicleMovementComponent::GetAverageSinkDepth() const
@@ -93,9 +169,22 @@ void UB1VehicleMovementComponent::Update(float DeltaTime)
 	Input.TestForceAnchor = TestForceAnchor;
 	GatherMudParams(Input.MudMaterials);
 	Input.BellyClearance = BellyClearance;
+	Input.SinkResetSerial = SinkResetSerial;
+	Input.UnstuckAssistForce = GetUnstuckAssistForce(DeltaTime);
 	Simulation->SetGameThreadInput(Input);
 
 	SimOutput = Simulation->GetGameThreadOutput();
+
+	if (bLogSinkReset && SimOutput.SinkResetSerial == SinkResetSerial)
+	{
+		bLogSinkReset = false;
+		TArray<FString> PerWheel;
+		for (int32 WheelIndex = 0; WheelIndex < GetNumWheels(); ++WheelIndex)
+		{
+			PerWheel.Add(FString::Printf(TEXT("%.1f"), GetWheelSinkDepth(WheelIndex)));
+		}
+		UE_LOG(LogB1Physics, Display, TEXT("B1Unstuck %s: sim reset applied, sink=%s"), *GetNameSafe(GetOwner()), *FString::Join(PerWheel, TEXT("/")));
+	}
 
 	if (!bLoggedClearance)
 	{

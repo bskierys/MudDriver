@@ -77,6 +77,18 @@ void UB1CheatManager::B1TestForce(const FString& Mode)
 	Jeep->GetB1VehicleMovement()->SetTestForce(*NewMode);
 }
 
+void UB1CheatManager::B1Unstuck()
+{
+	const AB1Jeep* Jeep = Cast<AB1Jeep>(GetOuterAPlayerController()->GetPawn());
+	if (!Jeep)
+	{
+		UE_LOG(LogB1Physics, Warning, TEXT("B1Unstuck: the player isn't driving an AB1Jeep"));
+		return;
+	}
+
+	Jeep->GetB1VehicleMovement()->Unstuck();
+}
+
 UB1AbilitySystemComponent* UB1CheatManager::GetPlayerASC(const TCHAR* CheatName) const
 {
 	const AB1PlayerState* PlayerState = GetOuterAPlayerController()->GetPlayerState<AB1PlayerState>();

@@ -394,15 +394,18 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds; a `bPossessWithPlayer` rig crossing medium logs `inMud=` (seconds tagged) > 0 and the tag is gone at the end.
   **User check:** —
 
-- [ ] **S2-11** `B1Unstuck` cheat (1.5 h)
+- [x] **S2-11** `B1Unstuck` cheat (1.5 h) <!-- done: 2026-10-26 -->
+  Result: `UB1VehicleMovementComponent::Unstuck()` (shared by the cheat and rigs): object trace for `B1Mud` 3 m above/below the actor, teleports level (yaw kept) so the lowest wheel bottom (wheel bone − radius) is 50 cm above the surface (no mud → +50 cm), zeroes velocities. The one-shot is a counter `SinkResetSerial` in `FB1VehicleSimInput` (input is latest-wins, so a bool could be dropped between physics steps); the sim zeroes `SinkDepth`/`SinkOffset` once per new value and echoes it in the output, then the component logs `B1Unstuck ...: sim reset applied, sink=` to `LogB1Physics`. Rig input step flag `bUnstuck`. New rig `B1Mud_UnstuckDeep` (deep lane, 4 s full → unstuck + 1 s idle → 3 s at 50 %): `sink before 68.6 cm avg`, lifted 123 cm, `sink=0.0/0.0/0.0/0.0`, then 3.4 m in the last step (was stuck). No thresholds (smoke rig). Gym 22/22, `Lvl_Offroad` 8/8.
+  Fix after user playtest (jeep sank right back): unstuck assist window. For `UnstuckAssistDuration` (4 s) after `Unstuck()`, the sim adds `UnstuckAssistForce` (15 kN) × (raw throttle − raw brake) along the flattened heading, via `FB1VehicleSimInput::UnstuckAssistForce`; both on the movement component (`Mud|Unstuck`). Logs `assist over, sink= avg`. `B1Mud_UnstuckDeep` last step 3.4 → 14.2 m, sink 17 cm at the end of the assist. Gym 22/22, `Lvl_Offroad` 8/8.
   Lifts the jeep 50 cm above the mud surface under it, zeroes linear/angular velocity, keeps yaw, and resets every wheel's `SinkDepth`/`SinkOffset` (new one-shot flag in `FB1VehicleSimInput`). Logs to `LogB1Physics`.
   **Done:** builds; headless run with `B1Unstuck` after `B1Mud_DeepFullThrottle`'s setup logs sink 0 on all wheels.
-  **User check:** get stuck in deep, `B1Unstuck`: the jeep pops out level and can drive (it'll sink again from weight, that's expected).
+  **User check:** get stuck in deep, `B1Unstuck`: the jeep pops out level and can drive (it'll sink again from weight, that's expected). ✅ signed off 2026-10-26 (with the assist window).
 
-- [ ] **S2-12** `ShowDebug B1Mud` (1 h)
+- [x] **S2-12** `ShowDebug B1Mud` (1 h) <!-- done: 2026-10-26 -->
+  Result: `Debug/B1MudShowDebug` (`DrawVehicle`, `DrawPatch`). Jeep: `AMudDriverPawn::DrawShowDebug` made virtual, `AB1Jeep` overrides it; orange lines start at the B1Vehicle anchor and run down (both categories can be on): `InMud yes|no|n/a (no ASC)`, belly cm / N, per wheel material, sink / material max cm, mu, rr N, `(air)`. Patches: each `AB1MudPatch` binds `AHUD::OnShowDebugInfo` in BeginPlay and draws cyan text 1.5 m above its origin when the viewer's camera is within 50 m: label + material, max sink, static %, size, hard bottom depth, ramps (`+X -X …`, length). Builds; gym 22/22. A `-game` run with `ShowDebug B1Mud` showed no errors, but the camera faced the sky, so readability is unchecked on the agent side.
   Text over the jeep: per wheel material, sink cm / max, mu, rr N; belly cm / N; `InMud` tag. Over each `AB1MudPatch` within 50 m: preset name, max depth, ramps. Same binding pattern as `B1VehicleShowDebug`.
   **Done:** builds.
-  **User check:** `ShowDebug B1Mud` in the gym: readable over the jeep and the patches, toggles off.
+  **User check:** `ShowDebug B1Mud` in the gym: readable over the jeep and the patches, toggles off. ✅ signed off 2026-10-26.
 
 - [ ] **S2-13** Niagara mud spray (3 h)
   `NS_B1MudSpray`: GPU sprites, spawn rate ∝ slip speed × (sink depth > 0), velocity backward and up from the contact along the wheel spin direction, gravity, depth-buffer collision, short lifetime. One `UNiagaraComponent` per wheel on `AB1Jeep`, driven from `Tick` via user params (`SpawnRate`, `SpinDir`, `Color`). Mud wheels only; off on firm ground. Colour from a new `SprayColor` on `UB1PhysicalMaterial_Mud` (cheap stretch item).

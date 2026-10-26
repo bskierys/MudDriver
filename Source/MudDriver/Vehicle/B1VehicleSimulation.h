@@ -73,5 +73,7 @@ private:
 
 	float LastDeltaTime = 0.0f;
 
+	uint32 AppliedSinkResetSerial = 0;
+
 	bool bLoggedFirstTick = false;
 };
