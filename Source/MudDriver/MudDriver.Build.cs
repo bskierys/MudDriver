@@ -40,7 +40,7 @@ public class MudDriver : ModuleRules
 			"MudDriver/Vehicle"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "Projects", "ChaosVehiclesCore", "Niagara" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Projects", "ChaosVehiclesCore", "Niagara", "ProceduralMeshComponent" });
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

@@ -7,6 +7,7 @@
 #include "B1PhysicalMaterial_Mud.h"
 #include "B1MudShowDebug.h"
 #include "B1MudSprayComponent.h"
+#include "B1MudTrailComponent.h"
 #include "B1Log.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
@@ -24,6 +25,7 @@ AB1Jeep::AB1Jeep(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UB1VehicleMovementComponent>(AWheeledVehiclePawn::VehicleMovementComponentName))
 {
 	MudSpray = CreateDefaultSubobject<UB1MudSprayComponent>(TEXT("MudSpray"));
+	MudTrail = CreateDefaultSubobject<UB1MudTrailComponent>(TEXT("MudTrail"));
 }
 
 UB1VehicleMovementComponent* AB1Jeep::GetB1VehicleMovement() const

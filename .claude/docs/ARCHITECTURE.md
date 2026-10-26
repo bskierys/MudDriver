@@ -8,7 +8,7 @@ UE 5.8, engine at `C:\Program Files\UE_5.8`.
 
 | Module | Type | Deps | Holds |
 |---|---|---|---|
-| `MudDriver` | Runtime | Core, CoreUObject, Engine, InputCore, EnhancedInput, ChaosVehicles, PhysicsCore, UMG, Slate, NetImgui, GameplayAbilities, GameplayTags, GameplayTasks, DeveloperSettings; private Projects, ChaosVehiclesCore, Niagara | Game code |
+| `MudDriver` | Runtime | Core, CoreUObject, Engine, InputCore, EnhancedInput, ChaosVehicles, PhysicsCore, UMG, Slate, NetImgui, GameplayAbilities, GameplayTags, GameplayTasks, DeveloperSettings; private Projects, ChaosVehiclesCore, Niagara, ProceduralMeshComponent | Game code |
 | `MudDriverTests` | DeveloperTool (not in Shipping, ADR-013) | Core, CoreUObject, Engine, FunctionalTesting; private ChaosVehicles, MudDriver | Gym test rigs |
 
 Game-module symbols used by the tests need `MUDDRIVER_API` (the log categories already have it).
@@ -96,6 +96,15 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 - The emitter sits 20 cm above the visible mud surface (hit + sink depth, ADR-012) and behind the tread, so depth-buffer collision doesn't catch particles at birth.
 - `NS_B1MudSpray`: one GPU emitter (Fountain template), fixed bounds, cone velocity from `SprayVelocity`, 0.4–0.9 s life, 10–25 cm sprites, gravity, drag, GPU depth-buffer collision with Kill Occluded off. `M_B1MudSpray`: masked, lit, base colour = particle colour, round cutout.
 - CVar `b1.Mud.Spray`; the `B1Mud` telemetry line has `spray=` per wheel. <!-- updated 2026-10-26 -->
+
+## Mud ruts (ADR-008, visual only)
+
+- `AB1MudPatch` has two surfaces: `MudSurface` (the 10 cm slab, hidden, collision only) and `MudVisual`, a `UProceduralMeshComponent` grid (`VisualGridSpacing` 10 cm, ≤ 400 cells per side, UV0 spans the patch, no collision, no shadow) built in `OnConstruction` with `MudSurface`'s material.
+- In game worlds the patch creates a 512² R16F render target (rut depth / 100 cm), puts it on a dynamic instance of the material (`TrailMask`, plus `TrailDepthRange`, `PatchSizeX/Y`) and registers with `UB1MudTrailSubsystem` (`UTickableWorldSubsystem`, Game/PIE).
+- `UB1MudTrailComponent` (on `AB1Jeep` as `MudTrail`) sends each mud wheel's contact path with its sink depth; wheels under `MinRutDepth` (2 cm) leave nothing. Width = tire width × `WidthScale` (1.2) + depth × `WallWidthPerDepth` (1.5).
+- The subsystem stamps every 5 cm and draws one canvas batch per patch per frame: a procedural soft brush (flat floor, falloff 0.3–1), translucent at 0.5 toward the stamp depth. The canvas has no max blend, so a shallower wheel partly fills an older rut. CVar `b1.Mud.Trails`.
+- `M_B1Mud` (HLSL Custom nodes): height = −depth + lip (saturate(4-tap blur − depth) × `LipFactor` 0.35 at `LipRadiusCm` 30) drives World Position Offset along the vertex normal; a world-space normal comes from the height gradient (`TrailTexel` step); base colour darkens to ×0.6 and roughness drops to 0.4 over the first 8 cm of depth.
+- Ruts never fade and don't touch physics. <!-- updated 2026-10-26 -->
 - Presets (S/M/L/XL): `/Game/B1/Mud/PM_B1Mud_Shallow` (25 cm), `_Medium` (35), `_Heavy` (50), `_Deep` (70), set as each gym patch's `MudMaterial`. Tints `MI_B1Mud_*`. Gym lanes: Shallow Y 16, Medium Y 29, Heavy Y 42, Deep Y 55. <!-- updated 2026-10-26 -->
 
 <!-- updated 2026-10-25 -->

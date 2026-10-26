@@ -16,8 +16,8 @@ stale: false
 
 | Metric | Value |
 |--------|-------|
-| Files | **39** |
-| Classes | **38** |
+| Files | **42** |
+| Classes | **41** |
 | Circular deps | **0** |
 | Dead code candidates | **0** |
 
@@ -32,7 +32,7 @@ stale: false
 - `UB1PhysicalMaterial_Mud` — 5 dependents
 - `UMudDriverUI` — 4 dependents
 - `ATimeTrialTrackGate` — 3 dependents
-- `FB1TestForceSettings` — 2 dependents
+- `AB1MudPatch` — 3 dependents
 
 ## GAS Summary
 
@@ -42,7 +42,7 @@ stale: false
 - GameplayTags (in assets): 0 high-confidence / 18 low
 - GAS .uassets — IS-A: GA 0 / GE 3 / AS 0 / ABP 1  |  Referencers: 7
 - Analysis confidence: **HIGH** (cpp_source_regex + binary_pattern_match)
-- Coverage: 129/129 assets (100.0%)
+- Coverage: 131/131 assets (100.0%)
 
 ---
 See [[index]] for the full wiki page catalog.

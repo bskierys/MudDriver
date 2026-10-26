@@ -423,14 +423,15 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds; a viewport capture after a rig drive through medium shows two clear tracks.
   **User check:** trails look acceptable; decide whether physics ruts are worth it (ADR-008 revisit → backlog or a new ADR). ❌ 2026-10-26: trails look flat, no depth (worst on Heavy/Deep). No physics ruts wanted, but they must look 3D → S2-14b.
 
-- [ ] **S2-14b** Deformed-looking ruts (4–6 h) _(requires S2-14)_
+- [x] **S2-14b** Deformed-looking ruts (4–6 h) _(requires S2-14)_ <!-- done: 2026-10-26 -->
+  Result: `AB1MudPatch` builds `MudVisual` (`UProceduralMeshComponent`, new private module dep; grid at `VisualGridSpacing` 10 cm, capped at 400 cells per side, UV0 spans the patch, no collision, no shadow) in `OnConstruction` with `MudSurface`'s material; `MudSurface` is hidden and stays for collision. The trail target is now R16F (R8's 0.4 cm steps striped the normals) and stores rut depth / `TrailDepthRange` (100 cm). Stamps blend toward the wheel's sink depth (translucent, 0.5 per stamp; canvas has no max blend, so a shallower wheel partly fills an older rut); wheels sunk < 2 cm leave no mark. Rut width = tire width × 1.2 + depth × 1.5 (deep ruts get sloped walls, not trenches); brush flat floor, falloff 0.3–1. `M_B1Mud`: UV0, `TrailMask` texture object, Custom HLSL nodes for height (−depth + lip = saturate(4-tap blur − depth) × `LipFactor` 0.35 at `LipRadiusCm` 30), WPO = vertex normal × height, a world-space normal from the height gradient (step `TrailTexel` 1.5 texels, local cm → world), and wet darkening ×0.6 over the first 8 cm. MID params `TrailDepthRange`, `PatchSizeX/Y` set by the patch. Captures after `B1Mud_CrossMedium` + `B1Mud_DeepRunUp`: wide sloped ruts with lips on Deep, grooves with lips on Medium from a chase-height angle. Gym 22/22, `Lvl_Offroad` 8/8.
   Visual only (ADR-008 amendment). Builds on the S2-14 trail render targets.
   - Stamps write the wheel's sink depth (normalized to the patch's mud `MaxSinkDepth`), max-blended, so Deep digs deep ruts and Shallow barely marks.
   - The patch gets a dense visual surface (subdivided plane, ~10 cm grid) for vertex displacement; the 10 cm slab stays for collision and is hidden.
   - `M_B1Mud`: World Position Offset pushes vertices down by rut depth and raises a lip beside the rut (mud pushed aside); normals rebuilt from the rut height gradient, so walls shade without shadow maps (ADR-011); wet darkening kept.
   - Ruts don't recover when the sink model does.
   **Done:** builds; both suites PASS; a viewport capture after rigs drive through medium and deep shows ruts with visible depth and lips.
-  **User check:** ruts on Heavy/Deep look dug into the mud from the chase camera.
+  **User check:** ruts on Heavy/Deep look dug into the mud from the chase camera. ✅ signed off 2026-10-26.
 
 ### Close
 

@@ -673,3 +673,26 @@ Sprint 2 `/work` from S2-10 up to the S2-12 user check. GAS and fuel were done; 
 
 ### Open follow-ups
 - S2-14b ruts with depth; S2-14 code is committed with it.
+
+---
+
+## 2026-10-26 — Ruts with depth (S2-14b)
+
+### Context
+After the flat first pass of S2-14, the user asked for ruts that look dug in, still without physics. Built as S2-14b on top of the S2-14 trail targets, and signed off.
+
+### What was built
+- `MudVisual` procedural grid per patch (the slab is hidden, collision only), R16F depth target, depth-aware stamps with width growing with depth, `M_B1Mud` with WPO displacement, lip and gradient normals.
+- S2-14 and S2-14b committed together.
+
+### Decisions made
+- ADR-008 amendment applied as written. Translucent blend toward the stamp depth instead of max (the canvas has no max blend).
+
+### What we learned
+- Without shadow maps, ground depth reads through normals; WPO alone would still look flat-lit.
+- Narrow deep ruts look like black trenches; widening with depth (sloped walls) reads much better.
+- An R8 depth target stripes gradient normals (0.4 cm steps); R16F fixes it.
+- `ObjectTools.set_properties` can't grow a Custom node's `inputs` array and change elements together: read the array back and append one element at a time. `ProgrammaticToolset.execute_tool_script` builds a whole material graph in one call.
+
+### Open follow-ups
+- S2-15 fuel tuning, S2-16 Phase 1 close playtest.
