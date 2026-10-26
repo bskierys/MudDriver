@@ -208,7 +208,14 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds; rig: full throttle on medium mud digs in within 2–4 s. → replaced by the bog-down / restart / recover rigs above.
   **User check:** drive slowly into medium, stop, and drive on with a little throttle; floor it in medium; hit deep at speed; drive out of deep.
 
-- [ ] **S1-21** Belly drag (2 h) _(requires S1-19, S1-20)_
+- [x] **S1-21** Belly drag (2 h) _(requires S1-19, S1-20)_ <!-- done: 2026-10-26 -->
+  Result: `FB1VehicleSimulation::ApplyBellyDrag`, after rolling resistance.
+  - Excess = average `SinkDepth` over all wheels − `BellyClearance` (new on `UB1VehicleMovementComponent`, `Mud|Config`, 45 cm). Drag = mean `BellyDragCoefficient` of the mud wheels × excess (m) × vehicle weight, at the centre of mass against ground velocity.
+  - Same rules as rolling resistance: at standstill it opposes the tires' summed push; capped at push + 0.4 × stopping force, so it never reverses the jeep.
+  - Clearance: a one-time `LogB1Physics` line measures the physics body's underside over firm ground: 60–64 cm. 45 cm is axle height, so only Heavy (dug to 50) and Deep reach it; weight alone (static floor 0.45 × max) never does.
+  - Telemetry `belly=<cm>/<N>`; rig line gets `belly=` (max N) and `vend=` (last speed), new threshold `MaxEndSpeed`.
+  - New rig `B1Mud_DeepFullThrottle` (7 s full throttle from rest in deep, stuck ≤ 5 s, vend ≤ 0.5, dist ≤ 15): headless PASS, stuck 0.85 s, vend 0.00, belly 7259 N. DeepRunUp belly 7355 N. Gym 14/14 and `Lvl_Offroad` 8/8 PASS headless.
+  - Found: MCP tools didn't register in this session (ECONNREFUSED at session start). The agent talks to `127.0.0.1:8001/mcp` with plain JSON-RPC from PowerShell instead.
   Analytic drag when the average `SinkDepth` > ground clearance, growing with the excess.
   **Done:** builds; rig: full throttle in deep mud ends stuck (< 0.5 m/s after 5 s).
   **User check:** —

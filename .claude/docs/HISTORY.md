@@ -337,3 +337,29 @@ Sinking worked (S1-19), but depth didn't affect grip or resistance yet. The firs
 - User playtest of the reworked mud and the four sizes. Pending: medium slog feel, Heavy restart (6.3 m in 6 s at 40 %), and climb-out bumps (ExitDeep peakOsc 0.92).
 - S1-21 belly drag should make full-depth deep a real stop.
 - The material constructor defaults (curves 1→0.6, RR 0.05→0.3) no longer match the tuned ranges; they only affect new assets.
+
+---
+
+## 2026-10-26 — S1-21 belly drag
+
+### Context
+The user asked the agent to run the rest of Sprint 1 without stopping for user checks; those are batched at the end of the sprint. Deep mud already stopped the jeep through rolling resistance and speed drag (S1-20), but the analytic belly drag from ADR-001/012 wasn't there yet.
+
+### What was built
+- `FB1VehicleSimulation::ApplyBellyDrag`: excess = average `SinkDepth` (all wheels) − `BellyClearance`; drag = mean `BellyDragCoefficient` of the mud wheels × excess (m) × vehicle weight, at the centre of mass against ground velocity. At standstill it opposes the tires' summed push; capped at push + 0.4 × stopping force.
+- `UB1VehicleMovementComponent::BellyClearance` (45 cm, `Mud|Config`), `GetBellyDepth`, `GetBellyDrag`, and a one-time `LogB1Physics` line with the measured body clearance.
+- Telemetry `belly=<cm>/<N>`. Rig line: `vend=` and `belly=`; new threshold `MaxEndSpeed`.
+- Rig `B1Mud_DeepFullThrottle` in `Lvl_Gym_Mud`.
+
+### Decisions made
+- `BellyClearance` is axle height (45 cm), not the physics body's underside (60–64 cm measured). With 62 cm only the last 8 cm of deep would drag. With 45, Heavy dug to full depth gets a little drag, and Medium and weight-only sinking (static floor ≤ 31.5 cm) get none.
+- The force goes at the centre of mass, not the belly, so it doesn't pitch the jeep.
+
+### What we learned
+- Full throttle from rest in deep already stops in under a metre; belly drag (≈7.3 kN, about half the weight) holds it there. DeepFullThrottle: dist 0.60, stuck 0.85 s, vend 0.00. DeepRunUp is unchanged at 39.97 m, belly 7355 N.
+- The unreal-mcp tools can fail to register at session start even when the editor comes up later. The server still answers plain JSON-RPC on `127.0.0.1:8001/mcp` (initialize → `Mcp-Session-Id` header → `tools/call` `call_tool`), which is enough to place and save rigs.
+- Headless: gym 14/14, `Lvl_Offroad` 8/8 PASS.
+
+### Open follow-ups
+- No A/B run with belly drag off; deep was already a stop without it. The user's end-of-sprint playtest decides whether it needs to be stronger or start earlier.
+- Preset `BellyDragCoefficient` values are all the class default (2.0); tuning per size is for S1-24.

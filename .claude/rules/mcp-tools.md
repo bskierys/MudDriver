@@ -4,6 +4,8 @@ Applies whenever you use the `unreal-mcp` server (Epic's ModelContextProtocol pl
 
 ## Calling tools
 
+- **If the MCP tools aren't registered** (the server failed at session start, ECONNREFUSED), start the editor and POST JSON-RPC to `http://127.0.0.1:8001/mcp` from PowerShell: `initialize`, keep the `Mcp-Session-Id` response header, then `tools/call` with name `call_tool` and the same `toolset_name` / `tool_name` / `arguments` (verified 2026-10-26).
+
 - **`call_tool` takes the short tool name plus `toolset_name`.** `describe_toolset` prints fully qualified names, but passing those to `call_tool` fails with `Unknown tool`.
 
   ```json

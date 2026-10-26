@@ -221,6 +221,8 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 
 **Implementation (2026-10-25, S1-19).** The offset is done by raising each trace start by the sink offset, not by moving the hit afterwards. A sunk chassis would otherwise start the sweep inside or below the 10 cm mud slab. Chaos measures `Distance` from the real start, so the hit lands the offset deeper. A rise-only rate limit (30 cm/s) replaces the planned entry ramp: depth starts at 0 on entry and only changes at the mud rates.
 
+**Implementation (2026-10-26, S1-21).** "Clearance" for belly drag is the axle height (`BellyClearance` 45 cm on the movement component), not the physics body's underside (60–64 cm measured). Axles and diffs plough mud first, and the body height would leave only the last 8 cm of deep for drag. The drag is applied at the centre of mass.
+
 ---
 
 ## ADR-013 — Test rigs live in a separate `MudDriverTests` module

@@ -23,6 +23,10 @@ namespace B1VehicleTelemetry
 
 		TStringBuilder<512> Line;
 		Line.Appendf(TEXT("B1Wheels %s v=%.1fkmh"), *GetNameSafe(Movement.GetOwner()), Movement.GetForwardSpeed() * 0.036f);
+		if (B1Movement)
+		{
+			Line.Appendf(TEXT(" belly=%.1fcm/%.0fN"), B1Movement->GetBellyDepth(), B1Movement->GetBellyDrag());
+		}
 
 		for (int32 WheelIndex = 0; WheelIndex < Movement.GetNumWheels(); ++WheelIndex)
 		{

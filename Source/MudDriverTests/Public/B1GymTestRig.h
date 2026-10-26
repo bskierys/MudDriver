@@ -47,6 +47,10 @@ struct FB1GymThresholds
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "s"))
 	float MaxTimeToStuck = -1.0f;
 
+	/** Speed on the last sample */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m/s"))
+	float MaxEndSpeed = -1.0f;
+
 	/** Peak vertical chassis speed, a jitter / explosion indicator */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m/s"))
 	float MaxPeakOscillation = -1.0f;
@@ -168,6 +172,10 @@ private:
 
 	/** Per wheel, cm */
 	TArray<float> MaxSinkDepth;
+
+	/** N */
+	float MaxBellyDrag = 0.0f;
+	float EndSpeed = 0.0f;
 
 	float TautTime = -1.0f;
 	FFloatInterval StretchFirst;

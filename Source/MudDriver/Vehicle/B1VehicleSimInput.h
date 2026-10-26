@@ -53,6 +53,7 @@ struct FB1MudSimParams
 	FRichCurve FrictionVsDepth;
 	FRichCurve RollingResistanceVsDepth;
 	float SpeedDragCoefficient = 0.0f;
+	float BellyDragCoefficient = 0.0f;
 };
 
 /** Game thread → physics thread data, copied once per game frame */
@@ -62,6 +63,9 @@ struct FB1VehicleSimInput
 	FB1TestForceSettings TestForceSettings;
 	FVector TestForceAnchor = FVector::ZeroVector;
 	TArray<FB1MudSimParams> MudMaterials;
+
+	/** cm, from the wheel contact to the underside of the chassis */
+	float BellyClearance = 0.0f;
 };
 
 /** Physics thread → game thread, latest step */
@@ -75,4 +79,10 @@ struct FB1VehicleSimOutput
 
 	/** Per wheel, N */
 	TArray<float> RollingResistance;
+
+	/** cm the average sink depth is past belly clearance */
+	float BellyDepth = 0.0f;
+
+	/** N */
+	float BellyDrag = 0.0f;
 };

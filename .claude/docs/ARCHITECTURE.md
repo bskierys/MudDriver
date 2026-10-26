@@ -50,6 +50,7 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
   - `SinkOffset` follows `SinkDepth` instantly going down and at most 30 cm/s going up, so leaving mud doesn't pop.
   - The component keeps `KnownMudMaterials` (every mud material its wheels have touched) and sends copies of their params (`FB1MudSimParams`). The sim matches `TraceResult.PhysMaterial` by weak-pointer equality, so new mud reads as firm for about a frame.
 - **Traction and resistance (ADR-001):** `ApplyWheelFrictionForces` scales each mud wheel's `FrictionMultiplier` by `FrictionVsDepth` around the base call. After the call, it adds a rolling resistance force along the steered wheel forward at the contact point: (`RollingResistanceVsDepth` + `SpeedDragCoefficient`·depth·v²) × the wheel's weight share. Below 1 cm/s it opposes the tire's push, like static friction, and it's capped at the tire push plus 0.4 × the stopping force. `SinkOffset` rises at max(30 cm/s, 0.5 × wheel speed). Telemetry shows `mu=` and `rr=`. <!-- updated 2026-10-26 -->
+- **Belly drag (ADR-012):** after rolling resistance, `ApplyBellyDrag` takes the average `SinkDepth` of all wheels minus `BellyClearance` (component, 45 cm = axle height; the body underside measures 60–64 cm, logged once per vehicle). Drag = mean `BellyDragCoefficient` of the mud wheels × excess (m) × weight, at the centre of mass against ground velocity, with the same standstill and no-reversal rules as rolling resistance. Only Heavy and Deep reach it. Telemetry `belly=<cm>/<N>`. <!-- updated 2026-10-26 -->
 - Forces from the sim use `AddForce` in kg·cm/s² (N × 100).
 - **Test forces** (`EB1TestForce`: Off / Push / Spring, settings in `TestForceSettings`, category `TestForce|Config`): push = constant world +Y force; spring = one-sided spring-damper to an anchor captured at toggle time. While active, the component zeroes `SleepThreshold`, because a sleeping vehicle skips the simulation, and restores it on Off.
 - Steps at a fixed 1/60 s (see Physics settings).
@@ -114,12 +115,15 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 - `B1Mud_RecoverMedium`: 2 s full, then 6 s at 35 %, ≥ 6 m.
 - `B1Mud_CrawlIntoMedium`: 14 s at 30 % from firm ground, ≥ 25 m.
 - `B1Mud_DeepRunUp`: full throttle with a 22 m run-up into deep, ≤ 42 m (stops inside the patch).
-- `B1Mud_ExitDeep`: 50 % out of deep, ≥ 8 m, endH ≥ −1.05 (back at firm height). <!-- updated 2026-10-26 -->
+- `B1Mud_ExitDeep`: 50 % out of deep, ≥ 8 m, endH ≥ −1.05 (back at firm height).
+- `B1Mud_DeepFullThrottle`: 7 s full throttle from rest in deep, stuck ≤ 5 s, `MaxEndSpeed` 0.5, ≤ 15 m.
+
+The rig line also has `vend=` (last-sample speed, `MaxEndSpeed` threshold) and, with a B1 component, `belly=` (max N). <!-- updated 2026-10-26 -->
 
 It also has `B1Gym_FirmSmoke` (6 s at 50 % throttle on the firm lane, ≥ 20 m; ~43 m) and `B1Gym_WallStop` (full throttle into the north wall; the jeep must stay on the floor). <!-- updated 2026-10-25 -->
 - Headless: `Scripts/RunGymTests.ps1 [-Map] [-Filter]` runs `UnrealEditor-Cmd -nullrhi` with `Automation RunTests Project.Functional Tests.<map dotted>[.<label>]; Quit`. The editor exits 0 regardless, so the script parses `Test Completed. Result={...}` lines for its exit code. Needs the editor closed (`Scripts/StopEditor.ps1`).
 - Editor lifecycle: `Scripts/StopEditor.ps1`, `StartEditor.ps1` and `BuildEditor.ps1` close, open and rebuild the editor without the user. Rules are in [.claude/rules/editor-lifecycle.md](../rules/editor-lifecycle.md).
-- Agent-side, in-editor: place/configure rigs through MCP, `StartPIE`, read `LogB1Test` with `LogsToolset.GetLogEntries`.
+- Agent-side, in-editor: place/configure rigs through MCP, `StartPIE`, read `LogB1Test` with `LogsToolset.GetLogEntries`. If the MCP tools don't register in a session, the server still takes plain JSON-RPC POSTs on `127.0.0.1:8001/mcp` (initialize, reuse the `Mcp-Session-Id` header, then `tools/call` `call_tool`). <!-- updated 2026-10-26 -->
 
 <!-- updated 2026-10-25 -->
 

@@ -37,6 +37,16 @@ public:
 	/** N, from the latest physics step */
 	float GetWheelRollingResistance(int32 WheelIndex) const;
 
+	/** cm the average sink depth is past BellyClearance */
+	float GetBellyDepth() const { return SimOutput.BellyDepth; }
+
+	/** N */
+	float GetBellyDrag() const { return SimOutput.BellyDrag; }
+
+	/** Belly drag starts once the average sink depth passes it. Axle height, below the jeep body's ~62 cm underside */
+	UPROPERTY(EditAnywhere, Category = "Mud|Config", meta = (Units = "cm", ClampMin = "0"))
+	float BellyClearance = 45.0f;
+
 protected:
 
 	/** Game thread, while the async input for the next physics step is open */
@@ -48,6 +58,10 @@ private:
 
 	/** Adds the mud materials the wheels touch now; params of every known one go to the sim */
 	void GatherMudParams(TArray<FB1MudSimParams>& OutParams);
+
+	/** Logs the chassis underside height over firm ground once, to check BellyClearance */
+	void LogMeasuredClearance();
+	bool bLoggedClearance = false;
 
 	/** Grows as wheels touch new mud. The sim treats a material as firm until it's in here, about a frame late */
 	UPROPERTY(Transient)

@@ -119,6 +119,8 @@ void AB1GymTestRig::StartTest()
 	SettleTimeMeasured = 0.0f;
 	PeakOscillation = 0.0f;
 	MaxSinkDepth.Init(0.0f, B1Movement ? B1Movement->GetNumWheels() : 0);
+	MaxBellyDrag = 0.0f;
+	EndSpeed = 0.0f;
 	TautTime = -1.0f;
 	StretchFirst = FFloatInterval();
 	StretchLast = FFloatInterval();
@@ -189,6 +191,7 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 	const FVector Velocity = Vehicle->GetMesh()->GetPhysicsLinearVelocity() / CmPerM;
 	const float Speed = Velocity.Size();
 	MaxSpeed = FMath::Max(MaxSpeed, Speed);
+	EndSpeed = Speed;
 	PeakOscillation = FMath::Max(PeakOscillation, FMath::Abs(static_cast<float>(Velocity.Z)));
 
 	if (Speed > SettleSpeed)
@@ -199,6 +202,10 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 	for (int32 WheelIndex = 0; WheelIndex < MaxSinkDepth.Num(); ++WheelIndex)
 	{
 		MaxSinkDepth[WheelIndex] = FMath::Max(MaxSinkDepth[WheelIndex], B1Movement->GetWheelSinkDepth(WheelIndex));
+	}
+	if (B1Movement)
+	{
+		MaxBellyDrag = FMath::Max(MaxBellyDrag, B1Movement->GetBellyDrag());
 	}
 
 	StuckTimer = Speed < StuckSpeed ? StuckTimer + DeltaSeconds : 0.0f;
@@ -260,6 +267,10 @@ void AB1GymTestRig::FinishScript()
 	{
 		Failures.Add(FString::Printf(TEXT("stuck>%.2f"), Thresholds.MaxTimeToStuck));
 	}
+	if (Thresholds.MaxEndSpeed >= 0.0f && EndSpeed > Thresholds.MaxEndSpeed)
+	{
+		Failures.Add(FString::Printf(TEXT("vend>%.2f"), Thresholds.MaxEndSpeed));
+	}
 	if (Thresholds.MaxPeakOscillation >= 0.0f && PeakOscillation > Thresholds.MaxPeakOscillation)
 	{
 		Failures.Add(FString::Printf(TEXT("peakOsc>%.3f"), Thresholds.MaxPeakOscillation));
@@ -303,14 +314,14 @@ void AB1GymTestRig::FinishScript()
 		{
 			PerWheel.Add(FString::Printf(TEXT("%.1f"), Depth));
 		}
-		SinkMetrics = TEXT(" sink=") + FString::Join(PerWheel, TEXT("/"));
+		SinkMetrics = TEXT(" sink=") + FString::Join(PerWheel, TEXT("/")) + FString::Printf(TEXT(" belly=%.0f"), MaxBellyDrag);
 	}
 
 	const bool bPassed = Failures.Num() == 0;
 	const FString Name = TestLabel.IsEmpty() ? GetName() : TestLabel;
-	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f avgDt=%.4f frames=%d%s%s%s%s"),
+	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f avgDt=%.4f frames=%d%s%s%s%s"),
 		*Name, bPassed ? TEXT("PASS") : TEXT("FAIL"),
-		PathLength, Displacement, MaxSpeed, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics,
+		PathLength, Displacement, MaxSpeed, EndSpeed, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics,
 		bPassed ? TEXT("") : TEXT(" failed="), *FString::Join(Failures, TEXT(",")));
 
 	UE_LOG(LogB1Test, Display, TEXT("%s"), *Line);

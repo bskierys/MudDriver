@@ -34,6 +34,7 @@ private:
 	float GetNormalizedDepth(int32 WheelIdx, const FB1MudSimParams& Mud) const;
 	void UpdateSinkOffset(int32 NumWheels);
 	void ApplyRollingResistance(float DeltaTime);
+	void ApplyBellyDrag(float DeltaTime);
 
 	/** Null when the wheel is airborne or not on a known mud material */
 	const FB1MudSimParams* FindContactMud(int32 WheelIdx) const;
@@ -51,6 +52,8 @@ private:
 
 	TArray<float> MudFrictionScale;
 	TArray<float> RollingResistance;
+	float BellyDepth = 0.0f;
+	float BellyDrag = 0.0f;
 
 	mutable FCriticalSection OutputLock;
 	FB1VehicleSimOutput LatestOutput;

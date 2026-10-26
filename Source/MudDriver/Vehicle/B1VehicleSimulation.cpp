@@ -48,6 +48,8 @@ void FB1VehicleSimulation::UpdateSimulation(float DeltaTime, const FChaosVehicle
 		LatestOutput.SinkDepth = SinkDepth;
 		LatestOutput.MudFrictionScale = MudFrictionScale;
 		LatestOutput.RollingResistance = RollingResistance;
+		LatestOutput.BellyDepth = BellyDepth;
+		LatestOutput.BellyDrag = BellyDrag;
 	}
 
 	if (!bLoggedFirstTick)
@@ -172,6 +174,7 @@ void FB1VehicleSimulation::ApplyWheelFrictionForces(float DeltaTime)
 	}
 
 	ApplyRollingResistance(DeltaTime);
+	ApplyBellyDrag(DeltaTime);
 }
 
 void FB1VehicleSimulation::ApplyRollingResistance(float DeltaTime)
@@ -220,6 +223,62 @@ void FB1VehicleSimulation::ApplyRollingResistance(float DeltaTime)
 		AddForceAtPosition(WheelForward * -MotionSign * Force, Hit.ImpactPoint);
 		RollingResistance[WheelIdx] = Force / NewtonsToUnreal;
 	}
+}
+
+void FB1VehicleSimulation::ApplyBellyDrag(float DeltaTime)
+{
+	BellyDepth = 0.0f;
+	BellyDrag = 0.0f;
+	const int32 NumWheels = PVehicle->Wheels.Num();
+	if (NumWheels == 0 || NumWheelsInContact == 0 || DeltaTime <= 0.0f)
+	{
+		return;
+	}
+
+	float DepthSum = 0.0f;
+	float CoefficientSum = 0.0f;
+	int32 NumMudWheels = 0;
+	for (int32 WheelIdx = 0; WheelIdx < NumWheels; ++WheelIdx)
+	{
+		DepthSum += SinkDepth.IsValidIndex(WheelIdx) ? SinkDepth[WheelIdx] : 0.0f;
+		if (const FB1MudSimParams* Mud = FindContactMud(WheelIdx))
+		{
+			CoefficientSum += Mud->BellyDragCoefficient;
+			++NumMudWheels;
+		}
+	}
+
+	BellyDepth = FMath::Max(DepthSum / NumWheels - StepInput.BellyClearance, 0.0f);
+	if (BellyDepth <= 0.0f || NumMudWheels == 0)
+	{
+		return;
+	}
+
+	const float Mass = PVehicle->Wheels[0].MassPerWheel * NumWheels;
+	const float DragLimit = CoefficientSum / NumMudWheels * BellyDepth / CmPerM * Mass * GravityCmPerS2;
+
+	// Same rules as rolling resistance: opposes ground motion, or at standstill the tires' push, and never reverses it.
+	const FVector Up = VehicleState.VehicleUpAxis;
+	const FVector GroundVelocity = FVector::VectorPlaneProject(VehicleState.VehicleWorldVelocity, Up);
+	const float Speed = GroundVelocity.Size();
+
+	FVector TirePush = FVector::ZeroVector;
+	for (const Chaos::FSimpleWheelSim& PWheel : PVehicle->Wheels)
+	{
+		TirePush += VehicleState.VehicleForwardAxis * PWheel.GetForceFromFriction().X;
+	}
+
+	const FVector Direction = Speed > StandstillSpeed ? GroundVelocity / Speed : TirePush.GetSafeNormal();
+	const float PushAlongMotion = FMath::Max(FVector::DotProduct(TirePush, Direction), 0.0f);
+	const float StopForce = Mass * Speed / DeltaTime * MaxStopForceFraction;
+	const float Force = FMath::Min(DragLimit, PushAlongMotion + StopForce);
+	if (Force <= 0.0f || Direction.IsNearlyZero())
+	{
+		return;
+	}
+
+	AddForce(-Direction * Force);
+	BellyDrag = Force / NewtonsToUnreal;
 }
 
 void FB1VehicleSimulation::UpdateRelativeLoads()

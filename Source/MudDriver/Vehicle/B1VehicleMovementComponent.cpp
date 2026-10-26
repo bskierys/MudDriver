@@ -54,9 +54,15 @@ void UB1VehicleMovementComponent::Update(float DeltaTime)
 	Input.TestForceSettings = TestForceSettings;
 	Input.TestForceAnchor = TestForceAnchor;
 	GatherMudParams(Input.MudMaterials);
+	Input.BellyClearance = BellyClearance;
 	Simulation->SetGameThreadInput(Input);
 
 	SimOutput = Simulation->GetGameThreadOutput();
+
+	if (!bLoggedClearance)
+	{
+		LogMeasuredClearance();
+	}
 
 #if ENABLE_DRAW_DEBUG
 	if (TestForce == EB1TestForce::Spring)
@@ -107,7 +113,32 @@ void UB1VehicleMovementComponent::GatherMudParams(TArray<FB1MudSimParams>& OutPa
 		Params.FrictionVsDepth = *Mud->FrictionVsDepth.GetRichCurveConst();
 		Params.RollingResistanceVsDepth = *Mud->RollingResistanceVsDepth.GetRichCurveConst();
 		Params.SpeedDragCoefficient = Mud->SpeedDragCoefficient;
+		Params.BellyDragCoefficient = Mud->BellyDragCoefficient;
 	}
+}
+
+void UB1VehicleMovementComponent::LogMeasuredClearance()
+{
+	const FBodyInstance* Body = UpdatedPrimitive ? UpdatedPrimitive->GetBodyInstance() : nullptr;
+	if (!Body || GetNumWheels() == 0 || GetForwardSpeed() > 10.0f)
+	{
+		return;
+	}
+
+	float ContactZ = 0.0f;
+	for (int32 WheelIndex = 0; WheelIndex < GetNumWheels(); ++WheelIndex)
+	{
+		const FWheelStatus& Wheel = GetWheelState(WheelIndex);
+		if (!Wheel.bInContact || Cast<UB1PhysicalMaterial_Mud>(Wheel.PhysMaterial.Get()))
+		{
+			return;
+		}
+		ContactZ += Wheel.HitLocation.Z / GetNumWheels();
+	}
+
+	bLoggedClearance = true;
+	UE_LOG(LogB1Physics, Log, TEXT("%s belly clearance: measured %.1f cm, BellyClearance %.1f cm"),
+		*GetNameSafe(GetOwner()), Body->GetBodyBounds().Min.Z - ContactZ, BellyClearance);
 }
 
 FB1VehicleSimulation* UB1VehicleMovementComponent::GetB1Simulation() const
