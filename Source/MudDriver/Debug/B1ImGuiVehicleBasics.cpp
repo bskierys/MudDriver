@@ -62,15 +62,22 @@ namespace B1ImGui
 
 		const APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
 		const AWheeledVehiclePawn* Vehicle = PC ? Cast<AWheeledVehiclePawn>(PC->GetPawn()) : nullptr;
-		const UChaosVehicleMovementComponent* Movement = Vehicle ? Vehicle->GetVehicleMovementComponent() : nullptr;
+		UChaosVehicleMovementComponent* Movement = Vehicle ? Vehicle->GetVehicleMovementComponent() : nullptr;
 
 		if (Movement)
 		{
 			ImGui::Text("Vehicle: %s", TCHAR_TO_UTF8(*Vehicle->GetName()));
-			ImGui::Text("Speed: %.1f km/h", Movement->GetForwardSpeed() * CmPerSecToKmPerHour);
+			ImGui::Text("Speed: %.1f km/h   Gear: %d   Throttle: %.0f%%", Movement->GetForwardSpeed() * CmPerSecToKmPerHour,
+				Movement->GetCurrentGear(), Movement->GetThrottleInput() * 100.0f);
 
 			if (const UChaosWheeledVehicleMovementComponent* WheeledMovement = Cast<UChaosWheeledVehicleMovementComponent>(Movement))
 			{
+				const float Rpm = WheeledMovement->GetEngineRotationSpeed();
+				const float MaxRpm = WheeledMovement->GetEngineMaxRotationSpeed();
+				char Overlay[48];
+				FCStringAnsi::Snprintf(Overlay, sizeof(Overlay), "%.0f / %.0f rpm", Rpm, MaxRpm);
+				ImGui::ProgressBar(MaxRpm > 0.0f ? Rpm / MaxRpm : 0.0f, ImVec2(-1.0f, 0.0f), Overlay);
+
 				DrawWheelTable(*WheeledMovement);
 				ImGui::TextDisabled("Orange = slipping / skidding");
 			}

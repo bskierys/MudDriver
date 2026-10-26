@@ -255,7 +255,8 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds.
   **User check:** type a `SinkRate` value; it applies like a drag does.
 
-- [ ] **S1-26** Engine RPM in "Vehicle Basics" (0.5 h)
+- [x] **S1-26** Engine RPM in "Vehicle Basics" (0.5 h) <!-- done: 2026-10-26 -->
+  Result: speed line now shows gear and throttle %; an RPM bar (`GetEngineRotationSpeed` / `GetEngineMaxRotationSpeed`) sits under it. Builds.
   RPM (with max), gear and throttle, next to speed, so wheelspin in mud is visible as revs without speed.
   **Done:** builds.
   **User check:** floor it in medium: RPM climbs while speed stays low.

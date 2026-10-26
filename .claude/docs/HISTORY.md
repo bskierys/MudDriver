@@ -432,3 +432,13 @@ User review of S1-21..S1-23 came back with four notes: mud patch edge ramps, typ
 
 ### Open follow-ups
 - User check: typing a value applies it like a drag.
+
+---
+
+## 2026-10-26 — S1-26 engine RPM in Vehicle Basics
+
+### What was built
+- Vehicle Basics: `Speed / Gear / Throttle %` line and an RPM progress bar (`current / max rpm`), so wheelspin in mud shows as revs without speed.
+
+### Open follow-ups
+- User check: floor it in medium; RPM climbs while speed stays low.
