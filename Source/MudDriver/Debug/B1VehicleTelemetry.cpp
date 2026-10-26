@@ -1,5 +1,6 @@
 #include "B1VehicleTelemetry.h"
 #include "B1Log.h"
+#include "B1PhysicalMaterial_Mud.h"
 #include "B1VehicleMovementComponent.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "HAL/IConsoleManager.h"
@@ -12,21 +13,25 @@ namespace B1VehicleTelemetry
 		true,
 		TEXT("Write a 2 Hz per-wheel telemetry line to LogB1Vehicle."));
 
+	static TAutoConsoleVariable<bool> CVarMudTelemetry(
+		TEXT("b1.Mud.Telemetry"),
+		true,
+		TEXT("Write a 2 Hz per-wheel mud line to LogB1Physics while the vehicle touches mud."));
+
 	bool IsEnabled()
 	{
 		return CVarVehicleTelemetry.GetValueOnGameThread();
 	}
 
+	bool IsMudEnabled()
+	{
+		return CVarMudTelemetry.GetValueOnGameThread();
+	}
+
 	void LogWheels(const UChaosWheeledVehicleMovementComponent& Movement)
 	{
-		const UB1VehicleMovementComponent* B1Movement = Cast<UB1VehicleMovementComponent>(&Movement);
-
 		TStringBuilder<512> Line;
 		Line.Appendf(TEXT("B1Wheels %s v=%.1fkmh"), *GetNameSafe(Movement.GetOwner()), Movement.GetForwardSpeed() * 0.036f);
-		if (B1Movement)
-		{
-			Line.Appendf(TEXT(" belly=%.1fcm/%.0fN"), B1Movement->GetBellyDepth(), B1Movement->GetBellyDrag());
-		}
 
 		for (int32 WheelIndex = 0; WheelIndex < Movement.GetNumWheels(); ++WheelIndex)
 		{
@@ -40,16 +45,39 @@ namespace B1VehicleTelemetry
 				Status.NormalizedSuspensionLength,
 				Status.DriveTorque,
 				Status.BrakeTorque);
-
-			if (B1Movement)
-			{
-				Line.Appendf(TEXT(" sink=%.1f mu=%.2f rr=%.0f"),
-					B1Movement->GetWheelSinkDepth(WheelIndex),
-					B1Movement->GetWheelMudFrictionScale(WheelIndex),
-					B1Movement->GetWheelRollingResistance(WheelIndex));
-			}
 		}
 
 		UE_LOG(LogB1Vehicle, Log, TEXT("%s"), *Line);
+	}
+
+	void LogMud(const UB1VehicleMovementComponent& Movement)
+	{
+		bool bAnyMud = Movement.GetBellyDepth() > 0.0f;
+		for (int32 WheelIndex = 0; WheelIndex < Movement.GetNumWheels() && !bAnyMud; ++WheelIndex)
+		{
+			bAnyMud = Movement.GetWheelSinkDepth(WheelIndex) > 0.0f || Cast<UB1PhysicalMaterial_Mud>(Movement.GetWheelState(WheelIndex).PhysMaterial.Get());
+		}
+		if (!bAnyMud)
+		{
+			return;
+		}
+
+		TStringBuilder<512> Line;
+		Line.Appendf(TEXT("B1Mud %s v=%.1fkmh belly=%.1fcm/%.0fN"), *GetNameSafe(Movement.GetOwner()), Movement.GetForwardSpeed() * 0.036f,
+			Movement.GetBellyDepth(), Movement.GetBellyDrag());
+
+		for (int32 WheelIndex = 0; WheelIndex < Movement.GetNumWheels(); ++WheelIndex)
+		{
+			const FWheelStatus& Status = Movement.GetWheelState(WheelIndex);
+			Line.Appendf(TEXT(" | w%d mat=%s sink=%.1f slip=%.2f mu=%.2f rr=%.0f"),
+				WheelIndex,
+				*GetNameSafe(Status.PhysMaterial.Get()),
+				Movement.GetWheelSinkDepth(WheelIndex),
+				Status.SlipMagnitude,
+				Movement.GetWheelMudFrictionScale(WheelIndex),
+				Movement.GetWheelRollingResistance(WheelIndex));
+		}
+
+		UE_LOG(LogB1Physics, Log, TEXT("%s"), *Line);
 	}
 }

@@ -363,3 +363,24 @@ The user asked the agent to run the rest of Sprint 1 without stopping for user c
 ### Open follow-ups
 - No A/B run with belly drag off; deep was already a stop without it. The user's end-of-sprint playtest decides whether it needs to be stronger or start earlier.
 - Preset `BellyDragCoefficient` values are all the class default (2.0); tuning per size is for S1-24.
+
+---
+
+## 2026-10-26 — S1-22 NetImGui Mud window + mud telemetry
+
+### Context
+Same autonomous sprint run. Mud tuning needed a live editor before the S1-24 playtest.
+
+### What was built
+- `Debug/B1ImGuiMud` (Debug → Mud): belly readout, live `BellyClearance`, a per-wheel mud table with sink bars, and live editing of every loaded mud preset (scalars plus curve keys) with "Save to asset" in editor builds.
+- `B1VehicleTelemetry::LogMud` behind CVar `b1.Mud.Telemetry`: a 2 Hz `B1Mud` line on `LogB1Physics`, only while touching mud. The mud fields left the `B1Wheels` line.
+
+### Decisions made
+- Presets are edited on the asset objects directly, not on a copy. The component already copies params to the physics thread every frame, and PIE uses the same asset objects as the editor, so "save" just writes the package.
+- Save uses `UPackage::SavePackage` under `WITH_EDITOR`, so the runtime module doesn't need an `UnrealEd` dependency.
+
+### What we learned
+- The NetImGui plugin ships ImGui 1.90 (`BeginDisabled` and tables are available).
+
+### Open follow-ups
+- User check: the window's layout, live `SinkRate` edits while driving, and Save persisting across an editor restart.

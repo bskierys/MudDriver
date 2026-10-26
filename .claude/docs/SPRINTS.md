@@ -220,7 +220,12 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds; rig: full throttle in deep mud ends stuck (< 0.5 m/s after 5 s).
   **User check:** —
 
-- [ ] **S1-22** NetImGui "Mud" window + telemetry (3 h) _(requires S1-18)_
+- [x] **S1-22** NetImGui "Mud" window + telemetry (3 h) _(requires S1-18)_ <!-- done: 2026-10-26 -->
+  Result: `Debug/B1ImGuiMud` (`B1ImGui::DrawMud`, menu Debug → Mud).
+  - Player vehicle: speed, belly depth and drag, live `BellyClearance`, and a per-wheel table: material, sink bar (fill = depth / the material's max), slip, friction multiplier, rolling resistance N.
+  - Presets: every loaded `UB1PhysicalMaterial_Mud` gets a collapsing header with all scalars plus the curve keys (normalized depth, value). Edits apply on the next frame, because the component copies params every frame. An edited preset shows `*`; "Save to asset" (editor builds only) writes the package with `UPackage::SavePackage` and logs to `LogB1Physics`.
+  - Telemetry: CVar `b1.Mud.Telemetry` writes `B1Mud <vehicle> v= belly=<cm>/<N> | w<i> mat= sink= slip= mu= rr=` to `LogB1Physics` at 2 Hz, only while a wheel touches mud or has depth. The mud fields moved out of the `B1Wheels` line.
+  - Verified headless: `B1Mud_SinkMedium` logs the line with sink rising 1.7→34.6 cm. The ImGui window and the save button are untested (no NetImGui client on the agent side) → user check.
   Per-wheel depth, slip, friction, resistance, plus belly drag. Live-edit the presets' params, with a "save to asset" button. 2 Hz telemetry line to `LogB1Physics`.
   **Done:** builds; the telemetry line appears during the rig run.
   **User check:** edit `SinkRate` live while driving: the effect is immediate and saving persists it.

@@ -1,5 +1,6 @@
 #include "B1ImGuiSubsystem.h"
 #include "B1ImGuiVehicleBasics.h"
+#include "B1ImGuiMud.h"
 #include "NetImguiModule.h"
 #include "Engine/GameInstance.h"
 
@@ -14,6 +15,7 @@ void UB1ImGuiSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 #if NETIMGUI_ENABLED
 	RegisterWindow("Debug", "Vehicle Basics", &B1ImGui::DrawVehicleBasics);
+	RegisterWindow("Debug", "Mud", &B1ImGui::DrawMud);
 
 	DrawHandle = FNetImguiModule::Get().OnDrawImgui.AddUObject(this, &UB1ImGuiSubsystem::DrawImGui);
 #endif
