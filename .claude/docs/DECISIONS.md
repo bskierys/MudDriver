@@ -175,6 +175,8 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 
 **Alternatives.** Greybox scenario first. A mud + winch vertical slice first.
 
+**Amendment (2026-10-26).** Mechanic gyms can have a playground companion for hands-on playtests: `Lvl_Gym_Swamp` mixes every mud depth, slopes and low ground over a large area. It has no rigs; rigs stay in the per-mechanic gyms.
+
 ---
 
 ## ADR-010 — Fuel attribute, consumed by engine work

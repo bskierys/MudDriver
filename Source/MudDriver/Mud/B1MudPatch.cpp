@@ -75,9 +75,11 @@ void AB1MudPatch::OnConstruction(const FTransform& Transform)
 	MudSurface->SetRelativeLocation(FVector(0.0f, 0.0f, -SurfaceThickness * 0.5f));
 	MudSurface->SetRelativeScale3D(FVector(Size.X, Size.Y, SurfaceThickness) / CubeMeshSize);
 	MudSurface->SetPhysMaterialOverride(MudMaterial);
-	MudSurface->SetVisibility(false);
+	MudSurface->SetVisibility(true);
+	MudSurface->SetHiddenInGame(true);
 
-	BuildVisualMesh();
+	// The grid is built in BeginPlay: built here, its sections get saved into the actor package (13+ MB per patch).
+	MudVisual->ClearAllMeshSections();
 	MudVisual->SetMaterial(0, MudSurface->GetMaterial(0));
 
 	HardBottom->SetRelativeLocation(FVector(0.0f, 0.0f, -HardBottomDepth - HardBottomThickness * 0.5f));
@@ -98,6 +100,7 @@ void AB1MudPatch::BeginPlay()
 	Super::BeginPlay();
 
 	ShowDebugHandle = AHUD::OnShowDebugInfo.AddUObject(this, &AB1MudPatch::DrawShowDebug);
+	BuildVisualMesh();
 
 	if (UB1MudTrailSubsystem* Trails = GetWorld()->GetSubsystem<UB1MudTrailSubsystem>())
 	{

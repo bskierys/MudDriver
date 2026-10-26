@@ -99,7 +99,7 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 
 ## Mud ruts (ADR-008, visual only)
 
-- `AB1MudPatch` has two surfaces: `MudSurface` (the 10 cm slab, hidden, collision only) and `MudVisual`, a `UProceduralMeshComponent` grid (`VisualGridSpacing` 10 cm, ≤ 400 cells per side, UV0 spans the patch, no collision, no shadow) built in `OnConstruction` with `MudSurface`'s material.
+- `AB1MudPatch` has two surfaces: `MudSurface` (the 10 cm slab, collision; visible in the editor, hidden in game) and `MudVisual`, a `UProceduralMeshComponent` grid (`VisualGridSpacing` 10 cm, ≤ 400 cells per side, UV0 spans the patch, no collision, no shadow) with `MudSurface`'s material. The grid is built in `BeginPlay` and cleared in `OnConstruction`: built in the editor, its sections were saved into each actor package (13–18 MB per patch, minutes per save). <!-- updated 2026-10-26 -->
 - In game worlds the patch creates a 512² R16F render target (rut depth / 100 cm), puts it on a dynamic instance of the material (`TrailMask`, plus `TrailDepthRange`, `PatchSizeX/Y`) and registers with `UB1MudTrailSubsystem` (`UTickableWorldSubsystem`, Game/PIE).
 - `UB1MudTrailComponent` (on `AB1Jeep` as `MudTrail`) sends each mud wheel's contact path with its sink depth; wheels under `MinRutDepth` (2 cm) leave nothing. Width = tire width × `WidthScale` (1.2) + depth × `WallWidthPerDepth` (1.5).
 - The subsystem stamps every 5 cm and draws one canvas batch per patch per frame: a procedural soft brush (flat floor, falloff 0.3–1), translucent at 0.5 toward the stamp depth. The canvas has no max blend, so a shallower wheel partly fills an older rut. CVar `b1.Mud.Trails`.
@@ -121,6 +121,20 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 - **Spawns:** `Spawn_1..5` at X −12 m. `Spawn_1_Firm` carries the `Player0` tag, which `AOffroadGameMode` always picks.
 
 <!-- updated 2026-10-25 -->
+
+## Swamp playground (ADR-009 amendment)
+
+`/Game/B1/Gym/Lvl_Gym_Swamp`: a duplicate of `Lvl_Gym_Mud` (same game mode and lighting), no rigs. Floor X −60..140 m, Y −80..80 m; hidden walls Z −4..8 m.
+- **Ground:** grid cube tiles 4 m thick, top at Z=0 (`Gym/Ground`); mud patches sit in gaps with their own hard bottoms (S 25, M 35, H 50, D 70 cm).
+- **Hard-bottom transitions:** a patch's own edge ramp is on only when the whole edge meets firm ground (S 150, M 200, H 300, D 400 cm). Otherwise hidden BlockAll slabs (`Gym/MudBottom`, `Bottom_<patch>_<edge><n>`) run per edge segment inside the deeper side: up to the surface next to firm ground, or up to the shallower neighbour's bottom (8 cm of run per cm of depth difference, 200–400 cm). A full-height ramp on an edge shared with mud made a bump under the surface.
+- **Spawn:** `Spawn_1_Main` (`Player0`) at X −50 m, Y 0, on a firm area X −60..−35.
+- **Swamp** (X −35..55): 27 patches, mostly shallow/medium with some heavy and deep. A 6 m firm path runs from the spawn east (Y 0) and jogs to the lake shore (Y 14..20), with branches north (X 0, then Y 50..56) and south to hill 2.
+- **Lake** (X 60..120, Y −30..30): concentric rings, shallow 5 m → medium 7.5 m → heavy 7.5 m → deep 20 × 20 m centre.
+- **Hill 1** (plateau X 80..100, Y 55..70, +4 m): west ramp 11°, south and east ramps 18°; the east ramp ends in medium mud (`Mud_HillFoot_M`). Everything from the lake's north shore (Y 30) to the wall around the hill is shallow mud (`Mud_Around_*`).
+- **Hill 2** (plateau X −6..6, Y −80..−70, +2.5 m) in shallow mud, with a firm landing at the end of the south path: north ramp 12°, east 14°, west 23°.
+- **Mud on slopes** (`Gym/Mud/Slope`): rotated patches, top surface flush with the ramp. Half the width is mud on hill 1 W (shallow), E (shallow), S (medium) and hill 2 N (medium), next to the firm half (the firm ramp slab only covers its half). Hill 2 E (shallow) and W (medium) are mud across the full width. Edge ramps on at the top edge and on the side next to the firm half; at the foot, the floor tile under the ramp caps the sink. No slope rules yet (Sprint 3).
+- **Basin** (X 75..105, Y −78..−40, floor −3 m, `Gym/Basin`): medium and heavy mud at −3 m; west and east ramps 11°, north ramp 21°.
+- Layout is generated: rectangles in metres, firm tiles fill what's left. Edit `Gym/` actors by hand for small changes. <!-- updated 2026-10-26 -->
 
 ## Debug tooling
 

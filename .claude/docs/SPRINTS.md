@@ -294,7 +294,7 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
 
 **Status:** active, planned 2026-10-26.
 
-**Goal.** Close Phase G and Phase 1. A single ASC on the PlayerState carries Condition and Fuel; fighting mud burns fuel; mud gets its state tag, debug, spray and trails.
+**Goal.** Close Phase G and Phase 1. A single ASC on the PlayerState carries Condition and Fuel; fighting mud burns fuel; mud gets its state tag, debug, spray and trails. Mud and fuel become components that can be copied into another project (added after /validate).
 
 **Sprint-wide notes**
 - ⚠️ Rigs that spawn their own jeep have no controller, so no PlayerState and no ASC. Fuel and tag rigs need the jeep possessed by the player controller (see S2-09). Mud rigs that don't touch GAS stay as they are.
@@ -433,15 +433,79 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds; both suites PASS; a viewport capture after rigs drive through medium and deep shows ruts with visible depth and lips.
   **User check:** ruts on Heavy/Deep look dug into the mud from the chase camera. ✅ signed off 2026-10-26.
 
+### Portability (added 2026-10-26 after /validate)
+
+Why now, not backlog: mud and fuel must be copyable into another project with a different movement component and fuel attribute, and mud surfaces must later come from PCG, not just rectangles. Sprint 3 (slope hold, standstill rule, winch) edits the same sim functions, so splitting after it means untangling winch from mud.
+
+- ⚠️ Pure refactors: behaviour must not change. Each task re-runs `Lvl_Gym_Mud` (22) and `Lvl_Offroad` (8) headless; numbers stay within 1 % (fixed step, so they should match). Record before/after in HISTORY.md.
+- ⚠️ New `.cpp`/`.h` files: `BuildEditor.ps1` drops `Makefile.bin`; header changes need a full build, not Live Coding.
+- ⚠️ Target: `Mud/` and `Fuel/` never include `AB1Jeep`, `UB1VehicleMovementComponent`, `UB1AbilitySystemComponent`, `UB1VehicleAttributeSet` or `B1GameplayTags`. The host vehicle reaches them through small interfaces.
+
+- [ ] **S2-18** Mud surface contract ADR (A1) (0.5 h)
+  New ADR: a mud surface is any primitive that (1) has the `B1MudSurface` profile (object `B1Mud`, blocks only `WorldDynamic`), (2) reports a `UB1PhysicalMaterial_Mud`, and (3) has something blocking `WorldDynamic` below it within `MaxSinkDepth`. Depth rule: mud sits over a depression. A surface flush on the landscape gives ~0 cm sink, because the hard-ground cap finds the landscape right under it. `AB1MudPatch` is one producer; spline meshes, modelling-tools blobs and, later, PCG output (mud surface at terrain height plus the terrain lowered under it, e.g. a landscape patch) are others. ARCHITECTURE Mud section states the contract.
+  **Done:** ADR in DECISIONS.md, ARCHITECTURE updated.
+  **User check:** read the ADR; the authoring model matches how you want to place mud.
+
+- [ ] **S2-19** Chaos-free mud model + `FB1MudSimulation` (P1) (4 h)
+  - `Mud/Sim/B1MudWheelModel`: plain C++, no Chaos or UObject types. Sink update (settle, dig, rise, clamp incl. hard ground), friction scale, rolling resistance coefficient, belly drag limit. POD in (slip m/s, road speed, relative load, dt, params, hard ground depth) and out.
+  - `Mud/Sim/FB1MudSimulation`, a member of `FB1VehicleSimulation` (composition, not inheritance). Owns `SinkDepth`, `SinkOffset`, `HardGroundDepth`, `RelativeLoad`, the mud params and output, the sink reset serial and the unstuck assist force. Hooks the host sim calls: `PreSuspensionTraces` (raised traces), `PostSuspensionTraces` (hit push-down, hard-ground trace), `PreFriction` / `PostFriction` (friction multiplier, rolling resistance, belly drag through an add-force callback), `Step`.
+  - Mud input/output split out of `FB1VehicleSimInput/Output` into `FB1MudSimInput/Output`. `FB1VehicleSimulation` keeps only the test force and forwards to the mud hooks.
+  **Done:** builds; both suites unchanged; `B1MudWheelModel.h` has no Chaos include; the host-side mud code in `FB1VehicleSimulation` is ~5 hook calls.
+  **User check:** —
+
+- [ ] **S2-20** `UB1MudVehicleComponent` (P2, P3) (4 h) _(requires S2-19)_
+  - New actor component on `AB1Jeep` (`Mud|Components`). Owns `KnownMudMaterials` + param gathering, `BellyClearance`, `Unstuck()` and its assist settings, and the mud getters (sink, friction scale, rolling resistance, belly, average sink). Adds `GetWheelMud(i)` (null when airborne or off mud), the single "is this wheel on mud" query that replaces the 6 `Cast<UB1PhysicalMaterial_Mud>` copies.
+  - Reaches the sim through `IB1MudSimHost`, a UInterface on the movement component: `FB1MudSimulation*`, wheel count, wheel state, wheel radius/width, effective throttle. Pushes input from its own tick (the buffer is latest-wins) and reads output post-physics, so the host doesn't need to override `Update` for mud.
+  - Consumers move to the component, cached in BeginPlay (no per-tick `FindComponentByClass`): spray, trail, `ShowDebug B1Mud`, Mud ImGui window, `B1Unstuck` cheat, `B1Mud` telemetry, rig metrics (`sink=`, `belly=`, `bUnstuck`).
+  - Amend ADR-001 (slopes): `SlopeHoldVsSinkDepth` goes on this component, not on `UB1VehicleMovementComponent`.
+  **Done:** builds; both suites unchanged; no `UB1VehicleMovementComponent` reference in `Mud/` or the mud debug files except the `IB1MudSimHost` implementation.
+  **User check:** drive the gym: sinking, spray, ruts, `ShowDebug B1Mud`, the Mud window and `B1Unstuck` all behave as before.
+
+- [ ] **S2-21** InMud tag + mud strain on the mud component (P4) (1.5 h) _(requires S2-20)_
+  - `UpdateInMud` / `SetInMud` move from `AB1Jeep`. ASC through `UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Owner)`. Tag from `UPROPERTY FGameplayTag InMudTag` (set to `Vehicle.State.InMud` on `BP_B1Jeep`), release delay a property. Cleared when the owner pawn's controller changes (`ReceiveControllerChangedDelegate`), so the jeep doesn't have to call it.
+  - `GetMudStrain()` = effective throttle × clamp(average sink / `MudFullStrainDepth`). `MudFullStrainDepth` moves here from `UB1VehicleTuningData`.
+  **Done:** builds; `B1Fuel_Medium` `inMud=` and fuel numbers unchanged; no leftover-tag error after re-possess.
+  **User check:** —
+
+- [ ] **S2-22** `UB1FuelConsumptionComponent` (2.5 h) _(requires S2-21)_
+  - `ConsumeFuel`, the fuel change delegate / out-of-fuel handling and the L/100 m window move from `AB1Jeep` into `Fuel/UB1FuelConsumptionComponent`.
+  - No tie to this project's GAS classes: `FGameplayAttribute FuelAttribute`, drain GE class, SetByCaller tag and `OutOfFuelTag` are properties (`BP_B1Jeep`: `Fuel`, `GE_B1FuelDrain`, `Data.Fuel`, `Vehicle.State.OutOfFuel`). Works on any `UAbilitySystemComponent` found from the owner.
+  - Loads come through interfaces so fuel and mud don't include each other: engine power + throttle from `IB1EngineLoadSource` (on `UB1VehicleMovementComponent`), mud strain from `IB1FuelLoadSource` (on `UB1MudVehicleComponent`). 🔍 Decide where the mud rate lives: per-source rate keyed by name in the fuel data (recommended) or the source returning L/h.
+  - Out of fuel: the component broadcasts `OnOutOfFuelChanged(bool)`; `AB1Jeep` binds it and sets the movement's fuel cut-off (the cut-off stays vehicle-specific).
+  - `UB1VehicleTuningData` (all fuel fields) becomes `UB1FuelConsumptionData` in `Fuel/` with a CoreRedirect, so `DA_B1JeepTuning` keeps working.
+  - Vehicle Status window, `B1Status` telemetry and fuel rig metrics read the component. ADR-010 amended.
+  **Done:** builds; all fuel rigs PASS with unchanged numbers; `AB1Jeep` has no fuel code beyond the cut-off binding.
+  **User check:** Vehicle Status fuel section, rate edits and "Save to asset" still work.
+
+- [ ] **S2-23** Trail receivers off `AB1MudPatch` (A2) (2 h) _(requires S2-18)_
+  `UB1MudTrailSurfaceComponent` owns the render target, the MID params and `WorldToTrailUV` over a local XY rect. `AB1MudPatch` adds one and sets its size. `UB1MudTrailSubsystem` registers components, not patches, with a world-bounds prefilter before the UV test (ready for many PCG surfaces). The wheel → subsystem side stays world-space as it is.
+  **Done:** builds; capture after `B1Mud_CrossMedium` shows ruts as before; the subsystem doesn't include `B1MudPatch.h`.
+  **User check:** —
+
+- [ ] **S2-24** `UB1MudSettings`, `LogB1Mud`, folder layout (P5, P6) (2 h) _(requires S2-20, S2-23)_
+  - `UB1MudSettings : UDeveloperSettings` (Project Settings → B1 Mud, `DefaultGame.ini`): mud object channel, surface profile name, spray Niagara system as a soft ref (replaces the `ConstructorHelpers` path). Replaces the `B1CollisionChannels.h` macros.
+    ⚠️ Note: `WheelTraceCollisionResponses` is set in the movement constructor (CDO time); confirm the settings CDO is loaded from config by then, or set the response in `OnRegister`/`CreatePhysicsVehicle`.
+  - `LogB1Mud` in `Mud/B1MudLog.h`, used by all mud code (the `B1Mud` telemetry line too), so `Mud/` doesn't need `B1Log.h`.
+  - Layout: `Mud/` runtime, `Mud/Sim/`, `Mud/Debug/` (`B1MudShowDebug`, `B1ImGuiMud`); `Fuel/` for the fuel component and data.
+  **Done:** builds; both suites pass; no `ECC_GameTraceChannel1` outside the settings default, no `LogB1Physics` in `Mud/`; ARCHITECTURE modules/log list updated.
+  **User check:** Project Settings → B1 Mud shows the channel and spray asset.
+
+- [ ] **S2-25** Migration guide + keep-it-current rule (1.5 h) _(requires S2-22, S2-23, S2-24)_
+  - `.claude/docs/MIGRATION.md`: copying mud and fuel into another project. Folders and files; Build.cs modules and plugins; `DefaultEngine.ini` channel + profile and `DefaultGame.ini` settings; content (`M_B1Mud`, `NS_B1MudSpray`, `M_B1MudSpray`, `PM_B1Mud_*`, `MI_B1Mud_*`, `BP_B1MudPatch`, `GE_B1FuelDrain`); what the host vehicle implements (`IB1MudSimHost`, `IB1EngineLoadSource`, the `FB1MudSimulation` hook calls in its Chaos sim subclass, with a snippet); GAS wiring (tags, fuel attribute, drain GE on the components); debug wiring (ImGui window registration, ShowDebug); the `B1` prefix; verification (mud rigs or a smoke drive).
+  - Rule `.claude/rules/portability.md` (applyTo `Source/MudDriver/Mud/**`, `Source/MudDriver/Fuel/**`): no includes of project-specific classes from these folders; any change that adds a host requirement, setting, asset or dependency updates MIGRATION.md in the same task. Listed in CLAUDE.md's docs and rules tables.
+  **Done:** guide and rule exist; the includes in `Mud/` and `Fuel/` match the guide's dependency list.
+  **User check:** read the guide: it matches what you'd do in the other project.
+
 ### Close
 
-- [ ] **S2-15** Fuel playtest + tuning (user + agent, 1 h) _(requires S2-06, S2-09)_
+- [ ] **S2-15** Fuel playtest + tuning (user + agent, 1 h) _(requires S2-06, S2-09, S2-22)_
   You drive the gym and tune the rates in Vehicle Status. The agent writes the values into `DA_B1JeepTuning` and re-runs S2-09.
   **Done:** fuel rigs PASS with the tuned values.
   **User check:** sign-off on fuel pressure (Phase G).
 
-- [ ] **S2-16** Phase 1 close playtest (user + agent, 1 h) _(requires S2-10..S2-14b)_
+- [ ] **S2-16** Phase 1 close playtest (user + agent, 1 h) _(requires S2-10..S2-14b, S2-18..S2-25)_
   Mud checklist (ROADMAP Phase 1) plus spray, trails, `ShowDebug B1Mud`, `B1Unstuck`. You also check `stat unit` on the laptop (sanity only).
+  Drive `Lvl_Gym_Swamp` too (large mixed mud, lake, hills, basin); S2-15 fuel tuning can use it as well.
   **Done:** both suites PASS; ROADMAP Phase 1 and Phase G ticked.
   **User check:** sign-off on Phase 1.
 
@@ -458,7 +522,8 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
 **Goal.** Prove mud + winch before any on-foot work. Mud learns slopes (slide when barely sunk, hold when deep, never climb unwinched), the winch pulls the jeep out of deep mud and up the muddy slope, and the user feels it at a checkpoint with the hook attached by cheat.
 
 **Sprint-wide notes**
-- ⚠️ The slope rules must not change flat ground. Every task touching `FB1VehicleSimulation` re-runs `Lvl_Gym_Mud` (21) and `Lvl_Offroad` (8) headless; numbers stay within 5 % of Sprint 2.
+- ⚠️ After S2-19..S2-22, mud forces live in `FB1MudSimulation` / `B1MudWheelModel` and mud config on `UB1MudVehicleComponent`; slope and winch-drag-cap code goes there, not into `FB1VehicleSimulation`. Keep `MIGRATION.md` current (S2-25 rule).
+- ⚠️ The slope rules must not change flat ground. Every task touching `FB1VehicleSimulation` or `FB1MudSimulation` re-runs `Lvl_Gym_Mud` (21) and `Lvl_Offroad` (8) headless; numbers stay within 5 % of Sprint 2.
 - ⚠️ `ActorTools.set_actor_transform` resets omitted fields: always pass location, rotation and scale when placing slopes and rotated patches.
 - ⚠️ `Lvl_Gym_Winch` is WP/OFPA like `Lvl_Gym_Mud`: new actors need `save_assets([])` to land on disk; check `git status`.
 - ⚠️ The agent can't drive or run cheats through MCP. Winch behaviour is verified by rigs with `WinchAnchor` / `WinchPull`; cheats, ImGui and ShowDebug are user checks.
@@ -483,7 +548,7 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **User check:** —
 
 - [ ] **S3-04** Slope hold by sink depth (3 h) _(requires S3-03)_
-  `SlopeHoldVsSinkDepth` (`FRuntimeFloatCurve` over absolute cm, fraction of wheel load) on `UB1VehicleMovementComponent` (`Mud|Config`), copied to the sim. Per mud wheel: a force that cancels the net downhill force along the ground up to `curve(SinkDepth) × wheel load`, never more, so it can't push the jeep uphill. Start curve: 0 at 0–15 cm, 1 at 30 cm. Mud window: editable curve keys (typed fields per `imgui.md`) and a per-wheel `hold` column; `B1Mud` telemetry gets `hold=`.
+  `SlopeHoldVsSinkDepth` (`FRuntimeFloatCurve` over absolute cm, fraction of wheel load) on `UB1MudVehicleComponent` (`Mud|Config`, per the S2-20 ADR-001 amendment), copied to `FB1MudSimulation`. Per mud wheel: a force that cancels the net downhill force along the ground up to `curve(SinkDepth) × wheel load`, never more, so it can't push the jeep uphill. Start curve: 0 at 0–15 cm, 1 at 30 cm. Mud window: editable curve keys (typed fields per `imgui.md`) and a per-wheel `hold` column; `B1Mud` telemetry gets `hold=`.
   **Done:** builds; flat suites unchanged (the term is 0 on flat ground); medium idle on the test slope slides; a jeep dug in to ≥ 30 cm on the slope holds.
   **User check:** on the medium slope, stop and let go: the jeep slides back slowly. Floor it until it digs in, let go: it stays. Edit the curve live and feel the change.
 
