@@ -2,7 +2,7 @@
 
 Task format: `- [ ] **SN-XX** title (estimate)`, then **Done:** (what the agent verifies) and **User check:** (what you try by hand). Markers: 🔍 Research first · ⚠️ Note · _(requires SN-YY)_.
 
-Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-10-25-river-crossing.md) (Approach, Testing).
+Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-10-25-river-crossing.md) (Approach, Testing; Sprints 1–2) and [plans/2026-10-26-mud-winch-first.md](plans/2026-10-26-mud-winch-first.md) (slope rules, winch, on foot; Sprints 3–4).
 
 **Sprint-wide notes**
 - ⚠️ Live Coding only handles function-body edits. New classes, headers or UPROPERTY changes need a full build with the **editor closed**. The agent runs `Scripts/BuildEditor.ps1`, which closes the editor, builds and reopens it. You only step in if a save prompt blocks the close.
@@ -388,7 +388,8 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
 
 ### Mud polish (Phase 1)
 
-- [ ] **S2-10** `Vehicle.State.InMud` tag (1 h) _(requires S2-04)_
+- [x] **S2-10** `Vehicle.State.InMud` tag (1 h) _(requires S2-04)_ <!-- done: 2026-10-26 -->
+  Result: `AB1Jeep::UpdateInMud` in `Tick` (only while possessed with an ASC): any wheel `bInContact` on a `UB1PhysicalMaterial_Mud` sets the loose tag, released 0.5 s after the last contact; `UnPossessed` clears it. `IsInMud()` getter. Rig: `inMud=` (s tagged) in the fuel metrics, threshold `MinInMudTime`, and an error log if the tag is still on the ASC after the rig re-possesses the old pawn. Headless: `B1Fuel_Medium` inMud=3.37 (guard `MinInMudTime` 2), `B1Fuel_DeepFull` 7.00, firm rigs 0, no leftover-tag error.
   The jeep adds the loose tag while any wheel touches mud and removes it 0.5 s after the last mud contact (no flicker on bumps). Removed on unpossess (ADR-004). Shows in the Vehicle Status tag list.
   **Done:** builds; a `bPossessWithPlayer` rig crossing medium logs `inMud=` (seconds tagged) > 0 and the tag is gone at the end.
   **User check:** —
@@ -432,3 +433,181 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
 ### Backlog (found during the sprint)
 
 - `Lvl_Offroad` load logs `LoadErrors: ... /Lvl_Offroad/B/9M/ZNZM1Q9PKXHV07GMT8Q6NN, a dependent package None was not available`. Present since at least 2026-10-25; rigs pass. Find the actor and fix or delete its broken reference. _(found in S2-03)_
+
+---
+
+## Sprint 3 — Mud + winch core (Phase 2, part 1)
+
+**Status:** planned 2026-10-26, starts after Sprint 2 closes.
+
+**Goal.** Prove mud + winch before any on-foot work. Mud learns slopes (slide when barely sunk, hold when deep, never climb unwinched), the winch pulls the jeep out of deep mud and up the muddy slope, and the user feels it at a checkpoint with the hook attached by cheat.
+
+**Sprint-wide notes**
+- ⚠️ The slope rules must not change flat ground. Every task touching `FB1VehicleSimulation` re-runs `Lvl_Gym_Mud` (21) and `Lvl_Offroad` (8) headless; numbers stay within 5 % of Sprint 2.
+- ⚠️ `ActorTools.set_actor_transform` resets omitted fields: always pass location, rotation and scale when placing slopes and rotated patches.
+- ⚠️ `Lvl_Gym_Winch` is WP/OFPA like `Lvl_Gym_Mud`: new actors need `save_assets([])` to land on disk; check `git status`.
+- ⚠️ The agent can't drive or run cheats through MCP. Winch behaviour is verified by rigs with `WinchAnchor` / `WinchPull`; cheats, ImGui and ShowDebug are user checks.
+
+### Slopes (ADR-001 amendment)
+
+- [ ] **S3-01** `Lvl_Gym_Winch` base + test slope (3 h)
+  Duplicate `Lvl_Gym_Mud`'s setup (floor tiles, hidden walls, sky, `BP_B1GymGameMode`), strip the lanes. Add one test slope pair at 20°: a firm slope (rotated cube tiles) and a medium-mud slope (rotated `BP_B1MudPatch` with `PM_B1Mud_Medium`, own hard bottom, ramp only at the foot), each ~30 m long with a 20 m flat run-up and a 10 m flat top. Spawns at each run-up.
+  ⚠️ Note: `AB1MudPatch` builds with the actor rotation (`B1MudPatch.cpp:88`), but the hard-ground cap trace is vertical and `MaxSinkDepth` long. On a slope the bottom is `depth / cos θ` away, so lengthen the trace if needed.
+  **Done:** builds; viewport capture of the slopes; PIE spawns the jeep at the run-up; a rig dropped on the mud slope shows `sink=` > 0 (mud is read on the rotated patch).
+  **User check:** drive both slopes once as they are: describe what the jeep does on the mud slope today.
+
+- [ ] **S3-02** Rig `maxH` + slope baseline (2 h) _(requires S3-01)_
+  New rig metric `maxH` (peak height above the rig) and threshold `MaxPeakHeight`. Baseline rigs on the test slopes, measured **before** any rule change: firm 50 %, medium 30/50/100 % (15 s from the run-up), medium idle from mid-slope (10 s). Record numbers in HISTORY.md.
+  **Done:** builds; baseline numbers recorded; existing suites still pass.
+  **User check:** —
+
+- [ ] **S3-03** Net-force standstill rule (2.5 h) _(requires S3-02)_
+  Rolling resistance (`ApplyWheelFrictionForces`) and belly drag (`ApplyBellyDrag`) judge "push" from the net force along the ground: tire force + gravity along the ground (+ winch later, S3-10), not `GetForceFromFriction().X` alone. On flat ground gravity along the ground is 0, so nothing changes there.
+  ⚠️ Note: at rest on a slope the tire force is mostly the tire holding against gravity; the old rule applied resistance downhill. Gravity along the ground per wheel = weight share × (gravity · ground forward); for belly drag use the whole-body component on the ground plane.
+  **Done:** builds; both flat suites within 5 % of Sprint 2; the medium idle rig no longer accelerates downhill from the resistance itself (compare with the S3-02 baseline).
+  **User check:** —
+
+- [ ] **S3-04** Slope hold by sink depth (3 h) _(requires S3-03)_
+  `SlopeHoldVsSinkDepth` (`FRuntimeFloatCurve` over absolute cm, fraction of wheel load) on `UB1VehicleMovementComponent` (`Mud|Config`), copied to the sim. Per mud wheel: a force that cancels the net downhill force along the ground up to `curve(SinkDepth) × wheel load`, never more, so it can't push the jeep uphill. Start curve: 0 at 0–15 cm, 1 at 30 cm. Mud window: editable curve keys (typed fields per `imgui.md`) and a per-wheel `hold` column; `B1Mud` telemetry gets `hold=`.
+  **Done:** builds; flat suites unchanged (the term is 0 on flat ground); medium idle on the test slope slides; a jeep dug in to ≥ 30 cm on the slope holds.
+  **User check:** on the medium slope, stop and let go: the jeep slides back slowly. Floor it until it digs in, let go: it stays. Edit the curve live and feel the change.
+
+- [ ] **S3-05** Slope angle + final slope lanes (2.5 h) _(requires S3-04)_
+  Pick θ: firm climbs at 50 %, medium fails at 30/50/100 %. If no θ in 15–30° does both, stop and raise a per-material slope grip factor (ADR-001 fallback) with the user. Build three lanes at θ: firm, medium, deep (`PM_B1Mud_Deep`), each with run-up and top plateau, and an anchor marker 8 m past each mud top. Record θ, lengths and anchor spots in ARCHITECTURE.md (Winch gym).
+  **Done:** viewport capture; θ and layout in ARCHITECTURE.md.
+  **User check:** the slopes read clearly; θ looks like a hill you'd expect a jeep to climb on dry ground.
+
+- [ ] **S3-06** Slope rig suite, unwinched (2.5 h) _(requires S3-05)_
+  - `B1Slope_FirmClimb`: 50 % from the run-up, reaches the top (`endH` ≥ top − 0.5 m).
+  - `B1Slope_Medium30/50/100`: 15 s from the run-up, `maxH` ≤ top − 1 m.
+  - `B1Slope_MediumIdle`: mid-slope, zero throttle 10 s, slides ≥ 1 m, `vmax` ≤ 1.5 m/s.
+  - `B1Slope_DeepIdle`: mid-slope, zero throttle 10 s, slides ≥ 0.1 m, `lastDisp` ≤ 5 cm over the last 5 s.
+  - `B1Slope_MediumDugIn`: 3 s full, then 10 s at 50 %, gains < 0.5 m height.
+  ⚠️ Note: rigs on the same lane collide in PIE; run in rounds, one per lane.
+  **Done:** all PASS headless; flat suites PASS.
+  **User check:** drive the three slopes: firm is easy, medium is impossible however careful you are, deep slides then sticks.
+
+### Winch core (ADR-007 amendment)
+
+- [ ] **S3-07** Winch + anchor components, tree, cable visual (3 h) _(requires S3-01)_
+  `UB1WinchComponent` (scene component on `AB1Jeep`, at a `WinchPoint` on the front bumper): attached anchor, rest length, `MaxCableLength` (40 m), `MaxPullForce` (40 kN), `ReelInSpeed` (1 m/s), stiffness, damping; category `Winch|Config`. `UB1WinchAnchorComponent` (scene component). `BP_B1WinchTree`: a placeholder trunk mesh + anchor. Cable drawn with `UCableComponent` from the winch point to the anchor while attached. Cheats `B1WinchAttachNearest` (nearest anchor within `MaxCableLength`, rest length = current distance), `B1WinchDetach`. No force yet.
+  🔍 Research first: `CableComponent` in 5.8 (enable the plugin in `MudDriver.uproject`, module dep, attaching the end to a moving component).
+  ⚠️ Note: new plugin + new classes = full build with the editor closed (`Scripts/BuildEditor.ps1`).
+  **Done:** builds; Simulate + capture shows the cable from the jeep to a tree after an attach (set via MCP on the component).
+  **User check:** `B1WinchAttachNearest` near a tree: the cable appears; `B1WinchDetach` removes it.
+
+- [ ] **S3-08** Winch tension in the simulation (3 h) _(requires S3-07)_
+  Game thread sends anchor world position, rest length, pull and params through `FB1VehicleSimInput`. `FB1VehicleSimulation` applies a one-sided spring-damper, capped at `MaxPullForce`, with `AddForceAtPosition` at the winch point (its own path; `EB1TestForce` stays). Rest length shrinks at `ReelInSpeed × pull` while taut. The body stays awake while attached (same rule as the test force). Output: tension N, current length. Loose `Vehicle.State.Winching` while pull > 0 (new native tag).
+  ⚠️ Note: the winch point moves with the body; compute it on the physics thread from the body transform, not from a game-thread position a frame old.
+  **Done:** builds; a rig with a fixed anchor and full pull on firm ground drags a braked jeep toward the anchor; tension never exceeds the cap.
+  **User check:** —
+
+- [ ] **S3-09** Winch pull input (1.5 h) _(requires S3-08)_
+  `IA_B1WinchPull` (analog, axis1D: trigger / key) and `IA_B1WinchRelease` (detach) in the vehicle mapping context; the jeep binds them natively (like throttle), pull goes to `UB1WinchComponent`.
+  🔍 Research first: whether `DataAssetTools.create` makes `UInputAction` assets (it's a `UDataAsset` subclass) and how to add a mapping to the template IMC through MCP. Fallback: you add the two mappings by hand from a spec.
+  **Done:** builds; the IMC asset lists both mappings.
+  **User check:** attach by cheat, hold the pull key/trigger: the cable tightens and pulls; analog trigger pulls proportionally.
+
+- [ ] **S3-10** Winch counts as push in the drag caps (1.5 h) _(requires S3-03, S3-08)_
+  Add the winch force (projected on the ground plane / wheel forward) to the net push in the rolling-resistance and belly-drag caps, so a belly-stuck jeep can be pulled out.
+  **Done:** builds; a rig stuck in deep (dig-in script) moves under full pull at zero throttle, and the drag force is visible in telemetry.
+  **User check:** —
+
+### Debug + rigs
+
+- [ ] **S3-11** Rig winch support + metrics (2.5 h) _(requires S3-08)_
+  `AB1GymTestRig`: optional `WinchAnchor` actor (attached at script start, rest length = distance), `WinchPull` per input step. Metrics `tensionMax`, `tensionOsc` (tension amplitude over the last step), `anchorDistMax` and thresholds.
+  **Done:** builds; the S3-08 rig uses the new fields and prints the metrics.
+  **User check:** —
+
+- [ ] **S3-12** NetImGui "Winch" window + telemetry (2.5 h) _(requires S3-08)_
+  Debug → Winch: attached anchor, length / max, tension bar vs cap, pull %, `Winching` tag, per-wheel net push vs drag; live-edit of the winch params (typed fields, save to asset per `imgui.md`); Attach nearest / Detach buttons. CVar `b1.Winch.Telemetry`: `B1Winch <vehicle> anchor= len= rest= tension= pull=` to `LogB1Physics` at 2 Hz while attached.
+  **Done:** builds; the telemetry line appears in a headless winch rig run.
+  **User check:** the window reads well while winching; tune `MaxPullForce` live.
+
+- [ ] **S3-13** `ShowDebug B1Winch` (1 h) _(requires S3-08)_
+  Over the jeep: tension / cap, length / max, pull. Over each anchor within 50 m: name, distance, in range or not. Same binding pattern as `B1VehicleShowDebug`.
+  **Done:** builds.
+  **User check:** `ShowDebug B1Winch` readable, toggles off.
+
+- [ ] **S3-14** Deep strip lane + anchors (1.5 h) _(requires S3-05, S3-07)_
+  Deep (XL) patch with ramps in `Lvl_Gym_Winch`, `BP_B1WinchTree` ~10 m past the far ramp; trees at the S3-05 anchor spots on the medium and deep slopes.
+  **Done:** viewport capture; ARCHITECTURE.md lists the anchors.
+  **User check:** —
+
+- [ ] **S3-15** Winch rig suite (3 h) _(requires S3-06, S3-10, S3-11, S3-14)_
+  - `B1Winch_Stability20/120`: full pull against a jeep stuck in deep at `MaxFPS` 20 and 120: `tensionMax` ≤ cap + 5 %, `tensionOsc` non-growing, `peakOsc` ≤ 0.5.
+  - `B1Winch_CableLimit`: drive away from the anchor at 50 %: `anchorDistMax` ≤ `MaxCableLength` + 0.5 m.
+  - `B1Winch_DeepStrip`: dig in, then full pull + 50 %: `endH` back at firm height past the far ramp in ≤ 20 s.
+  - `B1Winch_SlopeMedium`: from the run-up into the slope, full pull + 50 %: top in ≤ 30 s.
+  - `B1Winch_SlopeDeep`: same on the deep slope, ≤ 45 s.
+  **Done:** all PASS headless; slope and flat suites PASS.
+  **User check:** —
+
+### Close
+
+- [ ] **S3-16** Mud + winch checkpoint playtest (user + agent, 1–2 h) _(requires S3-09, S3-12, S3-15)_
+  You get stuck in the deep strip and on the medium and deep slopes, attach by cheat, and winch out and up from the car. Tune winch params and the hold curve live; the agent writes them back and re-runs S3-06 and S3-15.
+  **Done:** both winch and slope suites PASS with the tuned values; ADR-007 → accepted.
+  **User check:** sign-off: "mud + winch works". On foot starts only after this.
+
+---
+
+## Sprint 4 — On foot (Phase 2, part 2)
+
+**Status:** outlined 2026-10-26; refine with `/sprint` after the Sprint 3 checkpoint.
+
+**Goal.** Close Phase 2: the player gets out, carries the hook to a tree, gets back in and winches out; a log can be winched off a lane.
+
+**Sprint-wide notes**
+- ⚠️ Possession changes re-run both flat suites and the slope/winch suites headless.
+- ⚠️ Rigs with `bPossessWithPlayer` run one per round in PIE (single player 0).
+
+- [ ] **S4-01** Ability set + input config (ADR-014) (3.5 h)
+  `UB1AbilitySet` (abilities with input tags + effects), granted once on the PlayerState ASC (`AB1PlayerState` or `AB1GameMode` hook). `UB1InputConfig` (input action → `InputTag.*`). `AB1PlayerController` forwards pressed/released to `UB1AbilitySystemComponent`, which activates matching specs. A no-op test ability bound to a key logs activation.
+  🔍 Research first: Lyra's `ULyraAbilitySet`, `ULyraInputConfig` and `ULyraAbilitySystemComponent::AbilityInputTagPressed`; the minimum we need without `ULyraInputComponent`.
+  **Done:** builds; headless `-game` with a cheat that injects the input tag logs the test ability's activation; ADR-014 → accepted.
+  **User check:** press the test key in PIE: the activation shows in the log.
+
+- [ ] **S4-02** `AB1Character` + on-foot input (3 h) _(requires S4-01)_
+  First-person `ACharacter`: capsule, camera, walk/look/jump with Enhanced Input, `IMC_B1OnFoot`. `BP_B1Character` in `/Game/B1/Player/`. Implements `IAbilitySystemInterface` through the PlayerState ASC.
+  **Done:** builds; a character placed in `Lvl_Gym_Winch` and possessed via a debug cheat walks in PIE (user check).
+  **User check:** walking and looking feel fine; walking through mud stands on the hard bottom.
+
+- [ ] **S4-03** Mapping-context swap on possession (1.5 h) _(requires S4-02)_
+  `AB1PlayerController::OnPossess` removes the previous pawn's mapping contexts and adds the new one's (vehicle vs on-foot); the vehicle UI already hides on foot.
+  ⚠️ Note: the template adds its contexts in `BeginPlay`; move vehicle contexts to possession without breaking `Lvl_Offroad` respawn.
+  **Done:** builds; both flat suites PASS.
+  **User check:** —
+
+- [ ] **S4-04** Seat attach + engine off outside (2 h) _(requires S4-02)_
+  Seat socket on `BP_B1Jeep`. While driving the character is hidden, collision off, attached to the seat. Engine off on exit: throttle cut (same path as out-of-fuel), no fuel drain, `Vehicle.State.EngineOff`; restart on enter.
+  ⚠️ Note: an unpossessed jeep on a slope must still slide/hold per the slope rules; keep the sim running (don't let it sleep while on mud slope).
+  **Done:** builds; a headless run shows no fuel drain while the engine is off.
+  **User check:** —
+
+- [ ] **S4-05** `GA_B1EnterExitVehicle` + cheats (3 h) _(requires S4-01, S4-03, S4-04)_
+  Exit: place the character at the driver door (fallback spots if blocked), unhide, possess it, ASC avatar → character, `State.Avatar.OnFoot`. Enter: within range of the jeep, possess it, avatar → jeep. Tag-gated per ADR-004. Cheats `B1ExitVehicle`, `B1EnterVehicle`.
+  **Done:** builds; headless `-game` script with 10 × exit/enter: no errors or ensures, fuel unchanged while outside, avatar tags correct after each (logged).
+  **User check:** get out and in on firm ground, in mud and on the slope; camera and controls switch cleanly.
+
+- [ ] **S4-06** `GA_B1CarryWinchHook` (3.5 h) _(requires S3-07, S4-05)_
+  On foot at the jeep's front: take the hook; the cable runs from the winch point to the character's hand; the character can't walk past `MaxCableLength` (leash). Interact near an anchor attaches (rest length = distance); interact at the jeep puts the hook back. Detach from the car via `IA_B1WinchRelease`.
+  **Done:** builds; a headless cheat sequence (take, teleport near the tree, attach) logs the attachment; S3-15 rigs still PASS.
+  **User check:** carry the hook up the slope to the tree, attach, walk back, get in, winch up.
+
+- [ ] **S4-07** Interaction prompt + cable from hand (1.5 h) _(requires S4-06)_
+  Minimal UMG/ShowDebug-style prompt: "Take hook", "Attach", "Return hook" when in range. Cable end follows a hand socket on the first-person camera.
+  **Done:** builds.
+  **User check:** you always know what the interact key will do.
+
+- [ ] **S4-08** Winchable log (3 h) _(requires S3-08, S3-14)_
+  `BP_B1WinchLog`: simulating trunk mesh with `UB1WinchAnchorComponent`. The opposite cable force is applied in the log's async physics tick (`bAsyncPhysicsTickEnabled`), reading the winch's published tension and direction. Log lane in `Lvl_Gym_Winch`. Rig `B1Winch_Log`: braked jeep, full pull, log moves ≥ 3 m toward the jeep.
+  🔍 Research first: `AActor::AsyncPhysicsTickActor` in 5.8 and reading game-thread data safely from it. Fallback: game-thread `AddForce` on the log only.
+  **Done:** rig PASS headless.
+  **User check:** winch the log off the lane; it slides and rolls believably.
+
+- [ ] **S4-09** Phase 2 playtest (user + agent, 1–2 h) _(requires S4-05..S4-08)_
+  Full loop on foot in `Lvl_Gym_Winch`: get stuck, get out, carry the hook, attach, get in, winch out; same on both slopes; log lane. All suites headless.
+  **Done:** all suites PASS; ROADMAP Phase 2 ticked.
+  **User check:** sign-off on Phase 2.

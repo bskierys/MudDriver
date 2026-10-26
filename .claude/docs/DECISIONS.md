@@ -24,6 +24,13 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 
 **Amended 2026-10-26 (S1-20 playtest).** Medium mud is a slog, not a trap. Grip at full depth stays above rolling resistance, so the jeep can always crawl out, and full stops are left to belly drag in deep mud. Rolling resistance is low (0.02–0.25 × load). A speed drag (`SpeedDragCoefficient` × normalized depth × v²) slows fast driving hard and barely touches slow driving. At a standstill, rolling resistance acts like static friction, so spinning wheels don't creep. Presets come in four sizes: Shallow (S, 25 cm), Medium (M, 35), Heavy (L, 50) and Deep (XL, 70).
 
+**Amended 2026-10-26 (mud + winch replan, user decision): slopes.** Built in the Sprint 3 slope spike; values are starting points.
+- **Behaviour.** A stopped jeep on a muddy slope slides down slowly: the mud is slippery and gravity wins. How much the mud holds depends on how deep the jeep has sunk, not on the preset. Barely sunk slides; deeply sunk is held but still can't climb. A jeep on Deep slides until it has sunk in, then stops.
+- **Slope hold.** Per mud wheel, a force opposes the net downhill force along the ground (gravity along the ground minus the tire's uphill push), up to `SlopeHoldVsSinkDepth(SinkDepth cm) × wheel load`. It only cancels a net downhill force, so it never helps the jeep up. The curve is over absolute depth and sits on `UB1VehicleMovementComponent` (`Mud|Config`, next to `BellyClearance`). Start: ~0 up to 15 cm, full hold around 30 cm.
+- **Standstill rule.** Rolling resistance and belly drag judge "push" from the net force along the ground (tire force + gravity along the ground + winch pull), not the tire force alone. On a slope the old rule read the tire's holding force as push and applied resistance downhill.
+- **Flat ground is unchanged.** Gravity along the ground is zero there, so the S1-24 tuning holds; the flat mud suite guards it.
+- **Alternatives.** Hold by preset (rejected by the user: a Deep jeep that hasn't sunk yet should still slide). Lowering grip on slopes (doesn't give "held when deep"). A per-material slope grip factor stays as the fallback if no slope angle gives "firm climbs, medium fails".
+
 ---
 
 ## ADR-002 — Mud parameters live in a custom physical material
@@ -129,6 +136,14 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 **Rationale.** Physics constraints with changing length are stiff and tend to explode with heavy vehicles. A capped force is predictable and easy to tune.
 
 **Alternatives.** `UPhysicsConstraintComponent` with a linear limit (hard to animate the length). A rope made of physics segments (expensive).
+
+**Amended 2026-10-26 (mud + winch replan).** Stays proposed until the Sprint 3 stability rigs pass.
+- **Own force path.** The winch is a separate force in `FB1VehicleSimulation`, next to the S1-09 test force, which stays for the stepping rigs.
+- **Point of application.** `AddForceAtPosition` at the winch point on the jeep's front, so a winched jeep pitches nose-up on a slope.
+- **Drag caps.** The winch pull counts as push in the rolling-resistance and belly-drag caps (ADR-001 standstill rule). Otherwise a belly-stuck jeep wouldn't move under full pull, because the caps only let the tires' push through.
+- **Reel-in.** The rest length shrinks at `ReelInSpeed × pull` while taut, so tension ramps up to `MaxPullForce` instead of stepping. The body is kept awake while attached.
+- **Pull input.** Native analog input on the jeep (like throttle), not an ability. Continuous controls stay native; abilities are for discrete actions (ADR-014).
+- **Log.** A simulating anchor gets the opposite force in its own async physics tick (fixed step), reading the cable state the winch publishes. Fallback: game-thread `AddForce` on the log only.
 
 ---
 
@@ -240,3 +255,21 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 **Rationale.** Shipping builds stay clean without per-config hacks. Test code stays out of the game module.
 
 **Alternatives.** `FunctionalTesting` as a non-Shipping dependency of `MudDriver` (Shipping wouldn't compile). Blueprint-only rigs (logic and metrics harder to maintain).
+
+---
+
+## ADR-014 — Abilities are granted by ability sets and activated by input tags
+
+**Status:** proposed (2026-10-26, built in Sprint 4)
+
+**Problem.** Phase 2 adds the first real abilities (enter/exit, carry the winch hook; the machete follows in Phase 4). Nothing grants abilities or binds input to them yet, and the player swaps between two pawns while keeping one ASC on the PlayerState (ADR-004).
+
+**Decision.**
+- `UB1AbilitySet` (data asset): abilities with an input tag each, plus effects to grant. Sets are granted on the PlayerState ASC once, not per pawn; activation is gated by `State.Avatar.OnFoot` / `State.Avatar.InVehicle` tags.
+- `UB1InputConfig` (data asset): input action → ability input tag. `AB1PlayerController` forwards pressed/released for those actions to the ASC, which activates the abilities whose spec carries the tag.
+- Continuous controls (throttle, steering, look, walk, winch pull) stay native input on the pawn.
+- `AB1PlayerController` swaps the vehicle and on-foot mapping contexts on possession.
+
+**Rationale.** Lyra's pattern, and the user wants Lyra practices. Granting once on the PlayerState fits the single ASC; tags keep on-foot abilities from firing in the jeep and the other way round. Data assets keep bindings editable without code.
+
+**Alternatives.** Grant and remove abilities per pawn on possession (churn on every swap, and specs are lost). Activate by class from pawn input handlers (couples input code to ability classes). Lyra's full `ULyraInputComponent` / pawn data stack (more than a two-pawn prototype needs).

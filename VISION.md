@@ -31,6 +31,10 @@ The player can get out of the jeep and clear the way before driving on.
 - A log blocks the path. The player takes the winch hook, attaches it to the log, goes back to the jeep and winches the log off the path.
 - Branches block the path. The player cuts them with a machete before driving through. If they don't, the jeep still breaks them, but takes damage doing it.
 
+### Muddy slope
+
+The path climbs a hill and the slope is covered in mud. On firm ground the jeep climbs it easily, but on the mud it can't: even medium mud makes the wheels spin, the jeep digs in, loses grip and slides back down. Throttle control alone doesn't get you up. The player gets out, carries the winch hook up the slope, attaches it to a tree at the top, goes back to the jeep and climbs with the winch pulling and the engine helping.
+
 There is no scouting tool for the player. Obstacle parameters (integrity, break force, damage to the car) can be seen through debug tools (`ShowDebug`).
 
 So this will be physics-heavy driving system. My physics requirements:

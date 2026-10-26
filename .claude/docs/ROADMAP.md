@@ -1,7 +1,12 @@
 # ROADMAP — River Crossing prototype (Huta → Bagnisko)
 
-Source plan (closed): [plans/2026-10-25-river-crossing.md](plans/2026-10-25-river-crossing.md). It holds the detailed Approach, Testing model, Validation thresholds and Risks; read it before starting a phase.
-Sprint tasks live in [SPRINTS.md](SPRINTS.md); tick them there.
+Source plans (closed):
+- [plans/2026-10-25-river-crossing.md](plans/2026-10-25-river-crossing.md): the whole prototype, Testing model, Phases 0, 1, G.
+- [plans/2026-10-26-mud-winch-first.md](plans/2026-10-26-mud-winch-first.md): phase reorder (mud + winch first), Phase 2 design, slope rules.
+
+Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md](SPRINTS.md); tick them there.
+
+**Phase order (replanned 2026-10-26):** 0 → 1 / G → **2 On foot and winch** (was 4) → **3 River** → **4 Damage and vegetation** (was 2) → 5 Scenario. Older docs (HISTORY.md, the 2026-10-25 plan) use the old numbers.
 
 **Phase closes when:** the agent's rig tests pass **and** the user signs off after a playtest. If feel and numbers disagree, feel wins and the thresholds get updated.
 **Performance target:** 60 fps at 1080p Medium on i7-12700H / RTX 3050 Ti Laptop (4 GB VRAM).
@@ -69,19 +74,31 @@ Sprint tasks live in [SPRINTS.md](SPRINTS.md); tick them there.
 
 ---
 
-## Phase 2 — Damage and vegetation
-**Status:** not started (replan before starting)
+## Phase 2 — On foot and winch (was Phase 4)
+**Status:** planned, Sprints 3–4 (plan: [2026-10-26-mud-winch-first](plans/2026-10-26-mud-winch-first.md))
 
-**Outcome.** Speed has a cost: bumps, trees and branches damage the jeep, and vegetation reacts to it.
+**Outcome.** Mud + winch is proven: the jeep that can't get out of deep mud or up a muddy slope on its own gets out and up with the winch. The player can get out, carry the hook to a tree or a log, get back in and winch out.
 
-**Scope (minimum).** Impact damage from chassis hits, condition penalties, large tree, small tree (topples), bush (drag + scratch), breakable branch, physics log, `ShowDebug B1Obstacles`.
-**Stretch.** Bush/branch WPO bending, break VFX, hit sounds.
+**Scope (minimum).**
+- [ ] Slope rules (ADR-001 amendment): net-force standstill rule, slope hold by absolute sink depth (Sprint 3)
+- [ ] `Lvl_Gym_Winch`: deep strip, firm/medium/deep slopes, log lane, anchor trees (Sprints 3–4)
+- [ ] `UB1WinchComponent` + `UB1WinchAnchorComponent`, physics-thread tension at the winch point, counted as push in the drag caps, native analog pull input (ADR-007 amendment) (Sprint 3)
+- [ ] Winch debug: NetImGui "Winch", `B1Winch` telemetry, `ShowDebug B1Winch`, cheats `B1WinchAttachNearest` / `B1WinchDetach`, rig winch support (Sprint 3)
+- [ ] **Checkpoint:** mud + winch playtest via cheat attach, end of Sprint 3
+- [ ] Ability sets + input tags (ADR-014), `AB1Character`, mapping-context swap (Sprint 4)
+- [ ] `GA_B1EnterExitVehicle` (seat socket, engine off outside), cheats `B1ExitVehicle` / `B1EnterVehicle` (Sprint 4)
+- [ ] `GA_B1CarryWinchHook` with the cable as a leash, log pull via async physics tick (Sprint 4)
+
+**Stretch.** Cable sag visuals, hook-in-hand mesh, animations, winch free-spool, character slowed in mud.
 
 **Done when.**
-- The branch section at 40 km/h costs ≥ 3× the condition lost at 15 km/h.
-- At < 30 % condition, 0–30 km/h takes ≥ 25 % longer.
-- Cut branches cost 0 condition.
-- The user signs off.
+- Flat mud suites unchanged by the slope rules.
+- Firm slope climbs at 50 %; the medium slope can't be climbed unwinched at 30/50/100 %.
+- On the medium slope at idle the jeep slides down slowly; on the deep slope it slides, then holds once sunk.
+- Winched, the jeep climbs the medium and deep slopes and leaves the deep strip.
+- Winch tension stays capped and stable at 20 and 120 fps.
+- A winched log moves ≥ 3 m toward the jeep.
+- The user signs off at the Sprint 3 checkpoint (mud + winch) and at the phase playtest (full loop on foot).
 
 ---
 
@@ -93,21 +110,25 @@ Sprint tasks live in [SPRINTS.md](SPRINTS.md); tick them there.
 **Scope (minimum).** Box `AB1RiverVolume`, hull-point side force, traction loss with submersion, deep and shallow-mud ford in `Lvl_Gym_River`, flow debug.
 **Stretch.** Spline river, splash VFX, water surface shading.
 
-**Done when.** ≥ 8 of 10 unwinched rig crossings of the deep ford end downstream on the shallow side, and the user signs off.
+**Done when.**
+- ≥ 8 of 10 unwinched rig crossings of the deep ford end downstream on the shallow side.
+- Winched to a tree, the jeep crosses the deep ford (moved from the winch phase).
+- The user signs off.
 
 ---
 
-## Phase 4 — On foot and winch
+## Phase 4 — Damage and vegetation (was Phase 2)
 **Status:** not started (replan before starting)
 
-**Outcome.** The player can get out, carry the winch hook to a tree or a log, get back in and winch out. Branches can be cleared with a machete.
+**Outcome.** Speed has a cost: bumps, trees and branches damage the jeep, and vegetation reacts to it. Branches can be cleared with a machete.
 
-**Scope (minimum).** `AB1Character` (first-person). Enter/exit ability: the character is hidden and attached to a seat socket while driving; the engine switches off on exit and restarts on enter. `UB1WinchComponent` + anchors, carry/attach hook, in-car analog pull (ADR-007), log pull, `GA_B1Machete`, Winch debug.
-**Stretch.** Cable sag visuals, hook-in-hand mesh, animations.
+**Scope (minimum).** Impact damage from chassis hits, condition penalties, large tree (also a winch anchor), small tree (topples), bush (drag + scratch), breakable branch, `GA_B1Machete` (moved from the winch phase, uses the ADR-014 ability plumbing), `ShowDebug B1Obstacles`. The physics log moved to Phase 2.
+**Stretch.** Bush/branch WPO bending, break VFX, hit sounds.
 
 **Done when.**
-- Winched to a tree, the jeep leaves deep mud and crosses the deep ford.
-- A winched log moves ≥ 3 m off the path.
+- The branch section at 40 km/h costs ≥ 3× the condition lost at 15 km/h.
+- At < 30 % condition, 0–30 km/h takes ≥ 25 % longer.
+- Cut branches cost 0 condition.
 - The user signs off.
 
 ---
@@ -117,7 +138,7 @@ Sprint tasks live in [SPRINTS.md](SPRINTS.md); tick them there.
 
 **Outcome.** The full Huta → Bagnisko situation from VISION.md is playable.
 
-**Scope (minimum).** Greybox route: Huta → collapsed bridge → forest path (mud, bumps, branches, a log) → ford with two routes → Bagnisko arrival trigger. Built from modular meshes + spline tools. The user sculpts the landscape and paints any foliage; the agent places set pieces, volumes, anchors and triggers via MCP.
+**Scope (minimum).** Greybox route: Huta → collapsed bridge → forest path (mud, a muddy uphill, bumps, branches, a log) → ford with two routes → Bagnisko arrival trigger. Built from modular meshes + spline tools. The user sculpts the landscape and paints any foliage; the agent places set pieces, volumes, anchors and triggers via MCP.
 **Stretch.** Vegetation dressing, landmarks.
 
 **Done when.** The route is playable start to finish with both ford routes, at 60 fps on the target laptop, and the user signs off.

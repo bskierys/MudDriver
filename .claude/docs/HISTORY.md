@@ -588,3 +588,39 @@ S2-03..06 committed (`0d9b191`). This session built the fuel loop from ADR-010, 
 
 ### Open follow-ups
 - S2-15 fuel playtest: tune the placeholder rates (6 / 240 / 300 L/h, 50 cm).
+
+---
+
+## 2026-10-26 — Sprint 3–4 planning (mud + winch first)
+
+### Context
+The user reordered the phases after Phase 1/G to prove mud + winch first: On foot and winch (was Phase 4) is now Phase 2, River stays 3, Damage and vegetation (was 2) is now 4, Scenario stays 5. VISION.md gained a "Muddy slope" situation: a slope the jeep climbs on firm ground but not on mud, solved with the winch. The plan went through `/plan-new`, `/plan-analyse` (needs revision: slope standstill bug, winch vs drag caps, missing ability plumbing, two sprints), `/plan-replan` (ready) and is archived as [plans/2026-10-26-mud-winch-first.md](plans/2026-10-26-mud-winch-first.md). Sprint 2 was not changed. Sprint 3 ends with a mud + winch checkpoint (hook attached by cheat, pull from the car) before any on-foot work in Sprint 4.
+
+### Tasks created
+- S3-01 through S3-16 in SPRINTS.md (slopes, winch core, debug, rigs, checkpoint)
+- S4-01 through S4-09 in SPRINTS.md (outlined; ability plumbing, character, enter/exit, hook carry, log, phase playtest)
+
+### Decisions made
+- Phase reorder and renumbering; ROADMAP keeps "was Phase N" notes. Machete moved to Phase 4, the winched ford crossing to Phase 3, the physics log to Phase 2; Phase 5 gets a muddy uphill.
+- ADR-001 amended (user decision): on a muddy slope a stopped jeep slides down slowly; the mud's hold depends on absolute sink depth, not the preset (barely sunk slides, deeply sunk holds but can't climb, Deep slides until sunk in). `SlopeHoldVsSinkDepth` on the movement component; standstill rules use the net force along the ground. Flat ground unchanged.
+- ADR-007 amended: winch is its own force path (test force stays), applied at the winch point, counted as push in the drag caps, native analog pull input; log force via async physics tick.
+- ADR-014 (proposed): ability sets granted on the PlayerState ASC, input tags for abilities, native input for continuous controls.
+### What was built
+- VISION.md: new "Muddy slope" situation under the on-foot section.
+- ROADMAP.md reordered and renumbered; Phase 2 (On foot and winch) fully scoped.
+- SPRINTS.md: Sprint 3 (S3-01..S3-16) detailed, Sprint 4 (S4-01..S4-09) outlined. Sprint 2 untouched.
+- DECISIONS.md: ADR-001 and ADR-007 amendments, ADR-014 (proposed).
+- No code, assets or ARCHITECTURE.md changes.
+
+### What we learned
+- The mud standstill rules (`B1VehicleSimulation.cpp:229-235` rolling resistance, `:293-296` belly drag) take the tire force as "the push". On a slope the tire force is mostly holding against gravity, so the current rules would push a resting jeep downhill and brake a slide hard. Fixed by design in S3-03 (net force along the ground).
+- Same caps would block a winch pull on a belly-stuck jeep unless the winch counts as push (S3-10).
+- `AB1MudPatch` already builds with the actor rotation (`B1MudPatch.cpp:88`); only the vertical hard-ground cap trace needs care on slopes.
+- Nothing in the code grants abilities yet (no `GiveAbility`); Sprint 4 starts with that plumbing (ADR-014).
+- `CableComponent` isn't enabled in `MudDriver.uproject`.
+- Resting sink depths that drive the slope hold curve: Medium ~16 cm, Heavy ~22 cm, Deep ~31 cm (`MaxSinkDepth × StaticSinkRatio 0.45`).
+
+### Open follow-ups
+- Sprint 2 still open (S2-10..S2-16); Sprint 3 starts after it closes.
+- Sprint 4 needs a `/sprint` refinement after the S3-16 checkpoint.
+- Slope angle, hold curve and anchor distances are picked in S3-05; if no angle in 15–30° separates firm from medium, ask the user about a per-material slope grip factor.
