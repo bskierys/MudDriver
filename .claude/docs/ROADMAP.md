@@ -9,31 +9,31 @@ Sprint tasks live in [SPRINTS.md](SPRINTS.md); tick them there.
 ---
 
 ## Phase 0 — Foundation
-**Status:** in progress (Sprint 1)
+**Status:** done (Sprint 1, closed 2026-10-26)
 
 **Outcome.** The project runs on a low-end budget, custom code follows B1 conventions, the jeep runs on our own Chaos simulation subclass with a validated physics stepping mode, and there's a mud gym with an agent-runnable test rig.
 
 **Scope.**
 - [x] Low-end render budget (ADR-011)
-- [ ] `Mud*` → `B1*` rename, B1 log categories
-- [ ] Per-wheel debug (NetImGui + `ShowDebug B1Vehicle` + telemetry)
-- [ ] Template constructors → `FObjectInitializer`; `AB1Jeep`, `UB1VehicleMovementComponent`, `FB1VehicleSimulation`
-- [ ] Physics stepping decided (async fixed dt vs substepping), ADR-003 accepted
-- [ ] `AB1GymTestRig : AFunctionalTest` + headless runner
-- [ ] `Lvl_Gym_Mud` with layered mud patches (ADR-012)
+- [x] `Mud*` → `B1*` rename, B1 log categories
+- [x] Per-wheel debug (NetImGui + `ShowDebug B1Vehicle` + telemetry)
+- [x] Template constructors → `FObjectInitializer`; `AB1Jeep`, `UB1VehicleMovementComponent`, `FB1VehicleSimulation`
+- [x] Physics stepping decided (async fixed dt vs substepping), ADR-003 accepted
+- [x] `AB1GymTestRig : AFunctionalTest` + headless runner
+- [x] `Lvl_Gym_Mud` with layered mud patches (ADR-012)
 
 **Done when.** The spring-to-anchor rig test is stable at 20 and 120 fps, the gym smoke test passes in PIE and headless, and the user has checked the wheel debug and the gym layout.
 
 ---
 
 ## Phase 1 — Mud
-**Status:** core in Sprint 1, polish in Sprint 2
+**Status:** core done and signed off (Sprint 1, 2026-10-26); polish in Sprint 2
 
 **Outcome.** Mud that rewards driving slowly with intent: wheelspin digs you in, careful throttle gets you out, and deep mud stops you without a winch. Tires spray mud and leave trails.
 
 **Scope (minimum).**
-- [ ] `UB1PhysicalMaterial_Mud`, per-wheel sinking via trace offset, traction/resistance curves, belly drag (Sprint 1)
-- [ ] Mud NetImGui window with live tuning (Sprint 1)
+- [x] `UB1PhysicalMaterial_Mud`, per-wheel sinking via trace offset, traction/resistance curves, belly drag (Sprint 1)
+- [x] Mud NetImGui window with live tuning (Sprint 1)
 - [ ] `Vehicle.State.InMud` tag, `B1Unstuck`, `ShowDebug B1Mud` (Sprint 2, needs GAS)
 - [ ] Niagara mud spray (GPU sprites, depth-buffer collision) (Sprint 2)
 - [ ] Visual tire trails (ADR-008) (Sprint 2)

@@ -13,6 +13,8 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
 
 ## Sprint 1 — Foundation + mud core
 
+**Status:** ✅ closed 2026-10-26, signed off by the user after the mud playtest.
+
 **Goal.** Prove the two biggest unknowns, the Chaos simulation hook and mud sinking, in a gym with agent-runnable tests.
 
 ### Housekeeping
@@ -262,7 +264,7 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **User check:** floor it in medium: RPM climbs while speed stays low.
 
 - [x] **S1-27** Chase camera: full orbit, delayed weak recenter, further back (1 h) <!-- done: 2026-10-26 -->
-  Result: `AMudDriverPawn` `Camera` properties: `CameraYawRate` 1.5 (look input multiplier), `CameraRecenterDelay` 2 s, `CameraRecenterSpeed` 0.5 (template: 1.0, no delay). Yaw is normalized, so a full orbit recenters the short way. Back arm 650→850 cm, socket Z 150→180. The old 30–45° limit was the template's recenter pulling against the input every frame. Builds; PIE capture shows the new distance. Suite rerun with S1-28.
+  Result: `AMudDriverPawn` `Camera` properties: `CameraYawRate` 1.5 (look input multiplier), `CameraRecenterDelay` 1 s, `CameraRecenterSpeed` 0.75 (template: 1.0, no delay). First pass (2 s / 0.5) felt like no pull at all to the user; retuned, and PIE shows 120° → 44° in 1.2 s. Only non-zero look input resets the delay. Yaw is normalized, so a full orbit recenters the short way. Back arm 650→850 cm, socket Z 150→180. The old 30–45° limit was the template's recenter pulling against the input every frame. Builds; PIE capture shows the new distance. Suite rerun with S1-28.
   Look input can turn the camera all the way around the jeep, a bit faster than now. Recentering starts only after a delay without look input, and is slower. The camera sits further back. All values are `Camera` properties on the pawn.
   **Done:** builds; the rig suite still passes (camera doesn't touch physics).
   **User check:** orbit to the side of the jeep in mud, let go: the camera stays a moment, then drifts back slowly.
@@ -276,7 +278,8 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds; gym patches get ramps where the jeep drives out; the rig suite passes (thresholds updated where the exit bumps drop).
   **User check:** drive out of deep and heavy over a ramp: the climb-out is smoother and easier than the old step.
 
-- [ ] **S1-24** Mud playtest + tuning pass (user + agent, 1–2 h) _(requires S1-22, S1-23)_
+- [x] **S1-24** Mud playtest + tuning pass (user + agent, 1–2 h) _(requires S1-22, S1-23)_ <!-- done: 2026-10-26 -->
+  Result: user signed off on the mud physics as-is; no preset changes. Review notes became S1-25..S1-28. The deep run-up carrying through 20 m (S1-28) is accepted with the current tuning.
   You playtest `Lvl_Gym_Mud` and tune live. The agent writes the tuned values into the presets and re-runs S1-23 (thresholds get adjusted if your feel disagrees). You also check `stat unit` on the laptop.
   **Done:** the suite passes with the tuned values.
   **User check:** ✅ sign-off: "mud rewards driving slowly with intent".

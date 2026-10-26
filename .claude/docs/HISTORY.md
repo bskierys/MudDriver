@@ -484,3 +484,26 @@ Everything else within 1 %. Gym 16/16, `Lvl_Offroad` 8/8.
 ### Open follow-ups
 - S1-24: should a run-up carry through 20 m of deep? If not, raise Deep's `SpeedDragCoefficient` / rolling resistance and restore DeepRunUp's distance limit.
 - User check: climb-out over ramps feels smoother.
+
+---
+
+## 2026-10-26 — Sprint 1 sign-off
+
+### Context
+User reviewed S1-25..S1-28. Mud physics: satisfied, S1-24 closed without preset changes. Camera: the S1-27 recenter felt like no pull at all. Also asked for a fresh gdep snapshot and a gdep-first search rule.
+
+### What was built
+- Camera recenter retuned: delay 2 → 1 s, speed 0.5 → 0.75 (template 1.0, no delay). Only non-zero look input resets the delay. PIE check: 120° → 70° (0.6 s) → 44° (1.2 s) → 7° (3.7 s).
+- gdep regenerated (`gdep init <root> --force`): 30 files / 29 classes (was 18 / 18, from before the B1 classes).
+- `/save` got a step 5: regenerate gdep when classes change. CLAUDE.md "Code structure and search" and AGENTS.md now say to search dependencies with the gdep MCP tools before Grep/Read.
+- Sprint 1 closed; ROADMAP Phase 0 done, Phase 1 core items ticked.
+
+### Decisions made
+- The deep run-up carrying through a 20 m patch (S1-28) stays: the user is satisfied with the mud physics as-is.
+
+### What we learned
+- `IA_LookAround` has no triggers and maps only `MouseX`, so it fires only while the mouse moves; the weak pull was the tuning, not stray zero input.
+
+### Open follow-ups
+- User check: the retuned recenter.
+- Sprint 2 (GAS + fuel + mud polish) needs detailing at sprint start (`/sprint`).
