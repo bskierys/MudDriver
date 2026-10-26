@@ -47,8 +47,17 @@ If the session made an architectural decision (not just an implementation choice
 If a `/plan-roadmap` ran this session, PLAN.md is already zeroed. Skip.
 If a plan is mid-revision, leave it.
 
+### 5. gdep snapshot
+If the session added, removed or renamed C++ classes or files, regenerate the gdep context:
+
+```powershell
+gdep init "E:\GameDev\Projects\MudDriver" --force
+```
+
+It rewrites `.gdep/AGENTS.md`, `.gdep/HELP.md`, `.gdep/.agents_meta.json` and `.gdep/wiki/OVERVIEW.md`. Check that the class count in `.gdep/wiki/OVERVIEW.md` went up or down as expected. `/git-commit` stages those files with the rest (`.gdep/cache/` is gitignored).
+
 ## Then tell the user
 
-"Session saved. <N> tasks marked done, <M> ADRs added, HISTORY updated. Run `/git-commit` to push."
+"Session saved. <N> tasks marked done, <M> ADRs added, HISTORY updated<, gdep regenerated>. Run `/git-commit` to push."
 
 Do NOT commit or push — that's `/git-commit`'s job.

@@ -2,22 +2,22 @@
 title: Project Overview
 type: overview
 engine: UNREAL · Unreal Engine 5.8 · (C++)
-updated: 2026-10-25
+updated: 2026-10-26
 stale: false
 ---
 
 # MudDriver — Project Overview
 
 > Engine: UNREAL · Unreal Engine 5.8 · (C++)  |  Source: `E:\GameDev\Projects\MudDriver\Source`
-> Generated: 2026-10-25
+> Generated: 2026-10-26
 > Regenerate: `gdep init <project_path> --force`
 
 ## Codebase Snapshot
 
 | Metric | Value |
 |--------|-------|
-| Files | **18** |
-| Classes | **18** |
+| Files | **30** |
+| Classes | **29** |
 | Circular deps | **0** |
 | Dead code candidates | **0** |
 
@@ -29,20 +29,20 @@ stale: false
 ### High-coupling classes (likely God Objects — modify with care)
 
 - `AMudDriverPawn` — 6 dependents
+- `UB1PhysicalMaterial_Mud` — 5 dependents
 - `UMudDriverUI` — 4 dependents
 - `ATimeTrialTrackGate` — 3 dependents
-- `UMudDriverWheelFront` — 2 dependents
-- `UMudDriverWheelRear` — 2 dependents
+- `FB1TestForceSettings` — 2 dependents
 
 ## GAS Summary
 
 - Abilities (C++): 0
 - Effects (C++): 0
 - AttributeSets: 0
-- GameplayTags (in assets): 0 high-confidence / 12 low
-- GAS .uassets — IS-A: GA 0 / GE 0 / AS 0 / ABP 1  |  Referencers: 6
+- GameplayTags (in assets): 0 high-confidence / 14 low
+- GAS .uassets — IS-A: GA 0 / GE 0 / AS 0 / ABP 1  |  Referencers: 7
 - Analysis confidence: **MEDIUM** (cpp_source_regex + binary_pattern_match)
-- Coverage: 110/110 assets (100.0%)
+- Coverage: 123/123 assets (100.0%)
 
 ---
 See [[index]] for the full wiki page catalog.
