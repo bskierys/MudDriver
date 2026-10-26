@@ -290,6 +290,123 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
 
 ---
 
-## Sprint 2 — GAS + fuel + mud polish (provisional, detailed at sprint start)
+## Sprint 2 — GAS + fuel + mud polish
 
-Scope from ROADMAP Phase G and the rest of Phase 1: GAS bootstrap (`AB1GameMode`, `AB1PlayerController`, `AB1PlayerState`, single ASC), `UB1VehicleAttributeSet`, fuel (ADR-010), Vehicle Status window and cheats, `Vehicle.State.InMud`, `B1Unstuck`, `ShowDebug B1Mud`, Niagara spray, visual trails, Phase 1 close playtest.
+**Status:** active, planned 2026-10-26.
+
+**Goal.** Close Phase G and Phase 1. A single ASC on the PlayerState carries Condition and Fuel; fighting mud burns fuel; mud gets its state tag, debug, spray and trails.
+
+**Sprint-wide notes**
+- ⚠️ Rigs that spawn their own jeep have no controller, so no PlayerState and no ASC. Fuel and tag rigs need the jeep possessed by the player controller (see S2-09). Mud rigs that don't touch GAS stay as they are.
+- ⚠️ Every task that changes the controller, game mode or jeep re-runs both rig suites (`Lvl_Gym_Mud` 16, `Lvl_Offroad` 8) headless. GAS must not change handling.
+- ⚠️ Prototype first (CLAUDE.md §4): spray and trails take the simple path. No particle budgets or LODs; `stat unit` is only a sanity check at the playtest.
+
+### GAS bootstrap (ADR-004, 005)
+
+- [x] **S2-01** GAS modules + `B1GameplayTags` (1 h) <!-- done: 2026-10-26 -->
+  Result: modules public in `MudDriver.Build.cs`, include path `MudDriver/GAS`. Tags in namespace `B1GameplayTags` (`State_Avatar_InVehicle`, …) via `UE_DEFINE_GAMEPLAY_TAG_COMMENT`. Full build passes. The tag-picker check moves to S2-05 (first GE BP).
+  Link `GameplayAbilities`, `GameplayTags`, `GameplayTasks` in `MudDriver.Build.cs`. Native tags (`UE_DECLARE/DEFINE_GAMEPLAY_TAG`) in `GAS/B1GameplayTags.h/.cpp`: `State.Avatar.InVehicle`, `State.Avatar.OnFoot`, `Vehicle.State.InMud`, `Vehicle.State.OutOfFuel`, `Data.Fuel`, `Data.Damage`. Water/winch tags wait for their phases.
+  **Done:** full build passes; the tags show in the tag picker on any GE BP.
+  **User check:** —
+
+- [x] **S2-02** `AB1PlayerState` + ASC + `UB1VehicleAttributeSet` (2.5 h) _(requires S2-01)_ <!-- done: 2026-10-26 -->
+  Result: `Player/B1PlayerState` (ASC + set as default subobjects, Mixed mode; the ASC finds the set by outer in `InitializeComponent`). `GAS/B1AbilitySystemComponent` (empty), `GAS/B1VehicleAttributeSet` with defaults in its constructor (100/100/60/60). Damage goes through a meta attribute `Damage` (Lyra style, but visible to modifiers since we use a SetByCaller modifier, not an execution) that `PostGameplayEffectExecute` subtracts from Condition; `Data.Damage` SetByCaller targets it in S2-05. No attribute replication (single-player). Builds.
+  `AB1PlayerState` owns `UB1AbilitySystemComponent` (thin subclass, Lyra style) and the attribute set: `Condition`, `MaxCondition`, `Fuel`, `MaxFuel` with `ATTRIBUTE_ACCESSORS`. Clamp in `PreAttributeChange` and `PostGameplayEffectExecute` (`Data.Damage` → Condition, `Data.Fuel` → Fuel, both clamped to [0, Max]). Defaults via an init GE or the set's constructor: 100 / 100 / 60 L / 60 L.
+  🔍 Research first: Lyra's `ALyraPlayerState` ASC setup and `NetUpdateFrequency` defaults; how `InitAbilityActorInfo` behaves single-player when the avatar is a Chaos pawn.
+  **Done:** builds.
+  **User check:** —
+
+- [ ] **S2-03** `AB1GameMode` + `AB1PlayerController` (2.5 h) _(requires S2-02)_
+  - `AB1GameMode : AOffroadGameMode` (keeps the `Player0` start pick) sets `PlayerStateClass` and `PlayerControllerClass`. `BP_B1GymGameMode` and the `Lvl_Offroad` game mode get reparented to it via MCP.
+  - `AB1PlayerController : AMudDriverPlayerController`. `OnPossess` works for any pawn: the vehicle cast may be null, the vehicle UI shows only while driving, respawn binds only to vehicles. It calls `InitAbilityActorInfo(PlayerState, NewPawn)` and sets `State.Avatar.InVehicle` (loose tag) for vehicles.
+  - Recommendation: subclass the template controller instead of rewriting it; the template keeps its input/UI code, we fix only the vehicle-only assumptions in the base `OnPossess` (null-safe cast).
+  **Done:** builds; both rig suites PASS headless; in PIE, the GAS inspector toolset shows the ASC with `UB1VehicleAttributeSet` on the PlayerState.
+  **User check:** drive `Lvl_Gym_Mud` and `Lvl_Offroad`: everything works as before (UI, respawn, flip reset, cheats).
+
+- [ ] **S2-04** Jeep ↔ ASC link (1 h) _(requires S2-03)_
+  `AB1Jeep` implements `IAbilitySystemInterface` through a `TWeakObjectPtr` to the PlayerState ASC, set in `PossessedBy` and kept after unpossess (ADR-004). `UnPossessed` clears the `State.Avatar.InVehicle` tag; vehicle state tags stay owned by the jeep.
+  **Done:** builds; `UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Jeep)` returns the PlayerState ASC in PIE (logged once to `LogB1Vehicle`).
+  **User check:** —
+
+- [ ] **S2-05** Damage/fuel GEs + cheats (1.5 h) _(requires S2-04)_
+  `GE_B1Damage_Impact` (instant, SetByCaller `Data.Damage`), `GE_B1FuelDrain` / `GE_B1FuelAdd` (instant, SetByCaller `Data.Fuel`) in `/Game/B1/GAS/`. Cheats `B1DamageVehicle <amount>`, `B1SetCondition <value>`, `B1AddFuel <litres>` (negative drains).
+  🔍 Research first: whether MCP can create a `UGameplayEffect` BP and set its modifiers array. Fallback: native GE subclasses (`UB1GE_Damage`, …) configured in the constructor.
+  **Done:** builds; headless `-ExecCmds="EnableCheats,B1DamageVehicle 25"` logs Condition 100 → 75; the S2-01 tags show in the GE's tag picker.
+  **User check:** `B1DamageVehicle 30`, `B1SetCondition 100`, `B1AddFuel -50`: the values change as expected (S2-06 window or `showdebug abilitysystem`).
+
+- [ ] **S2-06** NetImGui "Vehicle Status" + telemetry (2 h) _(requires S2-05)_
+  New window `Debug/B1ImGuiVehicleStatus` (Debug → Vehicle Status): Condition and Fuel bars, active tags on the ASC, buttons for add fuel / refill / damage 10 / repair. CVar `b1.Vehicle.StatusTelemetry`: `B1Status cond= fuel= tags=` to `LogB1Vehicle` at 2 Hz. Fuel rate fields join in S2-07.
+  **Done:** builds; the telemetry line appears in a headless run with the CVar on.
+  **User check:** the window reads well while driving, and the buttons work.
+
+### Fuel (ADR-010)
+
+- [ ] **S2-07** `UB1VehicleTuningData` + fuel consumption (3 h) _(requires S2-05)_
+  - Data asset `UB1VehicleTuningData` (`Fuel|Config`): `IdleRate`, `WorkRate` (L/h, readable for tuning), `DrainInterval` (0.25 s). Asset `/Game/B1/Vehicles/DA_B1JeepTuning`, referenced by `AB1Jeep`.
+  - Jeep ticks: consumption += (`IdleRate` + `WorkRate`·`NormalizedEnginePower`)·dt, applies `GE_B1FuelDrain` every `DrainInterval`. `NormalizedEnginePower` = engine torque × ω / max power (from the torque curve), clamped [0, 1].
+  - Vehicle Status window: live L/h, L/100 m (rolling), and editable rates with "save to asset" (same pattern as the Mud window). `B1Status` gets `lph=`.
+  🔍 Research first: what the 5.8 Chaos engine exposes on the game thread for current torque (`FEngineSimModule`, `GetEngineTorque`?) vs throttle × torque curve(RPM) as a fallback. Engine off while the player is out is a Phase 4 concern: no consumption without a controller is enough for now.
+  **Done:** builds; telemetry shows idle consumption at standstill and higher consumption at full throttle.
+  **User check:** —
+
+- [ ] **S2-08** Out of fuel → no torque (1.5 h) _(requires S2-07)_
+  At Fuel = 0 the jeep adds `Vehicle.State.OutOfFuel` and the movement component forces the throttle to 0 (brake, steering and handbrake still work). Refuelling above 0 removes the tag. Not a fail state.
+  🔍 Research first: zeroing throttle in `UB1VehicleMovementComponent::Update` vs scaling engine max torque; pick the one that also stops the idle creep from the torque curve.
+  **Done:** builds; covered by the S2-09 rig.
+  **User check:** `B1AddFuel -100`, then floor it: the jeep doesn't move; `B1AddFuel 20` and it drives again.
+
+- [ ] **S2-09** Fuel rigs (2.5 h) _(requires S2-08)_
+  - Rig option `bPossessWithPlayer`: the rig's spawned jeep is possessed by player 0, so it gets the ASC. Fuel is refilled at script start.
+  - New metrics `fuelUsed=` (L), `fuelPer100m=` and thresholds; `B1Test` line also prints `cond=`.
+  - Rigs in `Lvl_Gym_Mud`: `B1Fuel_Firm` (50 % on firm, 100 m), `B1Fuel_Medium` (50 % across medium), `B1Fuel_Empty` (fuel 0, 5 s full throttle, disp < 1 m).
+  - Pass: medium L/100 m ≥ 2× firm (checked by a summary line from the runner, or by a firm-baseline threshold on the medium rig).
+  ⚠️ Note: PIE has one player 0, so rigs with `bPossessWithPlayer` run one per round.
+  **Done:** all three PASS headless; both suites still PASS.
+  **User check:** —
+
+### Mud polish (Phase 1)
+
+- [ ] **S2-10** `Vehicle.State.InMud` tag (1 h) _(requires S2-04)_
+  The jeep adds the loose tag while any wheel touches mud and removes it 0.5 s after the last mud contact (no flicker on bumps). Removed on unpossess (ADR-004). Shows in the Vehicle Status tag list.
+  **Done:** builds; a `bPossessWithPlayer` rig crossing medium logs `inMud=` (seconds tagged) > 0 and the tag is gone at the end.
+  **User check:** —
+
+- [ ] **S2-11** `B1Unstuck` cheat (1.5 h)
+  Lifts the jeep 50 cm above the mud surface under it, zeroes linear/angular velocity, keeps yaw, and resets every wheel's `SinkDepth`/`SinkOffset` (new one-shot flag in `FB1VehicleSimInput`). Logs to `LogB1Physics`.
+  **Done:** builds; headless run with `B1Unstuck` after `B1Mud_DeepFullThrottle`'s setup logs sink 0 on all wheels.
+  **User check:** get stuck in deep, `B1Unstuck`: the jeep pops out level and can drive (it'll sink again from weight, that's expected).
+
+- [ ] **S2-12** `ShowDebug B1Mud` (1 h)
+  Text over the jeep: per wheel material, sink cm / max, mu, rr N; belly cm / N; `InMud` tag. Over each `AB1MudPatch` within 50 m: preset name, max depth, ramps. Same binding pattern as `B1VehicleShowDebug`.
+  **Done:** builds.
+  **User check:** `ShowDebug B1Mud` in the gym: readable over the jeep and the patches, toggles off.
+
+- [ ] **S2-13** Niagara mud spray (3 h)
+  `NS_B1MudSpray`: GPU sprites, spawn rate ∝ slip speed × (sink depth > 0), velocity backward and up from the contact along the wheel spin direction, gravity, depth-buffer collision, short lifetime. One `UNiagaraComponent` per wheel on `AB1Jeep`, driven from `Tick` via user params (`SpawnRate`, `SpinDir`, `Color`). Mud wheels only; off on firm ground. Colour from a new `SprayColor` on `UB1PhysicalMaterial_Mud` (cheap stretch item).
+  🔍 Research first: what the MCP Niagara toolset can author (emitter modules, user params). If it can't build the system, the agent writes the C++ side and you make the system by hand from a short spec.
+  **Done:** builds; Simulate + `CaptureEditorImage` with a rig digging in medium shows spray on the mud wheels only.
+  **User check:** floor it in medium: the spray reads as mud and scales with wheelspin; crawling barely sprays.
+
+- [ ] **S2-14** Visual trails (ADR-008) (3.5 h)
+  - Each `AB1MudPatch` owns a render target (512², world-mapped over `Size`) created at BeginPlay. `M_B1Mud` samples it: darker and slightly glossier where driven.
+  - The jeep stamps a soft brush at each mud wheel's contact every ~10 cm travelled (`DrawMaterialToRenderTarget` with a brush material, or a canvas draw batch per frame), width from the wheel.
+  - Trails don't fade and don't touch physics.
+  🔍 Research first: per-patch render targets vs one RVT for all mud. Per-patch RT is the simple default; RVT only if per-patch has a blocker.
+  **Done:** builds; a viewport capture after a rig drive through medium shows two clear tracks.
+  **User check:** trails look acceptable; decide whether physics ruts are worth it (ADR-008 revisit → backlog or a new ADR).
+
+### Close
+
+- [ ] **S2-15** Fuel playtest + tuning (user + agent, 1 h) _(requires S2-06, S2-09)_
+  You drive the gym and tune the rates in Vehicle Status. The agent writes the values into `DA_B1JeepTuning` and re-runs S2-09.
+  **Done:** fuel rigs PASS with the tuned values.
+  **User check:** sign-off on fuel pressure (Phase G).
+
+- [ ] **S2-16** Phase 1 close playtest (user + agent, 1 h) _(requires S2-10..S2-14)_
+  Mud checklist (ROADMAP Phase 1) plus spray, trails, `ShowDebug B1Mud`, `B1Unstuck`. You also check `stat unit` on the laptop (sanity only).
+  **Done:** both suites PASS; ROADMAP Phase 1 and Phase G ticked.
+  **User check:** sign-off on Phase 1.
+
+### Backlog (found during the sprint)
+
+- _(empty)_

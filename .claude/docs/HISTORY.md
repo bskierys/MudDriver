@@ -507,3 +507,29 @@ User reviewed S1-25..S1-28. Mud physics: satisfied, S1-24 closed without preset 
 ### Open follow-ups
 - User check: the retuned recenter.
 - Sprint 2 (GAS + fuel + mud polish) needs detailing at sprint start (`/sprint`).
+
+---
+
+## 2026-10-26 — Sprint 2 planning + GAS foundation (S2-01, S2-02)
+
+### Context
+Sprint 1 closed. Sprint 2 was a one-line placeholder in SPRINTS.md; detailed it, then started the GAS bootstrap. No GAS code existed (plugin enabled, modules unlinked).
+
+### What was built
+- Sprint 2 in SPRINTS.md: 16 tasks (~30 h) in four groups: GAS bootstrap (S2-01..06), fuel (S2-07..09), mud polish (S2-10..14), close playtests (S2-15..16).
+- S2-01: `GameplayAbilities`/`GameplayTags`/`GameplayTasks` linked publicly; native tags in `GAS/B1GameplayTags` (`State.Avatar.InVehicle/OnFoot`, `Vehicle.State.InMud/OutOfFuel`, `Data.Fuel`, `Data.Damage`).
+- S2-02: `AB1PlayerState` (ASC + `UB1VehicleAttributeSet` as default subobjects, Mixed mode), empty `UB1AbilitySystemComponent`, attribute set Condition/MaxCondition 100, Fuel/MaxFuel 60 L, meta attribute `Damage` → Condition in `PostGameplayEffectExecute`, clamped in `PreAttributeChange`.
+
+### Decisions made
+- Rigs that spawn their own jeep have no ASC; fuel/tag rigs get a `bPossessWithPlayer` option (S2-09).
+- `AB1PlayerController` will subclass the template controller and only fix its vehicle-only `OnPossess` (S2-03).
+- GEs as BP assets via MCP; native GE classes as fallback (S2-05).
+- Damage via meta attribute targeted by a SetByCaller modifier, so `Damage` is not `HideFromModifiers` (Lyra hides it because it uses an execution calc).
+- No attribute replication: single-player prototype.
+
+### What we learned
+- The ASC registers attribute sets outered to its owner in `InitializeComponent` (`AbilitySystemComponent_Abilities.cpp:96`); no `AddAttributeSetSubobject` needed for default subobjects.
+
+### Open follow-ups
+- S2-01's tag-picker check moved to S2-05 (first GE BP).
+- Nothing uses `AB1PlayerState` until S2-03 sets it on `AB1GameMode`.

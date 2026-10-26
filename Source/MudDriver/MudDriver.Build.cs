@@ -18,7 +18,10 @@ public class MudDriver : ModuleRules
 			"PhysicsCore",
 			"UMG",
 			"Slate",
-			"NetImgui"
+			"NetImgui",
+			"GameplayAbilities",
+			"GameplayTags",
+			"GameplayTasks"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {
@@ -29,8 +32,10 @@ public class MudDriver : ModuleRules
 			"MudDriver/Variant_TimeTrial",
 			"MudDriver/Variant_TimeTrial/UI",
 			"MudDriver/Debug",
+			"MudDriver/GAS",
 			"MudDriver/Mud",
 			"MudDriver/Physics",
+			"MudDriver/Player",
 			"MudDriver/Vehicle"
 		});
 

@@ -8,12 +8,12 @@ UE 5.8, engine at `C:\Program Files\UE_5.8`.
 
 | Module | Type | Deps | Holds |
 |---|---|---|---|
-| `MudDriver` | Runtime | Core, CoreUObject, Engine, InputCore, EnhancedInput, ChaosVehicles, PhysicsCore, UMG, Slate, NetImgui; private Projects, ChaosVehiclesCore | Game code |
+| `MudDriver` | Runtime | Core, CoreUObject, Engine, InputCore, EnhancedInput, ChaosVehicles, PhysicsCore, UMG, Slate, NetImgui, GameplayAbilities, GameplayTags, GameplayTasks; private Projects, ChaosVehiclesCore | Game code |
 | `MudDriverTests` | DeveloperTool (not in Shipping, ADR-013) | Core, CoreUObject, Engine, FunctionalTesting; private ChaosVehicles, MudDriver | Gym test rigs |
 
 Game-module symbols used by the tests need `MUDDRIVER_API` (the log categories already have it).
 
-Plugins enabled: ChaosVehiclesPlugin, GameplayAbilities (no code uses it yet), NetImgui (project plugin), ModelContextProtocol + editor toolsets, GameInputWindows, ModelingToolsEditorMode.
+Plugins enabled: ChaosVehiclesPlugin, GameplayAbilities, NetImgui (project plugin), ModelContextProtocol + editor toolsets, GameInputWindows, ModelingToolsEditorMode.
 
 Log categories (`B1Log.h`): `LogB1Vehicle`, `LogB1Physics`, `LogB1Test`.
 
@@ -27,6 +27,8 @@ Log categories (`B1Log.h`): `LogB1Vehicle`, `LogB1Physics`, `LogB1Test`.
 | Sports car | `AMudDriverSportsCar` + wheels | Template leftover, unused for the game |
 | Controller | `AMudDriverPlayerController` | Mapping contexts, respawn, vehicle UI, sets `UB1CheatManager` |
 | Game modes | `AMudDriverGameMode`, `AOffroadGameMode`, `ATimeTrialGameMode` | Template variants |
+| Player state (ADR-004) | `AB1PlayerState` (`Player/`) | Owns the single `UB1AbilitySystemComponent` (Mixed) and `UB1VehicleAttributeSet` as default subobjects. Not used by any game mode yet (S2-03) |
+| GAS (`GAS/`) | `UB1AbilitySystemComponent`, `UB1VehicleAttributeSet`, `B1GameplayTags` | Attributes: Condition/MaxCondition (100), Fuel/MaxFuel (60 L), meta `Damage` → subtracted from Condition in `PostGameplayEffectExecute`; Condition/Fuel clamped to [0, Max]. No replication (single-player). Native tags in namespace `B1GameplayTags`: `State.Avatar.InVehicle/OnFoot`, `Vehicle.State.InMud/OutOfFuel`, `Data.Fuel`, `Data.Damage` (SetByCaller) <!-- updated 2026-10-26 --> |
 
 Maps: `VehicleTemplate/Maps/VehicleBasic`, `Variant_OffRoad/Maps/Lvl_Offroad` (World Partition, one file per actor), `Variant_TimeTrial/Maps/*`.
 Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
