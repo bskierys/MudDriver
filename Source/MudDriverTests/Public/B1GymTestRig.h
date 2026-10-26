@@ -47,6 +47,10 @@ struct FB1GymThresholds
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "s"))
 	float MaxTimeToStuck = -1.0f;
 
+	/** Horizontal displacement during the last input step, a creep check */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
+	float MaxLastStepDisplacement = -1.0f;
+
 	/** Speed on the last sample */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m/s"))
 	float MaxEndSpeed = -1.0f;
@@ -176,6 +180,9 @@ private:
 	/** N */
 	float MaxBellyDrag = 0.0f;
 	float EndSpeed = 0.0f;
+
+	FVector LastStepStart = FVector::ZeroVector;
+	bool bInLastStep = false;
 
 	float TautTime = -1.0f;
 	FFloatInterval StretchFirst;

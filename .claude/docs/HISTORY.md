@@ -384,3 +384,37 @@ Same autonomous sprint run. Mud tuning needed a live editor before the S1-24 pla
 
 ### Open follow-ups
 - User check: the window's layout, live `SinkRate` edits while driving, and Save persisting across an editor restart.
+
+---
+
+## 2026-10-26 — S1-23 mud rig suite
+
+### Context
+Same autonomous sprint run. The suite items mostly had rigs already; they needed thresholds that check the sprint's wording, plus a creep check.
+
+### What was built
+- Rig: `lastDisp` metric + `MaxLastStepDisplacement` threshold.
+- New rigs `B1Mud_CreepDeep` and `B1Mud_CreepMedium`. Thresholds tightened on `DigInMedium` (5–15 m), `CrossMedium` (10 s, ≥ 32 m, peakOsc ≤ 0.65), `CrawlIntoMedium` (peakOsc ≤ 0.5) and `DeepRunUp` (peakOsc ≤ 0.8).
+
+### Numbers (headless, 1/60 s fixed step)
+| Rig | Result |
+|---|---|
+| DigInMedium | dist 13.57, vmax 4.41 |
+| CrossMedium | dist 60.47, peakOsc 0.573 |
+| CrawlIntoMedium | dist 25.69, peakOsc 0.387 |
+| RestartMedium / RestartHeavy | dist 10.83 / 6.28 |
+| RecoverMedium | dist 19.17 |
+| DeepFullThrottle | dist 0.65, stuck 0.85 s, vend 0.02, belly 7259 N |
+| DeepRunUp | dist 39.99 (≤ 42), peakOsc 0.598 |
+| CreepDeep / CreepMedium | lastDisp 0.008 / 0.002 m |
+| ExitMediumFull / ExitDeep | peakOsc 0.379 / 0.916 |
+
+PIE (editor ~34 fps, async 1/60 physics) lands within a few percent: CrossMedium 60.44, DigInMedium 13.85, DeepRunUp 39.97.
+
+### What we learned
+- PIE with every rig on `bAutoRun` breaks: rigs on the same lane spawn jeeps on top of each other. Run them in rounds, one rig per lane.
+- Toggling `bAutoRun` dirties the rig packages; `StopEditor.ps1` then hangs on the save dialog. Save after resetting it to false.
+- Holding still in mud (creep) is solid: deep 8 mm in 10 s, medium 2 mm.
+
+### Open follow-ups
+- Exit bumps (CrossMedium 0.57, ExitDeep 0.92) for the S1-24 playtest.

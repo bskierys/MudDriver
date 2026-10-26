@@ -230,7 +230,15 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** builds; the telemetry line appears during the rig run.
   **User check:** edit `SinkRate` live while driving: the effect is immediate and saving persists it.
 
-- [ ] **S1-23** Mud rig test suite (2.5 h) _(requires S1-16, S1-21)_
+- [x] **S1-23** Mud rig test suite (2.5 h) _(requires S1-16, S1-21)_ <!-- done: 2026-10-26 -->
+  Result: the suite maps onto 16 rigs in `Lvl_Gym_Mud`, all PASS in PIE and headless (numbers in HISTORY.md).
+  - New rig metric `lastDisp` (horizontal displacement during the last input step) and threshold `MaxLastStepDisplacement`.
+  - Bogs down: `B1Mud_DigInMedium` now 5–15 m in 4 s (13.6 m; firm full throttle covers ~50 m).
+  - Crosses at ≤ 50 %: `B1Mud_CrossMedium` runs 10 s, ≥ 32 m (60.5 m, past the patch end at 30 m). Restart: `RestartMedium`/`RestartHeavy`, `CrawlIntoMedium`.
+  - Deep stuck: `DeepFullThrottle`, `DeepRunUp`, `SinkDeepStop`.
+  - Creep: new `B1Mud_CreepDeep` (3 s full throttle, then 10 s idle; lastDisp 0.008 m) and `B1Mud_CreepMedium` (10 s idle in medium; 0.002 m). Limit 0.05 m.
+  - Pops: entry checks `CrawlIntoMedium` ≤ 0.5 (0.39) and `DeepRunUp` ≤ 0.8 (0.60). Exit checks `ExitMediumFull` ≤ 0.5 (0.38) and `CrossMedium` ≤ 0.65 (0.57: climbing out at 50 % from ~20 cm deep, same kind of bump as ExitDeep's 0.92; for the user's playtest).
+  - PIE: rigs on the same lane collide when run together, so PIE runs go in rounds with one rig per lane (8 rounds, `bAutoRun` toggled over MCP, never saved as true).
   - full throttle, medium: bogs down (speed capped well below firm), not stuck (changed in S1-20 after the user's playtest)
   - ≤ 50 % throttle crosses a 20 m medium strip; restarts from a stop in medium at low throttle
   - deep: stuck

@@ -118,8 +118,10 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 - `B1Mud_DeepRunUp`: full throttle with a 22 m run-up into deep, ≤ 42 m (stops inside the patch).
 - `B1Mud_ExitDeep`: 50 % out of deep, ≥ 8 m, endH ≥ −1.05 (back at firm height).
 - `B1Mud_DeepFullThrottle`: 7 s full throttle from rest in deep, stuck ≤ 5 s, `MaxEndSpeed` 0.5, ≤ 15 m.
+- `B1Mud_CreepDeep` / `B1Mud_CreepMedium`: idle after digging in (deep) or from rest (medium), ≤ 5 cm horizontal in the last 10 s.
+- Updated limits: DigInMedium 5–15 m, CrossMedium 10 s ≥ 32 m with peakOsc ≤ 0.65, CrawlIntoMedium peakOsc ≤ 0.5, DeepRunUp peakOsc ≤ 0.8.
 
-The rig line also has `vend=` (last-sample speed, `MaxEndSpeed` threshold) and, with a B1 component, `belly=` (max N). <!-- updated 2026-10-26 -->
+The rig line also has `vend=` (last-sample speed, `MaxEndSpeed` threshold), `lastDisp=` (horizontal displacement during the last input step, `MaxLastStepDisplacement`) and, with a B1 component, `belly=` (max N). In PIE, rigs on the same lane collide, so run them in rounds with one rig per lane. <!-- updated 2026-10-26 -->
 
 It also has `B1Gym_FirmSmoke` (6 s at 50 % throttle on the firm lane, ≥ 20 m; ~43 m) and `B1Gym_WallStop` (full throttle into the north wall; the jeep must stay on the floor). <!-- updated 2026-10-25 -->
 - Headless: `Scripts/RunGymTests.ps1 [-Map] [-Filter]` runs `UnrealEditor-Cmd -nullrhi` with `Automation RunTests Project.Functional Tests.<map dotted>[.<label>]; Quit`. The editor exits 0 regardless, so the script parses `Test Completed. Result={...}` lines for its exit code. Needs the editor closed (`Scripts/StopEditor.ps1`).
