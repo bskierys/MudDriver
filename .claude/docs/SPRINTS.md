@@ -247,6 +247,29 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
   **Done:** all PASS in PIE and headless; the numbers are recorded in HISTORY.md.
   **User check:** —
 
+#### Review follow-ups (user review, 2026-10-26)
+
+- [x] **S1-25** NetImGui: type-in values (0.5 h) _(requires S1-22)_ <!-- done: 2026-10-26 -->
+  Result: `DragFloatTyped` (drag + 70 px text field, typed values clamped to the drag range) for all preset scalars and belly clearance; curve keys get an `InputFloat2`. Builds; window untested on the agent side.
+  Every drag in the Mud window (preset scalars, curve keys, belly clearance) gets a text field next to it, so values can be typed exactly.
+  **Done:** builds.
+  **User check:** type a `SinkRate` value; it applies like a drag does.
+
+- [ ] **S1-26** Engine RPM in "Vehicle Basics" (0.5 h)
+  RPM (with max), gear and throttle, next to speed, so wheelspin in mud is visible as revs without speed.
+  **Done:** builds.
+  **User check:** floor it in medium: RPM climbs while speed stays low.
+
+- [ ] **S1-27** Chase camera: full orbit, delayed weak recenter, further back (1 h)
+  Look input can turn the camera all the way around the jeep, a bit faster than now. Recentering starts only after a delay without look input, and is slower. The camera sits further back. All values are `Camera` properties on the pawn.
+  **Done:** builds; the rig suite still passes (camera doesn't touch physics).
+  **User check:** orbit to the side of the jeep in mud, let go: the camera stays a moment, then drifts back slowly.
+
+- [ ] **S1-28** Mud patch edge ramps (2.5 h) _(requires S1-19)_
+  Real puddles climb back out at the edges instead of ending in a step. Per patch edge (+X, −X, +Y, −Y) the hard bottom can ramp up to the surface over `EdgeRampLength`; edges without a ramp stay open, so patches can be placed edge to edge. Sinking is capped by the hard ground under each wheel (an extra trace that ignores the mud surface), so it works the same when the landscape is the bottom.
+  **Done:** builds; gym patches get ramps where the jeep drives out; the rig suite passes (thresholds updated where the exit bumps drop).
+  **User check:** drive out of deep and heavy over a ramp: the climb-out is smoother and easier than the old step.
+
 - [ ] **S1-24** Mud playtest + tuning pass (user + agent, 1–2 h) _(requires S1-22, S1-23)_
   You playtest `Lvl_Gym_Mud` and tune live. The agent writes the tuned values into the presets and re-runs S1-23 (thresholds get adjusted if your feel disagrees). You also check `stat unit` on the laptop.
   **Done:** the suite passes with the tuned values.

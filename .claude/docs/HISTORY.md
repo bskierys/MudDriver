@@ -418,3 +418,17 @@ PIE (editor ~34 fps, async 1/60 physics) lands within a few percent: CrossMedium
 
 ### Open follow-ups
 - Exit bumps (CrossMedium 0.57, ExitDeep 0.92) for the S1-24 playtest.
+
+---
+
+## 2026-10-26 — S1-25 type-in values in the Mud window
+
+### Context
+User review of S1-21..S1-23 came back with four notes: mud patch edge ramps, typed ImGui values, engine RPM in Vehicle Basics, and a better chase camera. They became S1-25..S1-28, ahead of the S1-24 playtest.
+
+### What was built
+- `DragFloatTyped` in `B1ImGuiMud.cpp`: drag, then a 70 px `InputFloat` field, then the label. Typed values are clamped to the drag's range. Used for every preset scalar and belly clearance. Curve keys get an `InputFloat2` next to the `DragFloat2`.
+- `Static sink ratio` changed from a slider to the same drag + field.
+
+### Open follow-ups
+- User check: typing a value applies it like a drag.

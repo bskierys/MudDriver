@@ -15,6 +15,28 @@
 namespace B1ImGui
 {
 #if NETIMGUI_ENABLED
+	static constexpr float TypeFieldWidth = 70.0f;
+
+	/** Drag plus a text field for typing an exact value */
+	static bool DragFloatTyped(const char* Label, float* Value, float Speed, float Min, float Max, const char* Format = "%.2f")
+	{
+		ImGui::PushID(Label);
+		const float DragWidth = FMath::Max(ImGui::CalcItemWidth() - TypeFieldWidth - ImGui::GetStyle().ItemInnerSpacing.x, 50.0f);
+		ImGui::SetNextItemWidth(DragWidth);
+		bool bChanged = ImGui::DragFloat("##drag", Value, Speed, Min, Max, Format, ImGuiSliderFlags_AlwaysClamp);
+		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+		ImGui::SetNextItemWidth(TypeFieldWidth);
+		if (ImGui::InputFloat("##type", Value, 0.0f, 0.0f, Format))
+		{
+			*Value = FMath::Clamp(*Value, Min, Max);
+			bChanged = true;
+		}
+		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+		ImGui::TextUnformatted(Label);
+		ImGui::PopID();
+		return bChanged;
+	}
+
 	static void DrawWheelTable(const UB1VehicleMovementComponent& Movement)
 	{
 		constexpr ImGuiTableFlags Flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
@@ -74,7 +96,12 @@ namespace B1ImGui
 			FRichCurveKey& Key = RichCurve->GetKey(Handles[KeyIndex]);
 			float TimeValue[2] = { Key.Time, Key.Value };
 			ImGui::PushID(KeyIndex);
-			if (ImGui::DragFloat2("##key", TimeValue, 0.005f))
+			ImGui::SetNextItemWidth(ImGui::CalcItemWidth() * 0.6f);
+			bool bKeyChanged = ImGui::DragFloat2("##key", TimeValue, 0.005f);
+			ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+			ImGui::SetNextItemWidth(TypeFieldWidth * 2.0f);
+			bKeyChanged |= ImGui::InputFloat2("##type", TimeValue, "%.3f");
+			if (bKeyChanged)
 			{
 				Key.Value = TimeValue[1];
 				RichCurve->SetKeyTime(Handles[KeyIndex], FMath::Clamp(TimeValue[0], 0.0f, 1.0f));
@@ -109,15 +136,15 @@ namespace B1ImGui
 	static bool DrawPreset(UB1PhysicalMaterial_Mud& Mud)
 	{
 		bool bChanged = false;
-		bChanged |= ImGui::DragFloat("Friction (zero depth)", &Mud.Friction, 0.01f, 0.0f, 2.0f);
-		bChanged |= ImGui::DragFloat("Max sink depth cm", &Mud.MaxSinkDepth, 0.5f, 0.0f, 200.0f);
-		bChanged |= ImGui::SliderFloat("Static sink ratio", &Mud.StaticSinkRatio, 0.0f, 1.0f);
-		bChanged |= ImGui::DragFloat("Settle rate cm/s", &Mud.SettleRate, 0.5f, 0.0f, 500.0f);
-		bChanged |= ImGui::DragFloat("Sink rate cm/s", &Mud.SinkRate, 0.5f, 0.0f, 500.0f);
-		bChanged |= ImGui::DragFloat("Full sink slip m/s", &Mud.FullSinkSlipSpeed, 0.05f, 0.1f, 50.0f);
-		bChanged |= ImGui::DragFloat("Rise rate cm/m", &Mud.RiseRate, 0.05f, 0.0f, 100.0f);
-		bChanged |= ImGui::DragFloat("Speed drag", &Mud.SpeedDragCoefficient, 0.001f, 0.0f, 1.0f, "%.3f");
-		bChanged |= ImGui::DragFloat("Belly drag", &Mud.BellyDragCoefficient, 0.05f, 0.0f, 50.0f);
+		bChanged |= DragFloatTyped("Friction (zero depth)", &Mud.Friction, 0.01f, 0.0f, 2.0f);
+		bChanged |= DragFloatTyped("Max sink depth cm", &Mud.MaxSinkDepth, 0.5f, 0.0f, 200.0f);
+		bChanged |= DragFloatTyped("Static sink ratio", &Mud.StaticSinkRatio, 0.005f, 0.0f, 1.0f, "%.3f");
+		bChanged |= DragFloatTyped("Settle rate cm/s", &Mud.SettleRate, 0.5f, 0.0f, 500.0f);
+		bChanged |= DragFloatTyped("Sink rate cm/s", &Mud.SinkRate, 0.5f, 0.0f, 500.0f);
+		bChanged |= DragFloatTyped("Full sink slip m/s", &Mud.FullSinkSlipSpeed, 0.05f, 0.1f, 50.0f);
+		bChanged |= DragFloatTyped("Rise rate cm/m", &Mud.RiseRate, 0.05f, 0.0f, 100.0f);
+		bChanged |= DragFloatTyped("Speed drag", &Mud.SpeedDragCoefficient, 0.001f, 0.0f, 1.0f, "%.3f");
+		bChanged |= DragFloatTyped("Belly drag", &Mud.BellyDragCoefficient, 0.05f, 0.0f, 50.0f);
 		bChanged |= DrawCurve("Friction x", Mud.FrictionVsDepth);
 		bChanged |= DrawCurve("Rolling resistance", Mud.RollingResistanceVsDepth);
 		return bChanged;
@@ -176,7 +203,7 @@ namespace B1ImGui
 		{
 			ImGui::Text("Speed: %.1f km/h", Movement->GetForwardSpeed() * 0.036f);
 			ImGui::Text("Belly: %.1f cm past clearance, drag %.0f N", Movement->GetBellyDepth(), Movement->GetBellyDrag());
-			ImGui::DragFloat("Belly clearance cm", &Movement->BellyClearance, 0.5f, 0.0f, 200.0f);
+			DragFloatTyped("Belly clearance cm", &Movement->BellyClearance, 0.5f, 0.0f, 200.0f);
 			DrawWheelTable(*Movement);
 		}
 		else
