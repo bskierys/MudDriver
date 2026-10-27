@@ -861,7 +861,15 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** builds; rig PASS headless; all suites PASS.
   **User check:** get out and in on firm ground, in mud and on the slope; camera and controls switch cleanly; the parked jeep stays put on firm ground and slides on the muddy slope.
 
-- [ ] **S4-13** Winch reel in/out + detach key + keyboard rebind (3 h) _(requires S4-06)_
+- [x] **S4-13** Winch reel in/out + detach key + keyboard rebind (3 h) _(requires S4-06)_ <!-- done: 2026-10-27 -->
+  Result:
+  - Signed pull end to end: `UB1WinchComponent::Pull` / `SetPull` −1..1, new `ReelOutSpeed` (`Winch|Config`; `BP_B1Jeep` 300 cm/s = its `ReelInSpeed`). `FB1WinchSimInput` carries `ReelOutSpeed` and `MaxCableLength`; the sim grows the rest length up to the max, ignoring the stall. Winch window (Reel-out field + save, pull shows in/out/hold), `ShowDebug B1Winch` and telemetry show signed pull.
+  - Reel-out damping: damping on body speed snatched a descending jeep in a loop (a steady 3 m/s read as +60 kN). During payout it now damps the stretch rate. Tried on reel-in too: every pull stepped to 60 kN (was 36–38 kN), so reel-in keeps body-speed damping. ADR-007 amended.
+  - Input: `IA_B1WinchToggle` renamed `IA_B1WinchDetach`; `AB1Jeep::WinchToggleAction` → `WinchDetachAction` (calls `Detach` only). `IMC_Vehicle_Default` now: pull Up / D-pad Up, pull with Negate Down / D-pad Down, detach Q / pad Y. Removed from it: arrow Up (throttle), Down (brake), Left/Right (steering), E (winch pull). `IMC_B1Abilities`: interact F → E (pad X stays). Pad Y and Q had no template bindings.
+  - Rig: `WinchPull` −1..1; thresholds `MaxLastStepSpeed`, `MinLastStepTension`, `MaxRestLength`; metrics `tensionMinLast`, `vmaxLast`.
+  - `B1Winch_ReelOutSlope` (X 50 m, Y 20 m on the medium slope, `Tree_MediumSlope`): 2 s hold, 4 s reel-out, 3 s measured; vmaxLast 3.02 ≤ 3.3, tensionMinLast 3938, 22.2 m down, rest 16.6 → 38.1 m. The first seconds peak at 5.1 m/s (start-up overshoot, accepted by the user). Script shortened from 15 s: at 300 cm/s it would run off the slope.
+  - `B1Winch_ReelOutLimit` (X 0, Y −55 m, firm, `Tree_FirmPull`, braked): 30 s reel-out (90 s not needed at 300 cm/s), rest 80.00.
+  - Headless: winch gym 23/23 (`s413_winch3.log` + `s413_reelout2.log`; reel-in rigs match their old numbers), core `B1OnFoot_ExitEnter10` PASS (`s413_core.log`). Mud and full core not rerun (not touched); run them with the full suite.
   Added mid-sprint (user, 2026-10-27): the winch can only shorten the cable, and S4-07 needs the final in-car controls before it removes attaching from the seat.
   - **Reel-out.** The pull input becomes signed, −1..1: positive reels in as today; negative grows the rest length at `ReelOutSpeed` (new, `Winch|Config`, default = `ReelInSpeed`) up to `MaxCableLength`.
     - Reel-out isn't limited by the drum stall, so a jeep held on a slope descends under control at reel speed.

@@ -1082,3 +1082,28 @@ After the first Sprint 4 refinement, `/plan-analyse` reviewed the open tasks (S4
 ### Open follow-ups
 - Next: S4-13, then S4-12, then S4-07.
 - Check `IMC_Vehicle_Default` for template bindings on the arrows, Q, E and Y before rebinding (S4-13).
+
+## 2026-10-27 — S4-13 winch reel-out, detach key, rebind
+
+### Context
+The winch could only shorten the cable, and the in-car controls still used the S3 attach/detach toggle. S4-13 (added mid-sprint) brings signed pull, a detach-only key and the user's keyboard/pad layout before S4-12 and S4-07.
+
+### What was built
+- Signed winch pull (−1..1) through `UB1WinchComponent`, `FB1WinchSimInput` and `FB1VehicleSimulation::UpdateWinch`: reel-out grows the rest length at `ReelOutSpeed` (new, `BP_B1Jeep` 300 cm/s) up to `MaxCableLength`, ignoring the stall.
+- Reel-out damps the cable's stretch rate (body speed minus payout); reel-in keeps body-speed damping.
+- `IA_B1WinchDetach` (renamed from `IA_B1WinchToggle`), `AB1Jeep::WinchDetachAction` → `Detach`. `IMC_Vehicle_Default`: arrows Up/Down and D-pad Up/Down reel in/out, Q / pad Y detach; template arrow drive/steer and E pull removed. Interact F → E.
+- Winch window Reel-out field, signed pull in the window, ShowDebug and telemetry.
+- Rig thresholds `MaxLastStepSpeed`, `MinLastStepTension`, `MaxRestLength`; rigs `B1Winch_ReelOutSlope` and `B1Winch_ReelOutLimit` in `Lvl_Gym_Winch`.
+
+### Decisions made
+- ADR-007 amended: signed pull, reel-out ignores the stall, stretch-rate damping on reel-out only, detach key.
+- Start-up overshoot on reel-out (≈5 m/s for a second or two, then 3.0 m/s) accepted by the user; the rig measures the last 3 s.
+
+### What we learned
+- Damping on body speed alone fights any steady reel: a jeep descending at 3 m/s read as +60 kN and snatched in a loop. Using stretch rate on reel-in made every pull step to the cap, so reel-in keeps the old term.
+- MCP `set_properties` can create an instanced subobject (e.g. an Input Modifier) by passing the class path as the refPath; array shrink needs every remaining element resent unchanged, which is easiest from a `ProgrammaticToolset` script that reads, slices and writes back.
+- New rigs start with one default `InputScript` element; grow the array by repeating it before setting real values.
+
+### Open follow-ups
+- Mud gym and full core not rerun this session (untouched); run with the full suite.
+- Next: S4-12 cable on ground and mud.

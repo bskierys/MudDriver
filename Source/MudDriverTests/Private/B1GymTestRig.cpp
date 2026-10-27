@@ -193,6 +193,7 @@ void AB1GymTestRig::StartTest()
 	MaxBellyDrag = 0.0f;
 	MaxSlopePull = 0.0f;
 	EndSpeed = 0.0f;
+	LastStepMaxSpeed = 0.0f;
 	bInLastStep = false;
 	LastStepStart = StartLocation;
 	TautTime = -1.0f;
@@ -458,6 +459,10 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 	const float Speed = Velocity.Size();
 	MaxSpeed = FMath::Max(MaxSpeed, Speed);
 	EndSpeed = Speed;
+	if (bInLastStep)
+	{
+		LastStepMaxSpeed = FMath::Max(LastStepMaxSpeed, Speed);
+	}
 	PeakOscillation = FMath::Max(PeakOscillation, FMath::Abs(static_cast<float>(Velocity.Z)));
 
 	if (Speed > SettleSpeed)
@@ -576,6 +581,10 @@ void AB1GymTestRig::FinishScript()
 	{
 		Failures.Add(FString::Printf(TEXT("vend>%.2f"), Thresholds.MaxEndSpeed));
 	}
+	if (Thresholds.MaxLastStepSpeed >= 0.0f && LastStepMaxSpeed > Thresholds.MaxLastStepSpeed)
+	{
+		Failures.Add(FString::Printf(TEXT("vmaxLast>%.2f"), Thresholds.MaxLastStepSpeed));
+	}
 	if (Thresholds.MaxPeakOscillation >= 0.0f && PeakOscillation > Thresholds.MaxPeakOscillation)
 	{
 		Failures.Add(FString::Printf(TEXT("peakOsc>%.3f"), Thresholds.MaxPeakOscillation));
@@ -630,7 +639,9 @@ void AB1GymTestRig::FinishScript()
 	if (Winch)
 	{
 		const float TensionOscillation = LastStepTension.IsValid() ? LastStepTension.Size() : 0.0f;
+		const float TensionMinLast = LastStepTension.IsValid() ? LastStepTension.Min : 0.0f;
 		const float AnchorDistance = MaxAnchorDistance / CmPerM;
+		const float RestLength = Winch->GetRestLength() / CmPerM;
 		if (Thresholds.MaxTension >= 0.0f && MaxTension > Thresholds.MaxTension)
 		{
 			Failures.Add(FString::Printf(TEXT("tensionMax>%.0f"), Thresholds.MaxTension));
@@ -644,8 +655,17 @@ void AB1GymTestRig::FinishScript()
 			Failures.Add(FString::Printf(TEXT("anchorDistMax>%.2f"), Thresholds.MaxAnchorDistance));
 		}
 
-		WinchMetrics = FString::Printf(TEXT(" tensionMax=%.0f tensionOsc=%.0f anchorDistMax=%.2f rest=%.2f"),
-			MaxTension, TensionOscillation, AnchorDistance, Winch->GetRestLength() / CmPerM);
+		if (Thresholds.MinLastStepTension >= 0.0f && TensionMinLast < Thresholds.MinLastStepTension)
+		{
+			Failures.Add(FString::Printf(TEXT("tensionMinLast<%.0f"), Thresholds.MinLastStepTension));
+		}
+		if (Thresholds.MaxRestLength >= 0.0f && RestLength > Thresholds.MaxRestLength)
+		{
+			Failures.Add(FString::Printf(TEXT("rest>%.2f"), Thresholds.MaxRestLength));
+		}
+
+		WinchMetrics = FString::Printf(TEXT(" tensionMax=%.0f tensionOsc=%.0f tensionMinLast=%.0f anchorDistMax=%.2f rest=%.2f vmaxLast=%.2f"),
+			MaxTension, TensionOscillation, TensionMinLast, AnchorDistance, RestLength, LastStepMaxSpeed);
 		Winch->Detach();
 		Winch = nullptr;
 	}

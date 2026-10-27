@@ -71,6 +71,7 @@ namespace B1ImGui
 		Archetype->MaxCableLength = Winch.MaxCableLength;
 		Archetype->MaxPullForce = Winch.MaxPullForce;
 		Archetype->ReelInSpeed = Winch.ReelInSpeed;
+		Archetype->ReelOutSpeed = Winch.ReelOutSpeed;
 		Archetype->MinRestLength = Winch.MinRestLength;
 		Archetype->CableStiffness = Winch.CableStiffness;
 		Archetype->CableDamping = Winch.CableDamping;
@@ -86,6 +87,7 @@ namespace B1ImGui
 		bChanged |= DragFloatTyped("Max cable cm", &Winch.MaxCableLength, 10.0f, 100.0f, 20000.0f, "%.0f");
 		bChanged |= DragFloatTyped("Max pull N", &Winch.MaxPullForce, 100.0f, 0.0f, 200000.0f, "%.0f");
 		bChanged |= DragFloatTyped("Reel-in cm/s", &Winch.ReelInSpeed, 1.0f, 0.0f, 1000.0f, "%.0f");
+		bChanged |= DragFloatTyped("Reel-out cm/s", &Winch.ReelOutSpeed, 1.0f, 0.0f, 1000.0f, "%.0f");
 		bChanged |= DragFloatTyped("Min rest cm", &Winch.MinRestLength, 1.0f, 0.0f, 2000.0f, "%.0f");
 		bChanged |= DragFloatTyped("Stiffness N/m", &Winch.CableStiffness, 1000.0f, 0.0f, 2000000.0f, "%.0f");
 		bChanged |= DragFloatTyped("Damping N*s/m", &Winch.CableDamping, 100.0f, 0.0f, 500000.0f, "%.0f");
@@ -158,7 +160,7 @@ namespace B1ImGui
 		DrawBar("Length m", Winch->GetCurrentLength() / 100.0f, Winch->MaxCableLength / 100.0f);
 		ImGui::Text("Rest %.2f m", Winch->GetRestLength() / 100.0f);
 		DrawBar("Tension kN", Winch->GetTension() / 1000.0f, Winch->MaxPullForce / 1000.0f);
-		ImGui::Text("Pull %3.0f %%", Winch->Pull * 100.0f);
+		ImGui::Text("Pull %+4.0f %% (%s)", Winch->Pull * 100.0f, Winch->Pull > 0.0f ? "in" : Winch->Pull < 0.0f ? "out" : "hold");
 
 		const UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Vehicle);
 		const bool bTag = ASC && Winch->WinchingTag.IsValid() && ASC->HasMatchingGameplayTag(Winch->WinchingTag);

@@ -49,12 +49,14 @@ struct FB1WinchSimInput
 	uint32 AttachSerial = 0;
 	float InitialRestLength = 0.0f;
 
-	/** [0, 1] */
+	/** [-1, 1]; negative reels out */
 	float Pull = 0.0f;
 
 	float MaxPullForce = 0.0f;
 	float ReelInSpeed = 0.0f;
+	float ReelOutSpeed = 0.0f;
 	float MinRestLength = 0.0f;
+	float MaxCableLength = 0.0f;
 	/** N/m */
 	float Stiffness = 0.0f;
 	/** N*s/m */

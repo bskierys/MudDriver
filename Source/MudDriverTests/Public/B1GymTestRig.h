@@ -51,8 +51,8 @@ struct FB1GymInputStep
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	bool bParked = false;
 
-	/** Winch reel-in fraction for this step; needs the rig's WinchAnchor */
-	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (ClampMin = "0", ClampMax = "1"))
+	/** Winch pull for this step, negative reels out; needs the rig's WinchAnchor */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (ClampMin = "-1", ClampMax = "1"))
 	float WinchPull = 0.0f;
 
 	/** Pressed through player 0's controller at step start, released at its end; needs bPossessWithPlayer */
@@ -92,6 +92,10 @@ struct FB1GymThresholds
 	/** Speed on the last sample */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m/s"))
 	float MaxEndSpeed = -1.0f;
+
+	/** Peak speed during the last input step */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m/s"))
+	float MaxLastStepSpeed = -1.0f;
 
 	/** Peak vertical chassis speed, a jitter / explosion indicator */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m/s"))
@@ -153,6 +157,14 @@ struct FB1GymThresholds
 	/** Tension range (max − min) during the last input step */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "N"))
 	float MaxTensionOscillation = -1.0f;
+
+	/** Lowest tension during the last input step; above 0 means the cable stayed taut */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "N"))
+	float MinLastStepTension = -1.0f;
+
+	/** Cable rest length at script end */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
+	float MaxRestLength = -1.0f;
 
 	/** Peak winch point to anchor distance */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
@@ -346,6 +358,7 @@ private:
 	/** N, peak of the summed per-wheel slope pull */
 	float MaxSlopePull = 0.0f;
 	float EndSpeed = 0.0f;
+	float LastStepMaxSpeed = 0.0f;
 
 	FVector LastStepStart = FVector::ZeroVector;
 	bool bInLastStep = false;

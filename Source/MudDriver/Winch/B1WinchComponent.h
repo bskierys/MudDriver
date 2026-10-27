@@ -35,6 +35,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Winch|Config", meta = (Units = "cm/s", ClampMin = "0"))
 	float ReelInSpeed = 100.0f;
 
+	/** Rest length growth rate at full reel-out, up to MaxCableLength; not limited by the stall */
+	UPROPERTY(EditAnywhere, Category = "Winch|Config", meta = (Units = "cm/s", ClampMin = "0"))
+	float ReelOutSpeed = 100.0f;
+
 	/** Reel-in stops here, short of the bumper */
 	UPROPERTY(EditAnywhere, Category = "Winch|Config", meta = (Units = "cm", ClampMin = "0"))
 	float MinRestLength = 150.0f;
@@ -64,8 +68,8 @@ public:
 	UPROPERTY(EditInstanceOnly, Category = "Winch|Debug")
 	TObjectPtr<AActor> StartAnchor;
 
-	/** Reel-in speed as a fraction of ReelInSpeed, [0, 1]. Input writes it every frame; editable for placed vehicles */
-	UPROPERTY(EditAnywhere, Category = "Winch|Debug", meta = (ClampMin = "0", ClampMax = "1"))
+	/** [-1, 1]: positive reels in (fraction of ReelInSpeed), negative reels out. Input writes it every frame; editable for placed vehicles */
+	UPROPERTY(EditAnywhere, Category = "Winch|Debug", meta = (ClampMin = "-1", ClampMax = "1"))
 	float Pull = 0.0f;
 
 	/** Rest length = current distance. False when the anchor is out of MaxCableLength */
@@ -79,7 +83,7 @@ public:
 	void ToggleAttachNearest();
 
 	UFUNCTION(BlueprintCallable, Category = "Winch")
-	void SetPull(float NewPull) { Pull = FMath::Clamp(NewPull, 0.0f, 1.0f); }
+	void SetPull(float NewPull) { Pull = FMath::Clamp(NewPull, -1.0f, 1.0f); }
 
 	/** Nearest anchor within MaxCableLength in this world */
 	UB1WinchAnchorComponent* FindNearestAnchor() const;

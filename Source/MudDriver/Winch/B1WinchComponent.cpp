@@ -69,7 +69,9 @@ void UB1WinchComponent::SendSimInput()
 		Input.Pull = Pull;
 		Input.MaxPullForce = MaxPullForce;
 		Input.ReelInSpeed = ReelInSpeed;
+		Input.ReelOutSpeed = ReelOutSpeed;
 		Input.MinRestLength = MinRestLength;
+		Input.MaxCableLength = MaxCableLength;
 		Input.Stiffness = CableStiffness;
 		Input.Damping = CableDamping;
 	}

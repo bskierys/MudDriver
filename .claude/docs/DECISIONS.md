@@ -158,6 +158,12 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 **Accepted 2026-10-27 (S3-15/16).** Stability rigs pass at 20 and 120 fps with the same tension (21.1 kN peak, ~1 kN range in the last 3 s). After the playtest the user tuned `BP_B1Jeep` to `MaxPullForce` 60 kN and `MaxCableLength` 8000 cm (80 m, S4-01); winch, slope and flat suites all pass with these values.
 - **Snatch overrun = drum slip (user, 2026-10-27).** Tension stays capped while a cable is being stretched, so a jeep that drives into a taut cable at speed pulls cable off the drum (`B1Winch_CableSnatch`: 4.9 m past a 77.8 m rest at 60 kN). Accepted as a slipping drum brake; no hold cap above `MaxPullForce`.
 
+**Amended 2026-10-27 (S4-13, reel-out).**
+- **Signed pull.** Pull is −1..1. Positive reels in as before. Negative grows the rest length at `ReelOutSpeed × |pull|` up to `MaxCableLength`, and ignores the stall, so a jeep hanging on the cable descends at reel speed. `Vehicle.State.Winching` stays reel-in only.
+- **Reel-out damping.** While paying out, damping acts on the stretch rate (body speed minus payout rate). Damping on body speed alone read a steady 3 m/s descent as 60 kN and snatched the jeep in a loop. Reel-in keeps body-speed damping so tension still ramps up (applying stretch-rate damping there stepped every pull to the cap).
+- **Start-up overshoot accepted (user).** A full reel-out step lets the hanging jeep lag, then catch the cable: on the medium slope it peaks at 4.3 m/s in the first seconds, then holds 3.0 m/s with steady tension. No payout ramp.
+- **Input.** Detach has its own action (`IA_B1WinchDetach`, Q / pad Y). Attaching from the seat ends; `B1WinchAttachNearest` and the Winch window's Attach button stay as debug until the on-foot hook carry (S4-07). Pull: arrow Up/Down, D-pad Up/Down.
+
 ---
 
 ## ADR-008 — Mud trails are visual only

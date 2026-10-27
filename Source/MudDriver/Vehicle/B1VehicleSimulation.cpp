@@ -51,9 +51,15 @@ void FB1VehicleSimulation::UpdateWinch(const FB1WinchSimInput& Input, const Chao
 
 	// The drum stalls at the cap, so the cable never stores more stretch than MaxPullForce.
 	const float SpringForce = Input.Stiffness * (Winch.Length - Winch.RestLength) / CmPerM;
+	const float PreviousRestLength = Winch.RestLength;
 	if (Input.Pull > 0.0f && SpringForce < Input.MaxPullForce)
 	{
 		Winch.RestLength = FMath::Max(Winch.RestLength - Input.ReelInSpeed * Input.Pull * DeltaTime, Input.MinRestLength);
+	}
+	// Reel-out ignores the stall, so a jeep hanging on the cable descends at reel speed.
+	else if (Input.Pull < 0.0f)
+	{
+		Winch.RestLength = FMath::Max(Winch.RestLength, FMath::Min(Winch.RestLength - Input.ReelOutSpeed * Input.Pull * DeltaTime, Input.MaxCableLength));
 	}
 
 	const float Stretch = (Winch.Length - Winch.RestLength) / CmPerM;
@@ -65,9 +71,13 @@ void FB1VehicleSimulation::UpdateWinch(const FB1WinchSimInput& Input, const Chao
 	const FVector CenterOfMass = BodyTransform.TransformPosition(Handle->CenterOfMass());
 	const FVector PointVelocity = Handle->V() + FVector::CrossProduct(Handle->W(), WinchPoint - CenterOfMass);
 	const float ClosingSpeed = FVector::DotProduct(PointVelocity, Direction) / CmPerM;
+	// On reel-out, damp the stretch rate: a jeep following the drum doesn't stretch the cable. Reel-in keeps body-speed damping so tension ramps (ADR-007).
+	const float PayoutRate = FMath::Max(0.0f, Winch.RestLength - PreviousRestLength);
+	const float RestRate = DeltaTime > 0.0f ? PayoutRate / DeltaTime / CmPerM : 0.0f;
+	const float StretchRate = -ClosingSpeed - RestRate;
 
 	// One-sided: damping can weaken the pull but never push.
-	Winch.Tension = FMath::Clamp(Input.Stiffness * Stretch - Input.Damping * ClosingSpeed, 0.0f, Input.MaxPullForce);
+	Winch.Tension = FMath::Clamp(Input.Stiffness * Stretch + Input.Damping * StretchRate, 0.0f, Input.MaxPullForce);
 	Winch.Force = Direction * Winch.Tension;
 }
 

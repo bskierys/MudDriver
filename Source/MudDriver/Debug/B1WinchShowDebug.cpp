@@ -86,7 +86,7 @@ namespace B1WinchShowDebug
 		{
 			Lines.Add(FString::Printf(TEXT("winch  not attached  max %.0f m"), Winch.MaxCableLength / 100.0f));
 		}
-		Lines.Add(FString::Printf(TEXT("pull %3.0f %%"), Winch.Pull * 100.0f));
+		Lines.Add(FString::Printf(TEXT("pull %+4.0f %%"), Winch.Pull * 100.0f));
 		DrawLines(Canvas, Winch.GetComponentLocation() + FVector(0.0f, 0.0f, WinchTextHeight), Lines, FColor(255, 120, 120));
 
 		if (bDrawAnchors)
