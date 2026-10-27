@@ -131,7 +131,7 @@ public class NetImgui : ModuleRules
         //---------------------------------------------------------------------
         // Will load Japanese font 
         // Note: If not using Japanese, set this to false, saves on memory (avoids 6MB font data table source include)
-        bool bFontJapanese_Enabled = true;
+        bool bFontJapanese_Enabled = false; // MudDriver: off, font source dropped from the repo
 		//---------------------------------------------------------------------
 
 		// Will load the 'Kenney Game Icons' font

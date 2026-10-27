@@ -6,6 +6,8 @@ DerivedDataCache/
 Build/
 Plugins/**/Binaries/
 Plugins/**/Intermediate/
+Plugins/**/Saved/
+Plugins/**/DerivedDataCache/
 
 # IDE / solution files (regenerated from .uproject)
 .vs/
@@ -18,6 +20,8 @@ Plugins/**/Intermediate/
 *.sdf
 *.VC.db
 *.VC.opendb
+*.DotSettings.user
+*.code-workspace
 
 # Compiled / build artifacts
 *.pdb

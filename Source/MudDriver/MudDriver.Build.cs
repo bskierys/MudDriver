@@ -30,8 +30,6 @@ public class MudDriver : ModuleRules
 			"MudDriver/SportsCar",
 			"MudDriver/OffroadCar",
 			"MudDriver/Variant_OffRoad",
-			"MudDriver/Variant_TimeTrial",
-			"MudDriver/Variant_TimeTrial/UI",
 			"MudDriver/Debug",
 			"MudDriver/Fuel",
 			"MudDriver/GAS",
