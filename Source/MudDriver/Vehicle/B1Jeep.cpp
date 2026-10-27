@@ -8,12 +8,15 @@
 #include "B1MudSprayComponent.h"
 #include "B1MudTrailComponent.h"
 #include "B1WinchComponent.h"
+#include "B1WinchShowDebug.h"
 #include "B1Log.h"
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "GameFramework/Controller.h"
+#include "GameFramework/HUD.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 
 AB1Jeep::AB1Jeep(const FObjectInitializer& ObjectInitializer)
@@ -100,6 +103,10 @@ void AB1Jeep::DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo&
 	Super::DrawShowDebug(HUD, Canvas, DisplayInfo, YL, YPos);
 
 	B1MudShowDebug::DrawVehicle(Canvas, DisplayInfo, *MudVehicle);
+
+	// Anchors only for the viewer's own vehicle, so rig jeeps don't draw them again.
+	const bool bViewerVehicle = HUD && HUD->PlayerOwner && HUD->PlayerOwner->GetPawn() == this;
+	B1WinchShowDebug::Draw(Canvas, DisplayInfo, *Winch, bViewerVehicle);
 }
 
 void AB1Jeep::UnPossessed()

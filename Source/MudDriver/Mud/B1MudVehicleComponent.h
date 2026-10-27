@@ -44,6 +44,9 @@ public:
 	/** N pulling the wheel down a muddy slope, from the latest physics step */
 	float GetWheelSlopePull(int32 WheelIndex) const;
 
+	/** N along the wheel forward that rolling resistance caps against (tire, gravity, external force, slope pull); 0 off mud */
+	float GetWheelNetPush(int32 WheelIndex) const;
+
 	/** cm the average sink depth is past BellyClearance */
 	float GetBellyDepth() const { return SimOutput.BellyDepth; }
 

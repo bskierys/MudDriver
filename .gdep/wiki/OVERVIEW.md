@@ -16,8 +16,8 @@ stale: false
 
 | Metric | Value |
 |--------|-------|
-| Files | **55** |
-| Classes | **56** |
+| Files | **56** |
+| Classes | **57** |
 | Circular deps | **0** |
 | Dead code candidates | **0** |
 

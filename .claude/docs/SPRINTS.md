@@ -680,27 +680,38 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
 
 ### Debug + rigs
 
-- [ ] **S3-11** Rig winch support + metrics (2.5 h) _(requires S3-08)_
+- [x] **S3-11** Rig winch support + metrics (2.5 h) _(requires S3-08)_ <!-- done: 2026-10-27 -->
+  Result: rig `WinchAnchor` (actor with a `UB1WinchAnchorComponent`; attached at script start, error if out of reach), `WinchPull` per step, detach at finish. Rig line `tensionMax= tensionOsc= anchorDistMax= rest=`; thresholds `MaxTension`, `MaxTensionOscillation` (range in the last step), `MaxAnchorDistance`. New `B1Winch_FirmPull` (`B1Tests/Winch`, X 0 Y −50 m, tree `Tree_FirmPull` 20 m ahead): 12 s handbrake + full brake + full pull → dragged 11.8 m at 1 m/s, tensionMax 18.6 kN, PASS headless (`s311.log`). Firm rigs sit at endH ≈ −0.98 (rig 1 m above the floor).
   `AB1GymTestRig`: optional `WinchAnchor` actor (attached at script start, rest length = distance), `WinchPull` per input step. Metrics `tensionMax`, `tensionOsc` (tension amplitude over the last step), `anchorDistMax` and thresholds.
   **Done:** builds; the S3-08 rig uses the new fields and prints the metrics.
   **User check:** —
 
-- [ ] **S3-12** NetImGui "Winch" window + telemetry (2.5 h) _(requires S3-08)_
+- [x] **S3-12** NetImGui "Winch" window + telemetry (2.5 h) _(requires S3-08)_ <!-- done: 2026-10-27 -->
+  Result: `B1ImGui::DrawWinch` (`Debug/B1ImGuiWinch`, Debug → Winch) on the player pawn's winch: anchor or nearest anchor + distance, Attach nearest / Detach, length / max and tension / cap bars, rest, pull %, `Vehicle.State.Winching` on/off, a per-wheel table (net push, drag, slope pull) + belly drag, and typed fields for every `Winch|Config` float. Edits are live on the jeep; "Save to asset" copies them to the BP's component template (archetype) and saves `BP_B1Jeep`. New mud sim output `NetPush` per wheel (`UB1MudVehicleComponent::GetWheelNetPush`, what rolling resistance caps against; no host change). CVar `b1.Winch.Telemetry` → `B1Winch <vehicle> anchor= len= rest= tension= pull=` on `LogB1Physics` at 2 Hz while attached (from `AMudDriverPawn::LogTelemetry`); seen in the headless `B1Winch_FirmPull` run (`s312.log`).
   Debug → Winch: attached anchor, length / max, tension bar vs cap, pull %, `Winching` tag, per-wheel net push vs drag; live-edit of the winch params (typed fields, save to asset per `imgui.md`); Attach nearest / Detach buttons. CVar `b1.Winch.Telemetry`: `B1Winch <vehicle> anchor= len= rest= tension= pull=` to `LogB1Physics` at 2 Hz while attached.
   **Done:** builds; the telemetry line appears in a headless winch rig run.
   **User check:** the window reads well while winching; tune `MaxPullForce` live.
 
-- [ ] **S3-13** `ShowDebug B1Winch` (1 h) _(requires S3-08)_
+- [x] **S3-13** `ShowDebug B1Winch` (1 h) _(requires S3-08)_ <!-- done: 2026-10-27 -->
+  Result: `Debug/B1WinchShowDebug` (category `B1Winch`), called from `AB1Jeep::DrawShowDebug`. Above the winch point (+1 m): anchor label, tension / cap kN, length / max m, rest, pull %; "not attached" otherwise. For the viewer's own pawn only, each anchor within 50 m of the winch: label, distance, hooked / in range (green) / out of range (grey). Builds; not run (user check).
   Over the jeep: tension / cap, length / max, pull. Over each anchor within 50 m: name, distance, in range or not. Same binding pattern as `B1VehicleShowDebug`.
   **Done:** builds.
   **User check:** `ShowDebug B1Winch` readable, toggles off.
 
-- [ ] **S3-14** Deep strip lane + anchors (1.5 h) _(requires S3-05, S3-07)_
+- [x] **S3-14** Deep strip lane + anchors (1.5 h) _(requires S3-05, S3-07)_ <!-- done: 2026-10-27 -->
+  Result: `Mud_DeepStrip` (X 10..30 m, Y −30, deep, 70 cm bottom, 300 cm ramps all round) in a gap cut by splitting `G_Floor` into four tiles; `Tree_DeepStrip` at X 40 m; `Tree_MediumSlope` / `Tree_DeepSlope` replace the plateau posts; `Spawn_4_DeepStrip` + label. Traces: floor 0, strip bottom −70 cm, ramps in between. Viewport capture checked; layout in ARCHITECTURE.md (Winch gym). ⚠️ The slope trees are ~48 m from the slope foot, past the 40 m cable, so slope winching starts from ~10 m up the slope.
   Deep (XL) patch with ramps in `Lvl_Gym_Winch`, `BP_B1WinchTree` ~10 m past the far ramp; trees at the S3-05 anchor spots on the medium and deep slopes.
   **Done:** viewport capture; ARCHITECTURE.md lists the anchors.
   **User check:** —
 
-- [ ] **S3-15** Winch rig suite (3 h) _(requires S3-06, S3-10, S3-11, S3-14)_
+- [x] **S3-15** Winch rig suite (3 h) _(requires S3-06, S3-10, S3-11, S3-14)_ <!-- done: 2026-10-27 -->
+  Result: 8/8 PASS headless (`s315_winch.log`), slope 8/8 (`s315_winchgym.log`), `Lvl_Gym_Mud` 22/22, `Lvl_Offroad` 8/8 (FullThrottle5s 89.0 m, unchanged). Rigs in `B1Tests/Winch`:
+  - `Stability20/120` (strip X 15 m; 3 s full, 7 + 3 s full pull, zero throttle): tensionMax 21.1 kN, tensionOsc (last 3 s) 1.02 / 1.03 kN, peakOsc 0.64 / 0.65, same at both rates. Limits: tension 42 kN, tensionOsc 2 kN, peakOsc 0.7, not 0.5: the no-winch deep rigs (`B1Mud_DeepFullThrottle`, `SinkDeepStop`) show 0.655 from the drop into deep at script start.
+  - `CableLimit` (firm lane, 38.3 m from `Tree_FirmPull`, 8 s at 50 % away): anchorDistMax 38.31 (limit 40.5). Trivial: rest = distance at attach, so the jeep can't move.
+  - `CableSnatch` (measurement only, no thresholds): 3 s reverse toward the tree, then 50 % away. Hits the end at speed and overruns to 42.7 m (rest 38.3, max 40), since tension is capped at `MaxPullForce` even while the cable is being stretched. See backlog.
+  - `DeepStrip` (dig in 3 s, then 20 s 50 % + full pull): dist 24.7, endH −0.99 (firm), belly peak 7.4 kN.
+  - `SlopeMedium` / `SlopeDeep` (on the slope 15 m up from the foot, the trees are out of reach from the run-up; 50 % + full pull): endH 7.93 in 30 s / 8.09 in 45 s (plateau ≈ 8.1), tension hits the 40 kN cap.
+  - `FirmPull` (S3-11).
   - `B1Winch_Stability20/120`: full pull against a jeep stuck in deep at `MaxFPS` 20 and 120: `tensionMax` ≤ cap + 5 %, `tensionOsc` non-growing, `peakOsc` ≤ 0.5.
   - `B1Winch_CableLimit`: drive away from the anchor at 50 %: `anchorDistMax` ≤ `MaxCableLength` + 0.5 m.
   - `B1Winch_DeepStrip`: dig in, then full pull + 50 %: `endH` back at firm height past the far ramp in ≤ 20 s.
@@ -709,9 +720,14 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** all PASS headless; slope and flat suites PASS.
   **User check:** —
 
+### Backlog (found during the sprint)
+
+- **Winch snatch overrun** (S3-15, decide at S3-16): tension is clamped to `MaxPullForce` (40 kN) in every case, so a jeep driving into a taut cable at ~7 m/s stretches it 4.4 m past rest (`B1Winch_CableSnatch`, 42.7 m vs the 40 m `MaxCableLength`). Options: cap only the drum's reel-in force and let a stretched cable hold with full stiffness (or a higher hold cap); or accept it (a slipping drum brake).
+
 ### Close
 
-- [ ] **S3-16** Mud + winch checkpoint playtest (user + agent, 1–2 h) _(requires S3-09, S3-12, S3-15)_
+- [x] **S3-16** Mud + winch checkpoint playtest (user + agent, 1–2 h) _(requires S3-09, S3-12, S3-15)_ <!-- done: 2026-10-27 -->
+  Result: you playtested and saved `BP_B1Jeep` winch defaults from the Winch window: `MaxPullForce` 60 kN (was 40), `MaxCableLength` 80000 cm (was 4000; trees hooked at 49–52 m in the playtest). The rig tension limit is now cap + 5 % = 63 kN. Headless with the tuned values: winch gym 16/16 (slope 8 + winch 8, `s316_winchgym.log`), `Lvl_Gym_Mud` 22/22, `Lvl_Offroad` 8/8. Slope winching now hits the 60 kN cap; medium reaches the plateau (endH 7.95), and so does deep (8.09). Snatch overrun 41.2 m (rest 38.3). ADR-007 → accepted. ✅ Sign-off: you asked to proceed after the playtest.
   You get stuck in the deep strip and on the medium and deep slopes, attach by cheat, and winch out and up from the car. Tune winch params and the hold curve live; the agent writes them back and re-runs S3-06 and S3-15.
   **Done:** both winch and slope suites PASS with the tuned values; ADR-007 → accepted.
   **User check:** sign-off: "mud + winch works". On foot starts only after this.

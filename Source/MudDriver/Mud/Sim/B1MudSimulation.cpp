@@ -54,6 +54,7 @@ void FB1MudSimulation::EndStep(UChaosWheeledVehicleSimulation& Vehicle, float De
 	LatestOutput.MudFrictionScale = MudFrictionScale;
 	LatestOutput.RollingResistance = RollingResistance;
 	LatestOutput.SlopePull = SlopePull;
+	LatestOutput.NetPush = WheelNetPush;
 	LatestOutput.BellyDepth = BellyDepth;
 	LatestOutput.BellyDrag = BellyDrag;
 	LatestOutput.MudGroundUpZ = MudGroundUpZ;
@@ -169,6 +170,7 @@ void FB1MudSimulation::ApplyRollingResistance(UChaosWheeledVehicleSimulation& Ve
 	const int32 NumWheels = Vehicle.PVehicle->Wheels.Num();
 	RollingResistance.Init(0.0f, NumWheels);
 	SlopePull.Init(0.0f, NumWheels);
+	WheelNetPush.Init(0.0f, NumWheels);
 	if (NumWheelsInContact == 0 || DeltaTime <= 0.0f)
 	{
 		return;
@@ -208,6 +210,8 @@ void FB1MudSimulation::ApplyRollingResistance(UChaosWheeledVehicleSimulation& Ve
 			NetPush += FVector::DotProduct(Pull, WheelForward);
 			SlopePull[WheelIdx] = Pull.Size() / B1MudWheelModel::NewtonsToUnreal;
 		}
+
+		WheelNetPush[WheelIdx] = NetPush / B1MudWheelModel::NewtonsToUnreal;
 
 		// Opposes motion, or at standstill the net push, like static friction, so a spinning wheel can't creep.
 		const float MotionSign = FMath::Abs(RoadSpeed) > B1MudWheelModel::StandstillSpeed ? FMath::Sign(RoadSpeed) : FMath::Sign(NetPush);

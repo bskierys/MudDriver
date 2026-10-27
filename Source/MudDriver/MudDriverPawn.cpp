@@ -14,6 +14,7 @@
 #include "B1Log.h"
 #include "B1VehicleTelemetry.h"
 #include "B1MudVehicleComponent.h"
+#include "B1WinchComponent.h"
 #include "B1VehicleShowDebug.h"
 #include "GameFramework/HUD.h"
 #include "TimerManager.h"
@@ -336,6 +337,12 @@ void AMudDriverPawn::LogTelemetry()
 	if (B1VehicleTelemetry::IsStatusEnabled())
 	{
 		B1VehicleTelemetry::LogStatus(*this);
+	}
+
+	const UB1WinchComponent* Winch = B1VehicleTelemetry::IsWinchEnabled() ? FindComponentByClass<UB1WinchComponent>() : nullptr;
+	if (Winch)
+	{
+		B1VehicleTelemetry::LogWinch(*Winch);
 	}
 }
 

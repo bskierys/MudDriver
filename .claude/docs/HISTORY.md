@@ -870,3 +870,34 @@ With the slopes signed off, the winch came next: components and a cable visual (
 - No trees in the gyms yet (S3-14); user tests by dropping `BP_B1WinchTree` into a level.
 - Pad pull is digital (D-pad); analog pull only if a trigger gets mapped later.
 - Next: S3-11 rig winch support.
+## 2026-10-27 — Winch debug, deep strip, winch rigs, checkpoint (S3-11..S3-16)
+
+### Context
+The winch pulled (S3-08..S3-10) but had no rig support, debug UI or gym layout. This session built S3-11..S3-15 in one go with the user's checks batched into the S3-16 playtest. The user then playtested, tuned the winch from the new window and asked to close the checkpoint.
+
+### What was built
+- Rig winch support (S3-11): `WinchAnchor`, per-step `WinchPull`, metrics `tensionMax / tensionOsc / anchorDistMax / rest` and thresholds; detach at finish.
+- Winch ImGui window (S3-12, `Debug/B1ImGuiWinch`): anchor, attach/detach, length and tension bars, tag, per-wheel net push vs drag, typed params with "Save to asset" into the BP component archetype. New mud sim output `NetPush` per wheel. CVar `b1.Winch.Telemetry` (`B1Winch` line).
+- `ShowDebug B1Winch` (S3-13, `Debug/B1WinchShowDebug`).
+- `Lvl_Gym_Winch` (S3-14): deep strip `Mud_DeepStrip` in a gap cut by splitting the floor into four tiles, trees at the strip and on the plateau (posts removed), `Spawn_4_DeepStrip`.
+- Winch rig suite (S3-15, `B1Tests/Winch`): FirmPull, Stability20/120, CableLimit, CableSnatch (measurement), DeepStrip, SlopeMedium, SlopeDeep.
+- S3-16: user's tuning on `BP_B1Jeep` (60 kN, 80000 cm cable); rig tension limit 63 kN; all suites PASS (winch gym 16/16, gym 22/22, offroad 8/8). ADR-007 accepted.
+
+### Decisions made
+- ADR-007 accepted (stability rigs pass; same tension at 20 and 120 fps).
+- Stability `MaxPeakOscillation` is 0.7, not 0.5: the deep-mud rigs without a winch show 0.655 from the drop into deep at script start.
+- Slope winch rigs start 15 m up the slope: the plateau trees are about 48 m from the slope foot, which was past the 40 m cable.
+- Winch window edits are live on the jeep; Save copies them to the BP's component archetype (the component isn't an asset object).
+
+### What we learned
+- Tension is clamped at `MaxPullForce` even while the cable is being stretched, so driving into a taut cable overruns it (`B1Winch_CableSnatch`: 42.7 m at 40 kN, 41.2 m at 60 kN, rest 38.3).
+- Because rest = distance at attach, `CableLimit` from standstill can't move the jeep at all; it only proves the trivial case.
+- MCP: `save_actor` and `save_assets([actor package])` fail with "Asset does not exist" on these OFPA rig packages, even when they're on disk; only `save_assets([])` wrote them. `set_properties` on `InputScript` needs the same-size write first (scripted helper does that).
+- `FCStringAnsi::Snprintf` needs a literal format (static_assert); UE treats a local shadowing a member as an error, so the sim member is `WheelNetPush`.
+- On firm ground a rig 1 m above the floor reads `endH ≈ −0.98`; the jeep's actor origin sits at the ground.
+
+### Open follow-ups
+- Winch snatch overrun (Sprint 3 backlog): cap only the reel-in force and let a stretched cable hold harder, or accept it as drum slip.
+- `MaxCableLength` on `BP_B1Jeep` is 80000 cm (800 m); trees were hooked at 49–52 m, so 8000 may have been meant. Confirm.
+- `ShowDebug B1Winch` hasn't been seen on screen by the agent.
+- Next: Sprint 4 (on foot).

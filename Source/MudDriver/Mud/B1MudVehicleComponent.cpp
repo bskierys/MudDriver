@@ -201,6 +201,11 @@ float UB1MudVehicleComponent::GetWheelSlopePull(int32 WheelIndex) const
 	return SimOutput.SlopePull.IsValidIndex(WheelIndex) ? SimOutput.SlopePull[WheelIndex] : 0.0f;
 }
 
+float UB1MudVehicleComponent::GetWheelNetPush(int32 WheelIndex) const
+{
+	return SimOutput.NetPush.IsValidIndex(WheelIndex) ? SimOutput.NetPush[WheelIndex] : 0.0f;
+}
+
 float UB1MudVehicleComponent::GetAverageSinkDepth() const
 {
 	const int32 NumWheels = GetNumWheels();

@@ -5,6 +5,8 @@
 #include "B1VehicleAttributeSet.h"
 #include "B1VehicleMovementComponent.h"
 #include "B1MudVehicleComponent.h"
+#include "B1WinchAnchorComponent.h"
+#include "B1WinchComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -150,9 +152,31 @@ void AB1GymTestRig::StartTest()
 	StretchFirst = FFloatInterval();
 	StretchLast = FFloatInterval();
 
+	MaxTension = 0.0f;
+	LastStepTension = FFloatInterval();
+	MaxAnchorDistance = 0.0f;
+
 	if (TestForce != EB1TestForce::Off)
 	{
 		B1Movement->SetTestForce(TestForce);
+	}
+
+	Winch = nullptr;
+	if (WinchAnchor)
+	{
+		UB1WinchComponent* VehicleWinch = Vehicle->FindComponentByClass<UB1WinchComponent>();
+		UB1WinchAnchorComponent* Anchor = WinchAnchor->FindComponentByClass<UB1WinchAnchorComponent>();
+		if (!VehicleWinch || !Anchor)
+		{
+			FinishTest(EFunctionalTestResult::Error, TEXT("WinchAnchor needs a UB1WinchComponent on the vehicle and a UB1WinchAnchorComponent on the anchor"));
+			return;
+		}
+		if (!VehicleWinch->AttachTo(Anchor))
+		{
+			FinishTest(EFunctionalTestResult::Error, TEXT("WinchAnchor is out of the cable's reach"));
+			return;
+		}
+		Winch = VehicleWinch;
 	}
 
 	TimeInMud = 0.0f;
@@ -208,6 +232,12 @@ void AB1GymTestRig::FinishTest(EFunctionalTestResult TestResult, const FString& 
 	}
 	PreviousPlayerPawn = nullptr;
 
+	if (Winch)
+	{
+		Winch->Detach();
+		Winch = nullptr;
+	}
+
 	Super::FinishTest(TestResult, Message);
 }
 
@@ -261,6 +291,10 @@ void AB1GymTestRig::ApplyInput(const FB1GymInputStep& Step)
 	Movement->SetSteeringInput(Step.Steer);
 	Movement->SetBrakeInput(Step.Brake);
 	Movement->SetHandbrakeInput(Step.bHandbrake);
+	if (Winch)
+	{
+		Winch->SetPull(Step.WinchPull);
+	}
 }
 
 void AB1GymTestRig::Sample(float DeltaSeconds)
@@ -295,6 +329,17 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 	if (AbilitySystem && AbilitySystem->HasMatchingGameplayTag(B1GameplayTags::Vehicle_State_InMud))
 	{
 		TimeInMud += DeltaSeconds;
+	}
+
+	if (Winch)
+	{
+		const float Tension = Winch->GetTension();
+		MaxTension = FMath::Max(MaxTension, Tension);
+		MaxAnchorDistance = FMath::Max(MaxAnchorDistance, Winch->GetCurrentLength());
+		if (bInLastStep)
+		{
+			LastStepTension.Include(Tension);
+		}
 	}
 
 	StuckTimer = Speed < StuckSpeed ? StuckTimer + DeltaSeconds : 0.0f;
@@ -416,6 +461,30 @@ void AB1GymTestRig::FinishScript()
 		SinkMetrics = TEXT(" sink=") + FString::Join(PerWheel, TEXT("/")) + FString::Printf(TEXT(" belly=%.0f pull=%.0f"), MaxBellyDrag, MaxSlopePull);
 	}
 
+	FString WinchMetrics;
+	if (Winch)
+	{
+		const float TensionOscillation = LastStepTension.IsValid() ? LastStepTension.Size() : 0.0f;
+		const float AnchorDistance = MaxAnchorDistance / CmPerM;
+		if (Thresholds.MaxTension >= 0.0f && MaxTension > Thresholds.MaxTension)
+		{
+			Failures.Add(FString::Printf(TEXT("tensionMax>%.0f"), Thresholds.MaxTension));
+		}
+		if (Thresholds.MaxTensionOscillation >= 0.0f && TensionOscillation > Thresholds.MaxTensionOscillation)
+		{
+			Failures.Add(FString::Printf(TEXT("tensionOsc>%.0f"), Thresholds.MaxTensionOscillation));
+		}
+		if (Thresholds.MaxAnchorDistance >= 0.0f && AnchorDistance > Thresholds.MaxAnchorDistance)
+		{
+			Failures.Add(FString::Printf(TEXT("anchorDistMax>%.2f"), Thresholds.MaxAnchorDistance));
+		}
+
+		WinchMetrics = FString::Printf(TEXT(" tensionMax=%.0f tensionOsc=%.0f anchorDistMax=%.2f rest=%.2f"),
+			MaxTension, TensionOscillation, AnchorDistance, Winch->GetRestLength() / CmPerM);
+		Winch->Detach();
+		Winch = nullptr;
+	}
+
 	FString FuelMetrics;
 	if (AbilitySystem)
 	{
@@ -448,9 +517,9 @@ void AB1GymTestRig::FinishScript()
 
 	const bool bPassed = Failures.Num() == 0;
 	const FString Name = TestLabel.IsEmpty() ? GetName() : TestLabel;
-	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f maxH=%.2f avgDt=%.4f frames=%d%s%s%s%s%s"),
+	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f maxH=%.2f avgDt=%.4f frames=%d%s%s%s%s%s%s"),
 		*Name, bPassed ? TEXT("PASS") : TEXT("FAIL"),
-		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, PeakHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics, *FuelMetrics,
+		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, PeakHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics, *WinchMetrics, *FuelMetrics,
 		bPassed ? TEXT("") : TEXT(" failed="), *FString::Join(Failures, TEXT(",")));
 
 	UE_LOG(LogB1Test, Display, TEXT("%s"), *Line);

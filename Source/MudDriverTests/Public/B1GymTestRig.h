@@ -10,6 +10,7 @@ class UChaosWheeledVehicleMovementComponent;
 class UB1VehicleMovementComponent;
 class UB1MudVehicleComponent;
 class UB1AbilitySystemComponent;
+class UB1WinchComponent;
 
 USTRUCT(BlueprintType)
 struct FB1GymInputStep
@@ -34,6 +35,10 @@ struct FB1GymInputStep
 	/** Runs B1Unstuck when the step starts; needs a UB1MudVehicleComponent */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	bool bUnstuck = false;
+
+	/** Winch reel-in fraction for this step; needs the rig's WinchAnchor */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (ClampMin = "0", ClampMax = "1"))
+	float WinchPull = 0.0f;
 };
 
 /** Pass criteria. Negative values disable a check */
@@ -105,6 +110,18 @@ struct FB1GymThresholds
 
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (InlineEditConditionToggle))
 	bool bCheckPeakHeight = false;
+
+	/** Peak cable tension; needs WinchAnchor */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "N"))
+	float MaxTension = -1.0f;
+
+	/** Tension range (max − min) during the last input step */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "N"))
+	float MaxTensionOscillation = -1.0f;
+
+	/** Peak winch point to anchor distance */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
+	float MaxAnchorDistance = -1.0f;
 };
 
 /**
@@ -167,6 +184,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
 	bool bDisableVehicleSleep = false;
 
+	/** The vehicle's winch hooks this actor's anchor at script start (rest = distance); steps set WinchPull */
+	UPROPERTY(EditInstanceOnly, Category = "B1Test|Config")
+	TObjectPtr<AActor> WinchAnchor;
+
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
 	FB1GymThresholds Thresholds;
 
@@ -204,6 +225,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UB1MudVehicleComponent> MudVehicle;
+
+	/** Set only while the rig's WinchAnchor is hooked */
+	UPROPERTY(Transient)
+	TObjectPtr<UB1WinchComponent> Winch;
 
 	/** Player 0's pawn before bPossessWithPlayer took over; possessed again when the test finishes */
 	UPROPERTY(Transient)
@@ -245,6 +270,12 @@ private:
 
 	FVector LastStepStart = FVector::ZeroVector;
 	bool bInLastStep = false;
+
+	/** N */
+	float MaxTension = 0.0f;
+	FFloatInterval LastStepTension;
+	/** cm */
+	float MaxAnchorDistance = 0.0f;
 
 	float TautTime = -1.0f;
 	FFloatInterval StretchFirst;

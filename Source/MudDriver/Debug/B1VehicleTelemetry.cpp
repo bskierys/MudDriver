@@ -6,6 +6,8 @@
 #include "B1VehicleAttributeSet.h"
 #include "B1FuelConsumptionComponent.h"
 #include "B1MudSprayComponent.h"
+#include "B1WinchAnchorComponent.h"
+#include "B1WinchComponent.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -29,9 +31,19 @@ namespace B1VehicleTelemetry
 		true,
 		TEXT("Write a 2 Hz condition/fuel/tags line to LogB1Vehicle for vehicles with an ASC."));
 
+	static TAutoConsoleVariable<bool> CVarWinchTelemetry(
+		TEXT("b1.Winch.Telemetry"),
+		true,
+		TEXT("Write a 2 Hz winch line to LogB1Physics while the winch is attached."));
+
 	bool IsStatusEnabled()
 	{
 		return CVarStatusTelemetry.GetValueOnGameThread();
+	}
+
+	bool IsWinchEnabled()
+	{
+		return CVarWinchTelemetry.GetValueOnGameThread();
 	}
 
 	bool IsEnabled()
@@ -124,5 +136,18 @@ namespace B1VehicleTelemetry
 			Fuel ? Fuel->GetEnginePower() : 0.0f,
 			Fuel ? Fuel->GetLoad(TEXT("Mud")) : 0.0f,
 			*Tags.ToStringSimple());
+	}
+
+	void LogWinch(const UB1WinchComponent& Winch)
+	{
+		const UB1WinchAnchorComponent* Anchor = Winch.GetAnchor();
+		if (!Anchor)
+		{
+			return;
+		}
+
+		UE_LOG(LogB1Physics, Log, TEXT("B1Winch %s anchor=%s len=%.2fm rest=%.2fm tension=%.0fN pull=%.2f"),
+			*GetNameSafe(Winch.GetOwner()), *GetNameSafe(Anchor->GetOwner()), Winch.GetCurrentLength() / 100.0f,
+			Winch.GetRestLength() / 100.0f, Winch.GetTension(), Winch.Pull);
 	}
 }

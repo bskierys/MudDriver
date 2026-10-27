@@ -132,7 +132,7 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 
 ## ADR-007 — Winch: tension force, not a physics constraint
 
-**Status:** proposed (2026-10-25)
+**Status:** accepted (2026-10-27, S3-16 checkpoint)
 
 **Problem.** The winch must pull the jeep toward an anchor (tree) or pull a log toward the jeep, with analog pull control.
 
@@ -154,6 +154,8 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 - **Reel-in and stall.** Pull reels in slack as well as a taut cable. The drum stalls once the spring force reaches `MaxPullForce`, so the cable never stores more than the cap (no lurch when the jeep breaks free). The rest length lives on the physics thread; the game thread only resets it per attach (serial).
 - **Drag caps, corrected premise.** Before counting the winch, mud barely resisted it: the caps let only the tire push through, so the winch dragged a stuck jeep almost freely, the opposite of what the amendment above expected. Counting the winch as push (`FB1MudSimulation::SetExternalForce`, a generic host hook) lets mud resist it at full strength.
 - **Input until on foot.** One toggle (attach nearest / release) plus pull, in the vehicle mapping context, until the on-foot hook carry (S4-06) replaces attaching from the seat. User's pad layout: D-pad Up pull, D-pad Down toggle.
+
+**Accepted 2026-10-27 (S3-15/16).** Stability rigs pass at 20 and 120 fps with the same tension (21.1 kN peak, ~1 kN range in the last 3 s). After the playtest the user tuned `BP_B1Jeep` to `MaxPullForce` 60 kN and `MaxCableLength` 80000 cm; winch, slope and flat suites all pass with these values. Still open: tension stays capped while a cable is being stretched, so a jeep that drives into a taut cable at speed overruns it (`B1Winch_CableSnatch`: 2.9 m past rest at 60 kN). Sprint 3 backlog.
 
 ---
 
