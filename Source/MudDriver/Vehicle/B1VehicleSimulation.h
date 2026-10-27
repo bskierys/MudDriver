@@ -16,6 +16,9 @@ public:
 	/** Game thread. The physics thread picks up the latest value on its next step */
 	void SetGameThreadInput(const FB1VehicleSimInput& Input);
 
+	/** Game thread. Result of the latest physics step */
+	FB1WinchSimOutput GetGameThreadWinchOutput() const;
+
 	FB1MudSimulation& GetMudSimulation() { return Mud; }
 
 	virtual void UpdateSimulation(float DeltaTime, const FChaosVehicleAsyncInput& InputData, Chaos::FRigidBodyHandle_Internal* Handle) override;
@@ -28,7 +31,17 @@ private:
 
 	void ApplyTestForce(const FB1VehicleSimInput& Input);
 
+	/** Before the base step, from the body handle: reels in and sets WinchForce / WinchPoint */
+	void UpdateWinch(const FB1WinchSimInput& Input, const Chaos::FRigidBodyHandle_Internal* Handle, float DeltaTime);
+
 	FB1MudSimulation Mud;
+
+	/** Physics thread; the rest length shrinks while reeling in */
+	FB1WinchSimOutput Winch;
+	FVector WinchPoint = FVector::ZeroVector;
+
+	mutable FCriticalSection OutputLock;
+	FB1WinchSimOutput LatestWinchOutput;
 
 	FCriticalSection InputLock;
 	FB1VehicleSimInput PendingInput;

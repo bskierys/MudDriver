@@ -836,3 +836,37 @@ Sprint 3 opened with the muddy slope from the replan: firm climbs, medium can't,
 - `Lvl_Offroad` moved with the anti-slide off (FullThrottle5s 85.3 → 89.0 m, Push drift 7.6 → 0.7 m); all PASS. Worth a feel check on its hills and the swamp.
 - `SlopePull` is per vehicle, not per mud preset; move it onto `PM_B1Mud_*` if medium and deep should differ.
 - Next: S3-07 winch + anchor components.
+
+---
+
+## 2026-10-27 — Sprint 3 winch core: S3-07..S3-10
+
+### Context
+With the slopes signed off, the winch came next: components and a cable visual (S3-07), then tension in the sim, pull input and the drag caps (S3-08..S3-10) in one go, with the user check batched after S3-10. The user picked the pad layout: D-pad Up pulls, D-pad Down toggles attach/release.
+
+### What was built
+- `Source/MudDriver/Winch/`: `UB1WinchComponent` (winch point on `AB1Jeep`'s nose, config, attach/detach/toggle, `Pull`, tag, sim I/O), `UB1WinchAnchorComponent` (`FindNearest`), `AB1WinchTree` → `/Game/B1/Winch/BP_B1WinchTree`. Cable: a fresh `UCableComponent` per attach, 7 cm, red `MI_B1WinchCable`, length = rest length.
+- Winch force in `FB1VehicleSimulation` (S3-08): capped one-sided spring-damper at the winch point from the body handle; physics-side rest length with reel-in and a stalling drum. `FB1WinchSimInput/Output` through the movement component; keep-awake while attached.
+- `Vehicle.State.Winching` loose tag; cheats `B1WinchAttachNearest`, `B1WinchDetach`; placed-jeep `StartAnchor` + editable `Pull` for MCP checks.
+- Input (S3-09): `IA_B1WinchPull` (E / D-pad Up), `IA_B1WinchToggle` (Q / D-pad Down) in `IMC_Vehicle_Default`, bound natively in `AB1Jeep`.
+- Drag caps (S3-10): portable `FB1MudSimulation::SetExternalForce`; rolling resistance and belly drag count it as push. MIGRATION.md updated.
+- Plugin `CableComponent`, module deps `CableComponent`, `Chaos`.
+
+### Decisions made
+- Reel-in also takes up slack; the drum stalls when the spring force reaches `MaxPullForce`, so the cable never stores more than the cap (ADR-007 amendment).
+- One toggle input (attach nearest / release) instead of release-only, until the on-foot hook carry (user's call).
+- Winch point and velocity come from the Chaos body handle at the start of the step, so the force is ready before the mud drag caps run.
+
+### What we learned
+- Before S3-10, mud barely resisted the winch: the drag caps only let the tire push through, so the winch dragged the jeep almost freely. The ADR premise ("a belly-stuck jeep wouldn't move") was the wrong way round; the change is right either way.
+- `FRigidBodyHandle_Internal` accessors need the `Chaos` module at link time (`TThreadSingleton<FPhysicsThreadContext>`).
+- `UCableComponent` with the default single solver iteration sags a 13 m cable through the floor; 16 iterations + stiffness looks like steel.
+- MCP: `DataAssetTools.create` makes `UInputAction`s; `ProgrammaticToolset` scripts can append to an IMC's mapping array (get, append, set the whole struct) and keep instanced modifiers. MCP can't call functions, so placed-actor properties (`StartAnchor`, `Pull`) stand in for calls in Simulate checks.
+- Adding and removing temporary actors leaves a WP map dirty and blocks `StopEditor`; save the map after removing them (no change on disk).
+- At world teardown the anchor can be destroyed before the winch; the cable pointer, not the anchor, marks "attached".
+
+### Open follow-ups
+- Dug-in belly case under winch untested (needs the S3-11 rig); covered by S3-15 `B1Winch_DeepStrip`.
+- No trees in the gyms yet (S3-14); user tests by dropping `BP_B1WinchTree` into a level.
+- Pad pull is digital (D-pad); analog pull only if a trigger gets mapped later.
+- Next: S3-11 rig winch support.

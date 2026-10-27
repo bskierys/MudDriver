@@ -30,6 +30,7 @@ void FB1MudSimulation::BeginStep()
 		FScopeLock Lock(&InputLock);
 		StepInput = PendingInput;
 	}
+	ExternalForce = FVector::ZeroVector;
 
 	if (StepInput.SinkResetSerial != AppliedSinkResetSerial)
 	{
@@ -195,6 +196,10 @@ void FB1MudSimulation::ApplyRollingResistance(UChaosWheeledVehicleSimulation& Ve
 		// Net = tire force + gravity along the ground: on a slope the tire force is mostly holding the jeep, not pushing it.
 		float NetPush = PWheel.GetForceFromFriction().X - WeightShare * WheelForward.Z;
 
+		// The host's external force (winch) is shared like the weight, so all mud wheels together see all of it.
+		const float ExternalShare = RelativeLoad[WheelIdx] / NumWheelsInContact;
+		NetPush += FVector::DotProduct(ExternalForce, WheelForward) * B1MudWheelModel::NewtonsToUnreal * ExternalShare;
+
 		// Mud on a slope is slippery: an extra pull down the slope, always on, so climbing is hard and a stopped jeep slides.
 		if (Hit.Normal.Z < StepInput.SlopeUpZ)
 		{
@@ -256,7 +261,7 @@ void FB1MudSimulation::ApplyBellyDrag(UChaosWheeledVehicleSimulation& Vehicle, f
 	const FVector GroundVelocity = FVector::VectorPlaneProject(State.VehicleWorldVelocity, State.VehicleUpAxis);
 	const float Speed = GroundVelocity.Size();
 
-	// Net push: tires plus gravity on the ground plane, as for rolling resistance.
+	// Net push: tires, gravity and the external force on the ground plane, as for rolling resistance.
 	FVector NetPush = FVector::ZeroVector;
 	FVector GroundUp = FVector::ZeroVector;
 	for (int32 WheelIdx = 0; WheelIdx < NumWheels; ++WheelIdx)
@@ -269,6 +274,7 @@ void FB1MudSimulation::ApplyBellyDrag(UChaosWheeledVehicleSimulation& Vehicle, f
 		}
 	}
 	NetPush += FVector::VectorPlaneProject(FVector(0.0f, 0.0f, -Mass * B1MudWheelModel::GravityCmPerS2), GroundUp.GetSafeNormal());
+	NetPush += FVector::VectorPlaneProject(ExternalForce * B1MudWheelModel::NewtonsToUnreal, GroundUp.GetSafeNormal());
 
 	const FVector Direction = Speed > B1MudWheelModel::StandstillSpeed ? GroundVelocity / Speed : NetPush.GetSafeNormal();
 	const float PushAlongMotion = FMath::Max(FVector::DotProduct(NetPush, Direction), 0.0f);

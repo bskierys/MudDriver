@@ -11,6 +11,9 @@ class UB1FuelConsumptionComponent;
 class UB1MudSprayComponent;
 class UB1MudTrailComponent;
 class UB1MudVehicleComponent;
+class UB1WinchComponent;
+class UInputAction;
+struct FInputActionValue;
 
 /** The player's jeep: the template offroad car running on UB1VehicleMovementComponent */
 UCLASS(abstract)
@@ -29,9 +32,11 @@ public:
 
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void UnPossessed() override;
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	UB1MudVehicleComponent* GetMudVehicle() const { return MudVehicle; }
 	UB1FuelConsumptionComponent* GetFuelConsumption() const { return FuelConsumption; }
+	UB1WinchComponent* GetWinch() const { return Winch; }
 
 protected:
 
@@ -49,12 +54,27 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mud|Components")
 	TObjectPtr<UB1MudTrailComponent> MudTrail;
 
+	/** Sits at the winch point on the front bumper */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Winch|Components")
+	TObjectPtr<UB1WinchComponent> Winch;
+
+	/** Axis1D, reel-in speed fraction */
+	UPROPERTY(EditAnywhere, Category = "Input")
+	TObjectPtr<UInputAction> WinchPullAction;
+
+	/** Detaches, or hooks the nearest anchor in range */
+	UPROPERTY(EditAnywhere, Category = "Input")
+	TObjectPtr<UInputAction> WinchToggleAction;
+
 	virtual void DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos) override;
 
 private:
 
 	/** Out of fuel cuts the throttle; brake and steering keep working */
 	void OnOutOfFuelChanged(bool bOutOfFuel);
+
+	void WinchPull(const FInputActionValue& Value);
+	void WinchToggle(const FInputActionValue& Value);
 
 	TWeakObjectPtr<UAbilitySystemComponent> AbilitySystem;
 };

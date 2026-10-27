@@ -27,21 +27,39 @@ TUniquePtr<Chaos::FSimpleWheeledVehicle> UB1VehicleMovementComponent::CreatePhys
 	return UChaosVehicleMovementComponent::CreatePhysicsVehicle();
 }
 
-void UB1VehicleMovementComponent::SetTestForce(EB1TestForce Mode)
+void UB1VehicleMovementComponent::RefreshForceKeepAwake()
 {
-	if (TestForce == EB1TestForce::Off && Mode != EB1TestForce::Off)
+	const bool bNeeded = TestForce != EB1TestForce::Off || WinchInput.bAttached;
+	if (bNeeded && !bForceKeepAwake)
 	{
 		SavedSleepThreshold = SleepThreshold;
 		SleepThreshold = 0.0f;
 		SetSleeping(false);
 	}
-	else if (TestForce != EB1TestForce::Off && Mode == EB1TestForce::Off)
+	else if (!bNeeded && bForceKeepAwake)
 	{
 		SleepThreshold = SavedSleepThreshold;
 	}
+	bForceKeepAwake = bNeeded;
+}
 
+void UB1VehicleMovementComponent::SetWinchInput(const FB1WinchSimInput& Input)
+{
+	WinchInput = Input;
+	RefreshForceKeepAwake();
+}
+
+FB1WinchSimOutput UB1VehicleMovementComponent::GetWinchOutput() const
+{
+	const FB1VehicleSimulation* Simulation = GetB1Simulation();
+	return Simulation ? Simulation->GetGameThreadWinchOutput() : FB1WinchSimOutput();
+}
+
+void UB1VehicleMovementComponent::SetTestForce(EB1TestForce Mode)
+{
 	TestForce = Mode;
 	TestForceAnchor = GetOwner()->GetActorLocation();
+	RefreshForceKeepAwake();
 
 	UE_LOG(LogB1Physics, Log, TEXT("TestForce %s on %s, anchor %s"),
 		*UEnum::GetValueAsString(Mode), *GetNameSafe(GetOwner()), *TestForceAnchor.ToCompactString());
@@ -88,6 +106,7 @@ void UB1VehicleMovementComponent::Update(float DeltaTime)
 	Input.TestForce = TestForce;
 	Input.TestForceSettings = TestForceSettings;
 	Input.TestForceAnchor = TestForceAnchor;
+	Input.Winch = WinchInput;
 	Simulation->SetGameThreadInput(Input);
 
 #if ENABLE_DRAW_DEBUG

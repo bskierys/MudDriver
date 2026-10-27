@@ -30,6 +30,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "TestForce|Config")
 	FB1TestForceSettings TestForceSettings;
 
+	/** Sent with the next physics input; the body stays awake while attached */
+	void SetWinchInput(const FB1WinchSimInput& Input);
+	FB1WinchSimOutput GetWinchOutput() const;
+
 	/** IB1EngineLoadSource: engine throttle² × torque(RPM) × RPM over the curve's peak power, [0, 1]; updated each game frame */
 	virtual float GetNormalizedEnginePower() const override { return NormalizedEnginePower; }
 
@@ -62,6 +66,9 @@ private:
 
 	void UpdateEnginePower();
 
+	/** Test force and winch need every step simulated */
+	void RefreshForceKeepAwake();
+
 	float NormalizedEnginePower = 0.0f;
 	float EffectiveThrottle = 0.0f;
 
@@ -73,7 +80,10 @@ private:
 	EB1TestForce TestForce = EB1TestForce::Off;
 	FVector TestForceAnchor = FVector::ZeroVector;
 
-	/** Vehicle sleep stops the simulation step, so it's disabled while a test force is active */
+	FB1WinchSimInput WinchInput;
+
+	/** Vehicle sleep stops the simulation step, so it's disabled while a test force or the winch is active */
+	bool bForceKeepAwake = false;
 	float SavedSleepThreshold = 0.0f;
 
 	/** Mud keep-awake blocks sleep through SleepSlopeLimit, so it doesn't fight the test force over SleepThreshold */

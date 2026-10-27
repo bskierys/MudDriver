@@ -639,26 +639,41 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
 
 ### Winch core (ADR-007 amendment)
 
-- [ ] **S3-07** Winch + anchor components, tree, cable visual (3 h) _(requires S3-01)_
+- [x] **S3-07** Winch + anchor components, tree, cable visual (3 h) _(requires S3-01)_ <!-- done: 2026-10-27 -->
+  Result:
+  - `Source/MudDriver/Winch/`: `UB1WinchComponent` (scene component = winch point, `Winch` on `AB1Jeep` at mesh-relative (230, 0, 60), the nose; `Winch|Config` MaxCableLength 4000 cm, MaxPullForce 40 kN, ReelInSpeed 100 cm/s, CableStiffness 200 kN/m, CableDamping 20 kN·s/m; `Winch|Visual` width 7 cm (2 cm was barely visible in PIE, user check), segments, material; `BP_B1Jeep` uses red `/Game/B1/Winch/MI_B1WinchCable` (child of the engine `BasicShapeMaterial`), user request). `AttachTo` refuses anchors past `MaxCableLength`, rest = current distance, and spawns a fresh `UCableComponent` (no collision, 16 solver iterations + stiffness, since the default single iteration sagged it through the floor); `Detach` destroys it. `UB1WinchAnchorComponent::FindNearest` (object iterator, same world).
+  - `AB1WinchTree` (root, `Trunk` mesh, `Anchor` at 80 cm) → `/Game/B1/Winch/BP_B1WinchTree` (Cylinder 0.5 × 0.5 × 6 = 50 cm × 6 m).
+  - Cheats `B1WinchAttachNearest`, `B1WinchDetach` (log to `LogB1Physics`). `CableComponent` plugin + private module dep.
+  - Added `StartAnchor` (`Winch|Debug`, EditInstanceOnly): a placed jeep hooks that actor's anchor at BeginPlay, since MCP can't call functions. Simulate in `Lvl_Gym_Mud` with a temporary jeep + tree (not saved): "winch attached …, rest 13.06 m", capture shows the cable from the nose to the trunk.
   `UB1WinchComponent` (scene component on `AB1Jeep`, at a `WinchPoint` on the front bumper): attached anchor, rest length, `MaxCableLength` (40 m), `MaxPullForce` (40 kN), `ReelInSpeed` (1 m/s), stiffness, damping; category `Winch|Config`. `UB1WinchAnchorComponent` (scene component). `BP_B1WinchTree`: a placeholder trunk mesh + anchor. Cable drawn with `UCableComponent` from the winch point to the anchor while attached. Cheats `B1WinchAttachNearest` (nearest anchor within `MaxCableLength`, rest length = current distance), `B1WinchDetach`. No force yet.
   🔍 Research first: `CableComponent` in 5.8 (enable the plugin in `MudDriver.uproject`, module dep, attaching the end to a moving component).
   ⚠️ Note: new plugin + new classes = full build with the editor closed (`Scripts/BuildEditor.ps1`).
   **Done:** builds; Simulate + capture shows the cable from the jeep to a tree after an attach (set via MCP on the component).
   **User check:** `B1WinchAttachNearest` near a tree: the cable appears; `B1WinchDetach` removes it.
 
-- [ ] **S3-08** Winch tension in the simulation (3 h) _(requires S3-07)_
+- [x] **S3-08** Winch tension in the simulation (3 h) _(requires S3-07)_ <!-- done: 2026-10-27 -->
+  Result:
+  - `FB1WinchSimInput` in `FB1VehicleSimInput` (anchor, winch point in the body frame, attach serial + initial rest, pull, params). `UB1WinchComponent` ticks in PrePhysics, sends it through `UB1VehicleMovementComponent::SetWinchInput` and reads `FB1WinchSimOutput` (tension, rest, length, world force) back. The movement keeps the body awake while attached or with a test force (`RefreshForceKeepAwake`).
+  - `FB1VehicleSimulation::UpdateWinch` runs before the base step from the body handle (pose this step; velocity at the point = V + W × r): rest shrinks at `ReelInSpeed × Pull` down to `MinRestLength` (150 cm), including slack, but the drum stalls once the spring force reaches `MaxPullForce`. Tension = clamp(k·stretch − c·closing speed, 0, cap), `AddForceAtPosition` at the winch point after the base step. New module dep `Chaos` (handle accessors).
+  - Loose `Vehicle.State.Winching` (`WinchingTag`, set in `AB1Jeep`) on the driver's ASC while attached with pull > 0, only when the pawn is controlled. `Pull` is editable on placed jeeps (`Winch|Debug`); cable visual length = rest length. Detach logs rest start → end and peak tension.
+  - Simulate in `Lvl_Gym_Mud` (temporary actors, not saved), full pull: jeep 12.7 m from a tree reeled to 1.5 m and parked at the trunk (peak 8.5 kN); jeep against the north wall with the tree behind it stalled at 40 000 N (cap).
   Game thread sends anchor world position, rest length, pull and params through `FB1VehicleSimInput`. `FB1VehicleSimulation` applies a one-sided spring-damper, capped at `MaxPullForce`, with `AddForceAtPosition` at the winch point (its own path; `EB1TestForce` stays). Rest length shrinks at `ReelInSpeed × pull` while taut. The body stays awake while attached (same rule as the test force). Output: tension N, current length. Loose `Vehicle.State.Winching` while pull > 0 (new native tag).
   ⚠️ Note: the winch point moves with the body; compute it on the physics thread from the body transform, not from a game-thread position a frame old.
   **Done:** builds; a rig with a fixed anchor and full pull on firm ground drags a braked jeep toward the anchor; tension never exceeds the cap.
   **User check:** —
 
-- [ ] **S3-09** Winch pull input (1.5 h) _(requires S3-08)_
+- [x] **S3-09** Winch pull input (1.5 h) _(requires S3-08)_ <!-- done: 2026-10-27 -->
+  Result: `DataAssetTools.create` makes `UInputAction`s. `/Game/B1/Input/IA_B1WinchPull` (Axis1D) and `IA_B1WinchToggle` (bool; user decision: one toggle that attaches the nearest anchor or releases, instead of release only). Appended to `IMC_Vehicle_Default` with a ProgrammaticToolset script (41 → 45, Negate modifiers kept): pull = E / Gamepad D-pad Up, toggle = Q / D-pad Down (user's pad layout, so pull is digital on the pad). `AB1Jeep` binds them natively (`WinchPullAction` / `WinchToggleAction`, set on `BP_B1Jeep`): pull Triggered/Completed → `SetPull`, toggle Started → `ToggleAttachNearest`.
   `IA_B1WinchPull` (analog, axis1D: trigger / key) and `IA_B1WinchRelease` (detach) in the vehicle mapping context; the jeep binds them natively (like throttle), pull goes to `UB1WinchComponent`.
   🔍 Research first: whether `DataAssetTools.create` makes `UInputAction` assets (it's a `UDataAsset` subclass) and how to add a mapping to the template IMC through MCP. Fallback: you add the two mappings by hand from a spec.
   **Done:** builds; the IMC asset lists both mappings.
   **User check:** attach by cheat, hold the pull key/trigger: the cable tightens and pulls; analog trigger pulls proportionally.
 
-- [ ] **S3-10** Winch counts as push in the drag caps (1.5 h) _(requires S3-03, S3-08)_
+- [x] **S3-10** Winch counts as push in the drag caps (1.5 h) _(requires S3-03, S3-08)_ <!-- done: 2026-10-27 -->
+  Result: portable hook `FB1MudSimulation::SetExternalForce` (world N, reset in `BeginStep`; MIGRATION.md updated). `FB1VehicleSimulation` passes the winch force before the base step. Rolling resistance adds each mud wheel's weight share of the force along the wheel forward to its net push; belly drag adds the force projected on the ground plane.
+  - Effect found while testing: before this, mud barely resisted the winch (at standstill the cap was the tire push, ~0; moving, push + 0.4 × stop force), so the winch dragged the jeep almost freely. Now mud resists it at full strength.
+  - Simulate in `Lvl_Gym_Mud` (temporary, not saved): jeep settled in deep (35–45 cm), zero throttle, full pull to a tree 21 m away → pulled out at 3.6 km/h (reel speed), `rr=` 500–700 N per wheel in the `B1Mud` telemetry, peak tension 8.7 kN. Belly stayed 0 (static sink < 45 cm clearance); the dug-in belly case needs the S3-11 rig (S3-15 `B1Winch_DeepStrip`).
+  - Headless (`s310_*.log`): gym 22/22, `Lvl_Offroad` 8/8 (FullThrottle5s 89.0 m, same as before), winch gym 8/8 PASS.
   Add the winch force (projected on the ground plane / wheel forward) to the net push in the rolling-resistance and belly-drag caps, so a belly-stuck jeep can be pulled out.
   **Done:** builds; a rig stuck in deep (dig-in script) moves under full pull at zero throttle, and the drag force is visible in telemetry.
   **User check:** —

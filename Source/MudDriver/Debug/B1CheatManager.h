@@ -33,7 +33,16 @@ public:
 	UFUNCTION(Exec)
 	void B1Unstuck();
 
+	/** Hooks the nearest winch anchor within cable range; rest length = current distance */
+	UFUNCTION(Exec)
+	void B1WinchAttachNearest();
+
+	UFUNCTION(Exec)
+	void B1WinchDetach();
+
 private:
+
+	class UB1WinchComponent* GetPlayerWinch(const TCHAR* CheatName) const;
 
 	class UB1AbilitySystemComponent* GetPlayerASC(const TCHAR* CheatName) const;
 };

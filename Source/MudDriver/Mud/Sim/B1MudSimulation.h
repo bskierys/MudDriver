@@ -24,6 +24,9 @@ public:
 	/** Before the base UpdateSimulation: latches the input and applies a pending sink reset */
 	void BeginStep();
 
+	/** Physics thread, after BeginStep: a force the host applies this step (e.g. a winch), world, N. Counted as push in the drag caps */
+	void SetExternalForce(const FVector& Force) { ExternalForce = Force; }
+
 	/** Raises each trace start by the wheel's sink offset; pass the result to the base PerformSuspensionTraces */
 	void PreSuspensionTraces(const UChaosWheeledVehicleSimulation& Vehicle, TArray<Chaos::FSuspensionTrace>& Traces);
 
@@ -75,6 +78,9 @@ private:
 	float BellyDepth = 0.0f;
 	float BellyDrag = 0.0f;
 	float MudGroundUpZ = 1.0f;
+
+	/** N; reset each BeginStep */
+	FVector ExternalForce = FVector::ZeroVector;
 
 	/** Per wheel, cm */
 	TArray<float> SinkDepth;

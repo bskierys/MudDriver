@@ -36,10 +36,47 @@ struct FB1TestForceSettings
 	float SpringMaxForce = 15000.0f;
 };
 
+/** Winch cable state the physics thread needs (ADR-007). Lengths in cm, forces in N */
+struct FB1WinchSimInput
+{
+	bool bAttached = false;
+	FVector AnchorLocation = FVector::ZeroVector;
+
+	/** In the body's frame, so the sim moves it with the body each step */
+	FVector WinchPointLocal = FVector::ZeroVector;
+
+	/** Bumped on each attach; the sim resets its rest length to InitialRestLength once per new value */
+	uint32 AttachSerial = 0;
+	float InitialRestLength = 0.0f;
+
+	/** [0, 1] */
+	float Pull = 0.0f;
+
+	float MaxPullForce = 0.0f;
+	float ReelInSpeed = 0.0f;
+	float MinRestLength = 0.0f;
+	/** N/m */
+	float Stiffness = 0.0f;
+	/** N*s/m */
+	float Damping = 0.0f;
+};
+
+struct FB1WinchSimOutput
+{
+	float Tension = 0.0f;
+	float RestLength = 0.0f;
+	float Length = 0.0f;
+	/** World, N. What the drag caps count as push */
+	FVector Force = FVector::ZeroVector;
+	uint32 AttachSerial = 0;
+};
+
 /** Game thread → physics thread data, copied once per game frame. Mud has its own (FB1MudSimInput) */
 struct FB1VehicleSimInput
 {
 	EB1TestForce TestForce = EB1TestForce::Off;
 	FB1TestForceSettings TestForceSettings;
 	FVector TestForceAnchor = FVector::ZeroVector;
+
+	FB1WinchSimInput Winch;
 };

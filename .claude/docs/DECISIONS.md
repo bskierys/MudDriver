@@ -150,6 +150,11 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 - **Pull input.** Native analog input on the jeep (like throttle), not an ability. Continuous controls stay native; abilities are for discrete actions (ADR-014).
 - **Log.** A simulating anchor gets the opposite force in its own async physics tick (fixed step), reading the cable state the winch publishes. Fallback: game-thread `AddForce` on the log only.
 
+**Amended 2026-10-27 (S3-08..S3-10, built).** Still proposed until the S3-15 stability rigs pass.
+- **Reel-in and stall.** Pull reels in slack as well as a taut cable. The drum stalls once the spring force reaches `MaxPullForce`, so the cable never stores more than the cap (no lurch when the jeep breaks free). The rest length lives on the physics thread; the game thread only resets it per attach (serial).
+- **Drag caps, corrected premise.** Before counting the winch, mud barely resisted it: the caps let only the tire push through, so the winch dragged a stuck jeep almost freely, the opposite of what the amendment above expected. Counting the winch as push (`FB1MudSimulation::SetExternalForce`, a generic host hook) lets mud resist it at full strength.
+- **Input until on foot.** One toggle (attach nearest / release) plus pull, in the vehicle mapping context, until the on-foot hook carry (S4-06) replaces attaching from the seat. User's pad layout: D-pad Up pull, D-pad Down toggle.
+
 ---
 
 ## ADR-008 — Mud trails are visual only

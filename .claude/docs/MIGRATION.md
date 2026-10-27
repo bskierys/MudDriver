@@ -93,6 +93,8 @@ public:
 	virtual void UpdateSimulation(float DeltaTime, const FChaosVehicleAsyncInput& InputData, Chaos::FRigidBodyHandle_Internal* Handle) override
 	{
 		Mud.BeginStep();
+		// optional: a force you apply this step (winch, tow), world, N, so the mud drag caps count it as push
+		Mud.SetExternalForce(MyWinchForce);
 		UChaosWheeledVehicleSimulation::UpdateSimulation(DeltaTime, InputData, Handle);
 		// your own forces here
 		Mud.EndStep(*this, DeltaTime);

@@ -7,7 +7,10 @@
 #include "B1MudShowDebug.h"
 #include "B1MudSprayComponent.h"
 #include "B1MudTrailComponent.h"
+#include "B1WinchComponent.h"
 #include "B1Log.h"
+#include "EnhancedInputComponent.h"
+#include "InputActionValue.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "GameFramework/Controller.h"
@@ -20,6 +23,11 @@ AB1Jeep::AB1Jeep(const FObjectInitializer& ObjectInitializer)
 	MudVehicle->InMudTag = B1GameplayTags::Vehicle_State_InMud;
 	MudSpray = CreateDefaultSubobject<UB1MudSprayComponent>(TEXT("MudSpray"));
 	MudTrail = CreateDefaultSubobject<UB1MudTrailComponent>(TEXT("MudTrail"));
+
+	Winch = CreateDefaultSubobject<UB1WinchComponent>(TEXT("Winch"));
+	Winch->SetupAttachment(GetMesh());
+	Winch->SetRelativeLocation(FVector(230.0f, 0.0f, 60.0f));
+	Winch->WinchingTag = B1GameplayTags::Vehicle_State_Winching;
 
 	// Data and DrainEffect are assets, set on BP_B1Jeep.
 	FuelConsumption = CreateDefaultSubobject<UB1FuelConsumptionComponent>(TEXT("FuelConsumption"));
@@ -56,6 +64,29 @@ void AB1Jeep::PossessedBy(AController* NewController)
 
 	UE_LOG(LogB1Vehicle, Log, TEXT("%s ASC link: %s"), *GetName(),
 		*GetNameSafe(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(this)));
+}
+
+void AB1Jeep::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	// Continuous control, native like throttle (ADR-007, ADR-014).
+	if (UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	{
+		EnhancedInput->BindAction(WinchPullAction, ETriggerEvent::Triggered, this, &AB1Jeep::WinchPull);
+		EnhancedInput->BindAction(WinchPullAction, ETriggerEvent::Completed, this, &AB1Jeep::WinchPull);
+		EnhancedInput->BindAction(WinchToggleAction, ETriggerEvent::Started, this, &AB1Jeep::WinchToggle);
+	}
+}
+
+void AB1Jeep::WinchPull(const FInputActionValue& Value)
+{
+	Winch->SetPull(Value.Get<float>());
+}
+
+void AB1Jeep::WinchToggle(const FInputActionValue& Value)
+{
+	Winch->ToggleAttachNearest();
 }
 
 void AB1Jeep::OnOutOfFuelChanged(bool bOutOfFuel)

@@ -1,5 +1,6 @@
 #include "B1VehicleSimulation.h"
 #include "B1Log.h"
+#include "PhysicsProxy/SingleParticlePhysicsProxy.h"
 
 namespace
 {
@@ -14,6 +15,62 @@ void FB1VehicleSimulation::SetGameThreadInput(const FB1VehicleSimInput& Input)
 	PendingInput = Input;
 }
 
+FB1WinchSimOutput FB1VehicleSimulation::GetGameThreadWinchOutput() const
+{
+	FScopeLock Lock(&OutputLock);
+	return LatestWinchOutput;
+}
+
+void FB1VehicleSimulation::UpdateWinch(const FB1WinchSimInput& Input, const Chaos::FRigidBodyHandle_Internal* Handle, float DeltaTime)
+{
+	Winch.Tension = 0.0f;
+	Winch.Force = FVector::ZeroVector;
+	if (!Input.bAttached || !Handle)
+	{
+		Winch.RestLength = 0.0f;
+		Winch.Length = 0.0f;
+		return;
+	}
+
+	if (Input.AttachSerial != Winch.AttachSerial)
+	{
+		Winch.AttachSerial = Input.AttachSerial;
+		Winch.RestLength = Input.InitialRestLength;
+	}
+
+	// From this step's body pose: a game-thread position would be a frame old.
+	const FTransform BodyTransform(Handle->R(), Handle->X());
+	WinchPoint = BodyTransform.TransformPosition(Input.WinchPointLocal);
+	const FVector ToAnchor = Input.AnchorLocation - WinchPoint;
+	Winch.Length = ToAnchor.Size();
+	if (Winch.Length < KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+	const FVector Direction = ToAnchor / Winch.Length;
+
+	// The drum stalls at the cap, so the cable never stores more stretch than MaxPullForce.
+	const float SpringForce = Input.Stiffness * (Winch.Length - Winch.RestLength) / CmPerM;
+	if (Input.Pull > 0.0f && SpringForce < Input.MaxPullForce)
+	{
+		Winch.RestLength = FMath::Max(Winch.RestLength - Input.ReelInSpeed * Input.Pull * DeltaTime, Input.MinRestLength);
+	}
+
+	const float Stretch = (Winch.Length - Winch.RestLength) / CmPerM;
+	if (Stretch <= 0.0f)
+	{
+		return;
+	}
+
+	const FVector CenterOfMass = BodyTransform.TransformPosition(Handle->CenterOfMass());
+	const FVector PointVelocity = Handle->V() + FVector::CrossProduct(Handle->W(), WinchPoint - CenterOfMass);
+	const float ClosingSpeed = FVector::DotProduct(PointVelocity, Direction) / CmPerM;
+
+	// One-sided: damping can weaken the pull but never push.
+	Winch.Tension = FMath::Clamp(Input.Stiffness * Stretch - Input.Damping * ClosingSpeed, 0.0f, Input.MaxPullForce);
+	Winch.Force = Direction * Winch.Tension;
+}
+
 void FB1VehicleSimulation::UpdateSimulation(float DeltaTime, const FChaosVehicleAsyncInput& InputData, Chaos::FRigidBodyHandle_Internal* Handle)
 {
 	{
@@ -21,11 +78,22 @@ void FB1VehicleSimulation::UpdateSimulation(float DeltaTime, const FChaosVehicle
 		StepInput = PendingInput;
 	}
 	Mud.BeginStep();
+	UpdateWinch(StepInput.Winch, Handle, DeltaTime);
+	Mud.SetExternalForce(Winch.Force);
 
 	UChaosWheeledVehicleSimulation::UpdateSimulation(DeltaTime, InputData, Handle);
 
 	ApplyTestForce(StepInput);
+	if (Winch.Tension > 0.0f)
+	{
+		AddForceAtPosition(Winch.Force * NewtonsToUnreal, WinchPoint);
+	}
 	Mud.EndStep(*this, DeltaTime);
+
+	{
+		FScopeLock Lock(&OutputLock);
+		LatestWinchOutput = Winch;
+	}
 
 	if (!bLoggedFirstTick)
 	{

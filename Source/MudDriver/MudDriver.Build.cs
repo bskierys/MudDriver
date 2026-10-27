@@ -39,10 +39,11 @@ public class MudDriver : ModuleRules
 			"MudDriver/Mud/Sim",
 			"MudDriver/Mud/Debug",
 			"MudDriver/Player",
-			"MudDriver/Vehicle"
+			"MudDriver/Vehicle",
+			"MudDriver/Winch"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "Projects", "ChaosVehiclesCore", "Niagara", "ProceduralMeshComponent" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Projects", "ChaosVehiclesCore", "Niagara", "ProceduralMeshComponent", "CableComponent", "Chaos" });
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

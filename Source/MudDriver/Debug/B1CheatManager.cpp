@@ -3,6 +3,8 @@
 #include "B1Log.h"
 #include "B1VehicleMovementComponent.h"
 #include "B1MudVehicleComponent.h"
+#include "B1WinchComponent.h"
+#include "B1WinchAnchorComponent.h"
 #include "B1PlayerState.h"
 #include "B1AbilitySystemComponent.h"
 #include "B1VehicleAttributeSet.h"
@@ -88,6 +90,43 @@ void UB1CheatManager::B1Unstuck()
 	}
 
 	Jeep->GetMudVehicle()->Unstuck();
+}
+
+UB1WinchComponent* UB1CheatManager::GetPlayerWinch(const TCHAR* CheatName) const
+{
+	const AB1Jeep* Jeep = Cast<AB1Jeep>(GetOuterAPlayerController()->GetPawn());
+	if (!Jeep)
+	{
+		UE_LOG(LogB1Physics, Warning, TEXT("%s: the player isn't driving an AB1Jeep"), CheatName);
+		return nullptr;
+	}
+	return Jeep->GetWinch();
+}
+
+void UB1CheatManager::B1WinchAttachNearest()
+{
+	UB1WinchComponent* Winch = GetPlayerWinch(TEXT("B1WinchAttachNearest"));
+	if (!Winch)
+	{
+		return;
+	}
+
+	UB1WinchAnchorComponent* Anchor = Winch->FindNearestAnchor();
+	if (!Anchor)
+	{
+		UE_LOG(LogB1Physics, Warning, TEXT("B1WinchAttachNearest: no anchor within %.1f m"), Winch->MaxCableLength / 100.0f);
+		return;
+	}
+
+	Winch->AttachTo(Anchor);
+}
+
+void UB1CheatManager::B1WinchDetach()
+{
+	if (UB1WinchComponent* Winch = GetPlayerWinch(TEXT("B1WinchDetach")))
+	{
+		Winch->Detach();
+	}
 }
 
 UB1AbilitySystemComponent* UB1CheatManager::GetPlayerASC(const TCHAR* CheatName) const
