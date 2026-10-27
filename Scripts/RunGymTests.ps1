@@ -4,11 +4,11 @@ exit code is 0 only when at least one test ran and every test passed; the editor
 own exit code ignores test results, so the log is parsed instead.
 
   .\Scripts\RunGymTests.ps1
-  .\Scripts\RunGymTests.ps1 -Map /Game/B1/Maps/Lvl_Gym_Mud -Filter FullThrottle
+  .\Scripts\RunGymTests.ps1 -Map /Game/B1/Gym/Lvl_Gym_Mud -Filter FirmSmoke
   .\Scripts\RunGymTests.ps1 -LogName Async60 -ExtraArgs '-ini:Engine:[/Script/Engine.PhysicsSettings]:bTickPhysicsAsync=True'
 #>
 param(
-    [string]$Map = "/Game/Variant_OffRoad/Maps/Lvl_Offroad",
+    [string]$Map = "/Game/B1/Gym/Lvl_Gym_Core",
     [string]$Filter = "",
     [string[]]$ExtraArgs = @(),
     [string]$LogName = "RunGymTests",

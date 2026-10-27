@@ -27,7 +27,7 @@ Applies whenever you use the `unreal-mcp` server (Epic's ModelContextProtocol pl
 - **Property names can't be guessed.** Run `ObjectTools.list_properties` before `get_properties` / `set_properties`. Setting an unknown name can fail silently.
 - **Blueprint defaults** live on the CDO: `BlueprintTools.get_default_object`, then `ObjectTools.set_properties`. Compile with `compile_blueprint` after structural changes.
 - **Verify visually** with `EditorAppToolset.CaptureViewport` / `CaptureAssetImage` after level or asset edits.
-- **New actors in World Partition maps** (`Lvl_Offroad`) live in their own `__ExternalActors__` package. `save_actor` and `save_assets([map])` both skip a package that isn't on disk yet. `save_assets([])` (save all dirty) writes it; check `git status` after.
+- **New actors in World Partition maps** (all `B1/Gym` maps) live in their own `__ExternalActors__` package. `save_actor` and `save_assets([map])` both skip a package that isn't on disk yet. `save_assets([])` (save all dirty) writes it; check `git status` after.
 - **WP landscape isn't loaded in the editor**, so `SceneTools.trace_world` hits nothing there. Place actors relative to known actors (e.g. PlayerStart) and let PIE settle them.
 - **`ActorTools.set_actor_transform` resets omitted fields.** Despite the schema ("unset = don't change"), passing only `rotation` moved the actor to the origin. Always pass location, rotation and scale.
 - **Collision profiles on static mesh actors:** set `bUseDefaultCollision=false` on the component first, then `BodyInstance` `collisionProfileName`, `objectType` and `collisionEnabled`. With default collision on (BasicShapes do this), the mesh's BlockAll wins and the profile is silently ignored, even after a reload.

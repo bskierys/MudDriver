@@ -541,7 +541,7 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
 
 ### Backlog (found during the sprint)
 
-- `Lvl_Offroad` load logs `LoadErrors: ... /Lvl_Offroad/B/9M/ZNZM1Q9PKXHV07GMT8Q6NN, a dependent package None was not available`. Present since at least 2026-10-25; rigs pass. Find the actor and fix or delete its broken reference. _(found in S2-03)_
+- ~~`Lvl_Offroad` load logs `LoadErrors: ... /Lvl_Offroad/B/9M/ZNZM1Q9PKXHV07GMT8Q6NN, a dependent package None was not available`.~~ Gone with the map (2026-10-27): its rigs moved to `Lvl_Gym_Core` and `Lvl_Offroad` was deleted. _(found in S2-03)_
 
 ---
 
@@ -757,7 +757,7 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
 
 - [ ] **S4-03** Mapping-context swap on possession (1.5 h) _(requires S4-02)_
   `AB1PlayerController::OnPossess` removes the previous pawn's mapping contexts and adds the new one's (vehicle vs on-foot); the vehicle UI already hides on foot.
-  ⚠️ Note: the template adds its contexts in `BeginPlay`; move vehicle contexts to possession without breaking `Lvl_Offroad` respawn.
+  ⚠️ Note: the template adds its contexts in `BeginPlay`; move vehicle contexts to possession without breaking respawn.
   **Done:** builds; both flat suites PASS.
   **User check:** —
 

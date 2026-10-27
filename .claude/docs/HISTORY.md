@@ -901,3 +901,26 @@ The winch pulled (S3-08..S3-10) but had no rig support, debug UI or gym layout. 
 - `MaxCableLength` on `BP_B1Jeep` is 80000 cm (800 m); trees were hooked at 49–52 m, so 8000 may have been meant. Confirm.
 - `ShowDebug B1Winch` hasn't been seen on screen by the agent.
 - Next: Sprint 4 (on foot).
+
+## 2026-10-27 — Retire Lvl_Offroad, rigs to Lvl_Gym_Core
+
+### Context
+The template's `Lvl_Offroad` (World Partition landscape, ~55 MB of external actors) was too large to keep, but it still held 8 functional tests: the vehicle baseline and stepping rigs on the landscape, and the mud-channel rigs on their own floors at Z≈5000.
+
+### What was built
+- `/Game/B1/Gym/Lvl_Gym_Core`: a duplicate of `Lvl_Gym_Winch` stripped to lighting, one 60 × 180 m floor (`G_Floor`, top at Z 0) and `Spawn_Player`. Game mode `BP_B1GymGameMode`.
+- The 8 rigs recreated with identical config (checked property by property against the originals): `B1Tests/Step` (FullThrottle5s, Spring20/120, Push20/120 at the origin, same yaws) and `B1Tests/MudChannel` (WheelsOnPlane, ChassisThroughRail, PatchSurface). The mud-channel geometry (`Gym/MudChannel`) was moved as a group by (+2563, −771, −5000), with the patch `Size` 800 × 800.
+- `Lvl_Offroad.umap` and its `__ExternalActors__` / `__ExternalObjects__` folders deleted (`git rm`); nothing else referenced it. `RunGymTests.ps1` defaults to `Lvl_Gym_Core`.
+- Headless: 8/8 PASS (`core_migrate.log`).
+
+### Decisions made
+- A separate core map instead of merging the rigs into `Lvl_Gym_Mud`, so the suites stay apart (core 8, gym 22).
+- Recreate rigs rather than duplicate `Lvl_Offroad`: a WP duplicate would carry the unloaded landscape proxies along.
+
+### What we learned
+- New baselines on flat ground: FullThrottle5s 89.2 → 77.0 m (old run went 7.8 m downhill), Push20/120 0.7 → 12.7/12.8 m (no slope holding it), Spring settleTaut 2.95/2.93 → 1.55/1.58 s. The mud-channel rigs are unchanged (10.22 m, endH −0.31/−0.31). The 20 vs 120 fps pairs still agree.
+- MCP: `AssetTools.duplicate` on a WP map copies its external actors; the copy is dirty until `save_assets([new map])`, and `load_level` refuses to open it before that. Empty outliner folders disappear, so `get_actors_in_folder` on them throws.
+- `BP_B1MudPatch` placed fresh defaults to `Size` 2000 × 2000 and spatially loaded; copy instance overrides explicitly.
+
+### Open follow-ups
+- The rest of `Variant_OffRoad/` (landscape materials, RVT, template BPs) may now be partly unused; not checked.
