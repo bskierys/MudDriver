@@ -998,3 +998,24 @@ Sprint 3 closed with the mud + winch checkpoint. Sprint 4 had been outlined on 2
 - Stick pitch fix is live-coded only; the next full build bakes it in.
 - Mouse sensitivity untuned (`MouseLookScale` on `BP_B1Character` if needed).
 - Next: S4-04 mapping-context swap on possession.
+
+## 2026-10-27 — S4-04 mapping-context swap
+
+### Context
+Same session, after the S4-03 commit and the pad pitch fix. Starting state: the template added every vehicle context at startup; the character added its own on-foot context.
+
+### What was built
+- `AB1PlayerController::VehicleMappingContexts` / `OnFootMappingContexts`, swapped in `OnPossess` (`ApplyPawnMappingContexts`, logged on `LogB1Vehicle`). `BP_B1PlayerController`: `DefaultMappingContexts` = `IMC_B1Abilities`; vehicle set = `IMC_Vehicle_Default`, `IMC_Vehicle_MouseLook`, `IMC_SteeringWheel`; on-foot set = `IMC_B1OnFoot`; `MobileExcludedMappingContexts` empty, `bUseSteeringWheelControls` off.
+- `AB1Character` lost its context handling.
+- `AMudDriverPlayerController::OnPawnDestroyed` respawns only for the possessed vehicle.
+- Core 10/10, mud 22/22 headless (`s404_*.log`).
+
+### Decisions made
+- Pawn-type contexts live on the controller (Lyra keeps them per pawn data; we have two pawn types and one controller).
+
+### What we learned
+- `APawn::Destroyed` unpossesses before `OnDestroyed` broadcasts, so a destroy handler can't compare against `GetPawn()`; the template's `VehiclePawn` (cleared by `OnPossess` on foot) works.
+
+### Open follow-ups
+- Touch controls no longer exclude the vehicle mouse-look context (desktop only for now).
+- Next: S4-05 seat, engine off, parked on exit.

@@ -7,7 +7,6 @@
 
 class UCameraComponent;
 class UInputAction;
-class UInputMappingContext;
 struct FInputActionValue;
 
 /** First-person on-foot avatar; its ASC is the PlayerState's (ADR-004) */
@@ -22,7 +21,6 @@ public:
 
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	virtual void PawnClientRestart() override;
 	virtual void UnPossessed() override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
@@ -36,13 +34,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	TObjectPtr<UCameraComponent> FirstPersonCamera;
 
-	/** Added on possession above the vehicle contexts, so shared keys go to walking */
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	TObjectPtr<UInputMappingContext> OnFootMappingContext;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Input")
-	int32 OnFootMappingPriority = 1;
-
+	// Mapping contexts are swapped by AB1PlayerController on possession.
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> MoveAction;
 
@@ -70,9 +62,4 @@ private:
 	void Move(const FInputActionValue& Value);
 	void LookMouse(const FInputActionValue& Value);
 	void LookStick(const FInputActionValue& Value);
-
-	void RemoveOnFootMappingContext();
-
-	/** Controller that got the on-foot context, so UnPossessed can remove it */
-	TWeakObjectPtr<APlayerController> InputController;
 };

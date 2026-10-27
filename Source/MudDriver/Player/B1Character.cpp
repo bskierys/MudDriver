@@ -5,7 +5,6 @@
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
-#include "EnhancedInputSubsystems.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
@@ -37,41 +36,14 @@ float AB1Character::GetCapsuleBottomZ() const
 	return GetCapsuleComponent()->GetComponentLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 }
 
-void AB1Character::PawnClientRestart()
-{
-	Super::PawnClientRestart();
-
-	// Mapping contexts move to the controller's possession swap in S4-04.
-	APlayerController* PC = Cast<APlayerController>(GetController());
-	UEnhancedInputLocalPlayerSubsystem* Subsystem = PC ? ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()) : nullptr;
-	if (Subsystem && OnFootMappingContext)
-	{
-		Subsystem->AddMappingContext(OnFootMappingContext, OnFootMappingPriority);
-		InputController = PC;
-	}
-}
-
 void AB1Character::UnPossessed()
 {
-	RemoveOnFootMappingContext();
-
 	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
 	{
 		ASC->SetLooseGameplayTagCount(B1GameplayTags::State_Avatar_OnFoot, 0);
 	}
 
 	Super::UnPossessed();
-}
-
-void AB1Character::RemoveOnFootMappingContext()
-{
-	const APlayerController* PC = InputController.Get();
-	UEnhancedInputLocalPlayerSubsystem* Subsystem = PC ? ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()) : nullptr;
-	if (Subsystem && OnFootMappingContext)
-	{
-		Subsystem->RemoveMappingContext(OnFootMappingContext);
-	}
-	InputController.Reset();
 }
 
 void AB1Character::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

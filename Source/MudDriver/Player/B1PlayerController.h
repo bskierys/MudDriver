@@ -28,4 +28,14 @@ protected:
 	/** Ability input actions, bound for both pawns (ADR-014) */
 	UPROPERTY(EditDefaultsOnly, Category = "B1|Input")
 	TObjectPtr<UB1InputConfig> InputConfig;
+
+	/** Active only while a vehicle is possessed; DefaultMappingContexts stay on for every pawn */
+	UPROPERTY(EditDefaultsOnly, Category = "B1|Input")
+	TArray<TObjectPtr<UInputMappingContext>> VehicleMappingContexts;
+
+	UPROPERTY(EditDefaultsOnly, Category = "B1|Input")
+	TArray<TObjectPtr<UInputMappingContext>> OnFootMappingContexts;
+
+private:
+	void ApplyPawnMappingContexts(const APawn* InPawn);
 };

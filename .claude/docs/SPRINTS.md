@@ -797,7 +797,13 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** builds; both walk rigs PASS headless.
   **User check:** walking and looking feel fine on keyboard and pad; walking through mud stands on the hard bottom.
 
-- [ ] **S4-04** Mapping-context swap on possession (1.5 h) _(requires S4-03)_
+- [x] **S4-04** Mapping-context swap on possession (1.5 h) _(requires S4-03)_ <!-- done: 2026-10-27 -->
+  Result:
+  - `AB1PlayerController::VehicleMappingContexts` / `OnFootMappingContexts`; `OnPossess` → `ApplyPawnMappingContexts` removes the other set and adds the pawn's (vehicle for `AWheeledVehiclePawn`, on foot for `AB1Character`, none otherwise) and logs `mapping contexts for <pawn>: vehicle|on foot|none` on `LogB1Vehicle`.
+  - `BP_B1PlayerController`: `DefaultMappingContexts` = `IMC_B1Abilities` only; `IMC_Vehicle_Default`, `IMC_Vehicle_MouseLook` (was mobile-excluded) and `IMC_SteeringWheel` (was `bUseSteeringWheelControls`, now off) moved to `VehicleMappingContexts`; `IMC_B1OnFoot` in `OnFootMappingContexts`. The character's own context code (S4-03) is gone. No child BPs of the controller.
+  - `AMudDriverPlayerController::OnPawnDestroyed` respawns only when the destroyed pawn is `VehiclePawn` (the possessed vehicle, null on foot). `APawn::Destroyed` unpossesses before `OnDestroyed` fires, so `GetPawn()` can't be used there.
+  - Headless: core 10/10 (`B1OnFoot_WalkFirm` 29.17 m, log shows "on foot"), mud 22/22 (`s404_*.log`).
+  - Touch controls no longer skip the vehicle mouse-look context (desktop only for now).
   `AB1PlayerController::OnPossess` removes the previous pawn's mapping contexts and adds the new one's (vehicle vs on-foot). The vehicle UI already hides on foot.
   ⚠️ Note: the template adds its contexts in `AMudDriverPlayerController::SetupInputComponent` (`DefaultMappingContexts`, `MobileExcludedMappingContexts`); move the vehicle ones to possession. `IMC_B1Abilities` stays in `DefaultMappingContexts` (ADR-014, S4-02). `OnPawnDestroyed` respawns and possesses a new jeep even if you're on foot: only do that when the destroyed pawn is the one possessed.
   **Done:** builds; core 9 and gym 22 PASS; `B1OnFoot_WalkFirm` still PASS (on-foot context added on possession).

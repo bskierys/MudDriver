@@ -131,6 +131,12 @@ void AMudDriverPlayerController::OnPossess(APawn* InPawn)
 
 void AMudDriverPlayerController::OnPawnDestroyed(AActor* DestroyedPawn)
 {
+	// The pawn is already unpossessed here, so compare against the last possessed vehicle (null while on foot).
+	if (DestroyedPawn != VehiclePawn)
+	{
+		return;
+	}
+
 	// find the player start
 	TArray<AActor*> ActorList;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), APlayerStart::StaticClass(), ActorList);
