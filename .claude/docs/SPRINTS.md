@@ -746,66 +746,133 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
 - ⚠️ Agent checks for on-foot work go through rigs (S4-02 adds ability-input steps), not console cheats. Cheats are for you.
 - ⚠️ Already in place, don't rebuild: `AB1PlayerController::OnPossess` accepts any pawn and sets `State.Avatar.InVehicle` (S2-03); the fuel components only act while the pawn is controlled; `IB1MudSimHost::SetMudKeepAwake` keeps a jeep awake on mud slopes (S3-03).
 - User decisions (2026-10-27): `MaxCableLength` 80 m; the jeep is parked with the handbrake when you get out, but still slides on a muddy slope; snatch overrun accepted as drum slip.
+- User decisions after the round 1 critique ([PLAN.md](PLAN.md), 2026-10-27):
+  - On-foot interact goes through a Lyra-style interaction scan (S4-11, ADR-017).
+  - At full cable length, a sliding jeep drags the character.
+  - Getting in while carrying the hook stows it.
+  - S4-08 adds a NetImGui "Abilities" panel.
+- Design rules from the critique:
+  - `State.Avatar.*` stays in `AB1PlayerController::OnPossess`, keyed on pawn type.
+  - Enter/exit abilities are instant and thin: the controller does the swap, and the cheats call the same functions.
+  - The character follows possession: possessing a jeep seats it there.
+  - A carried hook is visual only and never reaches the sim.
+- Out of scope: animations, hook-in-hand mesh, cable sag, winch free-spool, character slowed in mud, swimming. If the sprint runs long, S4-09 (log) is the task to slip.
 
-- [ ] **S4-01** Winch housekeeping (0.5 h)
+- [x] **S4-01** Winch housekeeping (0.5 h) <!-- done: 2026-10-27 -->
+  Result: `BP_B1Jeep` already had `MaxCableLength` 8000 cm. `B1Winch_CableLimit` and `CableSnatch` moved to X 95.5 m, Y −50 m (77.8 m from `Tree_FirmPull`, on firm floor, endH −0.98); `CableLimit` kept as a cheap regression check, limit 80.5 m. Headless winch gym 16/16 PASS (`s401_winchgym.log`): CableLimit anchorDistMax 77.81, CableSnatch 82.69 (rest 77.79, 4.9 m drum slip). ADR-007 records the drum slip.
   `BP_B1Jeep` `MaxCableLength` 80000 → 8000 cm (user). `B1Winch_CableLimit` and `CableSnatch` were built for 40 m: move them ~78 m from `Tree_FirmPull` (floor allows it) or retire `CableLimit` if it stays trivial (rest = distance at attach). ADR-007: snatch overrun accepted as drum slip; close the open line.
   **Done:** winch gym 16/16 PASS headless with 80 m; ADR-007 updated.
   **User check:** —
 
-- [ ] **S4-02** Ability set + input config + rig steps (ADR-014) (4 h)
+- [x] **S4-02** Ability set + input config + rig steps (ADR-014) (4 h) <!-- done: 2026-10-27 -->
+  Result:
+  - `UB1AbilitySet` (`GAS/`, Lyra's `ULyraAbilitySet` minus attribute sets): abilities + input tag (into the spec's dynamic source tags) and effects, plus granted handles. Granted from the new `UB1GASSettings::AbilitySets` in `AB1PlayerState::BeginPlay` (authority).
+  - `UB1InputConfig` (`Player/`): input action → `InputTag.*`. `AB1PlayerController::InputConfig` binds Started → `AbilityInputTagPressed`, Completed/Canceled → released, forwarded to `UB1AbilitySystemComponent`: it activates matching inactive specs, and active ones get input pressed/released + the replicated event (Lyra's logic, without the per-frame queue).
+  - `UB1GameplayAbility_TestPing` → `GA_B1TestPing` logs `TestPing activated #n` on `LogB1Ability` (new). Tag `InputTag.Debug.TestPing`. Assets: `AbilitySet_B1Player` (`/Game/B1/GAS`), `InputConfig_B1Player`, `IA_B1TestPing`, `IMC_B1Abilities` (P) in `/Game/B1/Input`. `IMC_B1Abilities` was added to `BP_B1PlayerController`'s `DefaultMappingContexts`.
+  - Rig: `FB1GymInputStep::AbilityInputTag` (pressed on step entry, released on the next step or at finish; errors without `bPossessWithPlayer`). Metric `abilities=` (ASC `AbilityActivatedCallbacks`), thresholds `Min/MaxAbilityActivations`. `B1Ability_TestPing` in `Lvl_Gym_Core` (`B1Tests/Ability`, origin): 3 presses with gaps, expects exactly 3.
+  - Headless `Lvl_Gym_Core` 9/9 PASS (`s402_core.log`, abilities=3, FullThrottle5s 77.07 m = baseline). ADR-014 accepted.
   `UB1AbilitySet` (abilities with input tags + effects), granted once on the `AB1PlayerState` ASC. `UB1InputConfig` (input action → native `InputTag.*` in `B1GameplayTags`). `AB1PlayerController` forwards pressed/released to `UB1AbilitySystemComponent`, which activates matching specs. A no-op `GA_B1TestPing` bound to a key logs activation.
   Rig: `FB1GymInputStep::AbilityInputTag` (pressed at step start, released at end, through the player controller; needs `bPossessWithPlayer`). Rig `B1Ability_TestPing` checks the activation count.
   🔍 Research first: Lyra's `ULyraAbilitySet`, `ULyraInputConfig` and `ULyraAbilitySystemComponent::AbilityInputTagPressed`; the minimum we need without `ULyraInputComponent`.
   **Done:** builds; `B1Ability_TestPing` PASS headless; ADR-014 → accepted.
   **User check:** press the test key in PIE: the activation shows in the log.
 
-- [ ] **S4-03** `AB1Character` + on-foot input (3 h) _(requires S4-02)_
-  First-person `ACharacter`: capsule, camera, walk/look/jump with Enhanced Input, `IMC_B1OnFoot`. `BP_B1Character` in `/Game/B1/Player/`. Implements `IAbilitySystemInterface` through the PlayerState ASC. Cheat `B1SpawnCharacter` (spawn in front of the jeep and possess) for testing before S4-06.
+- [x] **S4-03** `AB1Character` + on-foot input + rig move step (4.5 h) _(requires S4-02)_ <!-- done: 2026-10-27 -->
+  Result:
+  - `AB1Character` (`Player/`, abstract): capsule 35 × 90, `FirstPersonCamera` at +70 cm with pawn control rotation, yaw follows the controller. `GetAbilitySystemComponent` = the PlayerState's ASC. `PawnClientRestart` adds `OnFootMappingContext` at priority 1 (above the vehicle contexts, so W/S/A/D walk); `UnPossessed` removes it and clears `State.Avatar.OnFoot`. Mouse look goes through `AddControllerYaw/PitchInput` (template feel, legacy scales on); stick look writes deg/s straight into `RotationInput` (`StickYawRate` 300, `StickPitchRate` 165, Lyra's values).
+  - `AB1PlayerController::OnPossess` also sets `State.Avatar.OnFoot` (1 for `AB1Character`).
+  - Assets (duplicated from the template's `/Game/Input`): `IA_B1Move`, `IA_B1LookMouse`, `IA_B1LookStick`, `IA_B1Jump`, `IMC_B1OnFoot` (WASD + arrows up/down, Space, Mouse2D, gamepad sticks + face bottom) in `/Game/B1/Input`; `BP_B1Character` in `/Game/B1/Player`. `AB1GameMode::CharacterClass` (`BP_B1GameMode` → `BP_B1Character`; also set on `BP_B1GymGameMode`, which had saved None before the parent edit propagated).
+  - Cheat `B1SpawnCharacter`: spawns `CharacterClass` 5 m ahead of the current pawn and possesses it.
+  - Rig: `StartOnFootClass`, `FB1GymInputStep::Move`, metrics `pawn= avatar= charZmin=` (m above the rig), threshold `CharZminRange`. The capsule ignores the mud surface without any change (`B1MudSurface` blocks only WorldDynamic).
+  - `B1OnFoot_WalkFirm` (`Lvl_Gym_Core`, origin): 29.2 m in 5 s, charZmin 0.020. `B1OnFoot_WalkDeep` (`Lvl_Gym_Winch`, X 2 m, Y −32 m): 41.3 m, endH 0.92, charZmin −0.669 (3 cm above the 70 cm bottom). Core 10/10, mud 22/22, winch 17/17 headless (`s403_full_*.log`).
+  - User check (2026-10-27): walking and mud OK; pad pitch was inverted, flipped in `LookStick`.
+  First-person `ACharacter`: capsule, camera, walk/look/jump with Enhanced Input, `IMC_B1OnFoot` with keyboard/mouse **and gamepad** bindings. `BP_B1Character` in `/Game/B1/Player/`. Implements `IAbilitySystemInterface` through the PlayerState ASC. Cheat `B1SpawnCharacter` (spawn in front of the jeep and possess) for testing before S4-06.
   ⚠️ Note: the capsule must walk on a patch's hard bottom, not its mud surface; check its collision against the mud channel/profile from `UB1MudSettings`.
-  **Done:** builds; `BP_B1Character` placed in `Lvl_Gym_Winch` with auto-possess walks in PIE (capture).
-  **User check:** walking and looking feel fine; walking through mud stands on the hard bottom.
+  Rig:
+  - `StartOnFootClass` (config): spawn that character at the rig and possess it instead of a vehicle.
+  - `FB1GymInputStep::Move` (2D, pawn-relative; `AddMovementInput` on a possessed `AB1Character`).
+  - Metrics `pawn=` (possessed class), `avatar=` (`State.Avatar.*`), `charZmin=` (lowest capsule bottom).
+  - `B1OnFoot_WalkFirm` (`Lvl_Gym_Core`, 5 s forward: dist ≥ 10 m).
+  - `B1OnFoot_WalkDeep` (`Lvl_Gym_Winch`, across `Mud_DeepStrip`: `charZmin` within 5 cm of the 70 cm hard bottom, reaches the far side).
+  **Done:** builds; both walk rigs PASS headless.
+  **User check:** walking and looking feel fine on keyboard and pad; walking through mud stands on the hard bottom.
 
 - [ ] **S4-04** Mapping-context swap on possession (1.5 h) _(requires S4-03)_
   `AB1PlayerController::OnPossess` removes the previous pawn's mapping contexts and adds the new one's (vehicle vs on-foot). The vehicle UI already hides on foot.
-  ⚠️ Note: the template adds its contexts in `AMudDriverPlayerController::SetupInputComponent` (`DefaultMappingContexts`, `MobileExcludedMappingContexts`); move the vehicle ones to possession. `OnPawnDestroyed` respawns and possesses a new jeep even if you're on foot: only do that when the destroyed pawn is the one possessed.
-  **Done:** builds; core 8 and gym 22 PASS.
+  ⚠️ Note: the template adds its contexts in `AMudDriverPlayerController::SetupInputComponent` (`DefaultMappingContexts`, `MobileExcludedMappingContexts`); move the vehicle ones to possession. `IMC_B1Abilities` stays in `DefaultMappingContexts` (ADR-014, S4-02). `OnPawnDestroyed` respawns and possesses a new jeep even if you're on foot: only do that when the destroyed pawn is the one possessed.
+  **Done:** builds; core 9 and gym 22 PASS; `B1OnFoot_WalkFirm` still PASS (on-foot context added on possession).
   **User check:** —
 
-- [ ] **S4-05** Seat, engine off, parked on exit (3 h) _(requires S4-03)_
-  - Seat socket on `BP_B1Jeep`. The character is spawned once (class on `AB1GameMode`), hidden, collision off and attached to the seat while driving.
+- [ ] **S4-05** Seat, engine off, parked on exit (3.5 h) _(requires S4-03)_
+  - Seat socket on `BP_B1Jeep`. The character is spawned once (class on `AB1GameMode`). While driving it is hidden, collision off, `MOVE_None` and attached to the seat.
+  - The character follows possession: whenever the controller possesses a jeep, the character is seated in that jeep. Rig-spawned jeeps (`bPossessWithPlayer`) and respawned jeeps get it too, so exits always leave the possessed jeep.
   - Engine off outside: `Vehicle.State.EngineOff`, throttle cut through the same path as out-of-fuel (`SetFuelCutOff` → a general engine-cut reason), restart on enter. Fuel doesn't drain unpossessed already; verify, don't rebuild.
   - Parked on exit (user): handbrake on, released on enter. It must hold on firm ground and on the firm 20° slope, but still slide on a muddy slope.
   🔍 Research first: Chaos `bRequiresControllerForInputs` zeroes raw inputs without a controller, so a handbrake input won't stick on an unpossessed jeep; look at `SetParked` / `ParkingEnabled`. `FB1MudSimulation` already counts handbrake and parking as input (no brake release).
   ⚠️ Note: if the parked jeep holds on the medium slope (locked wheels out-grip `SlopePull`), fix it in the mud sim (portable), not in the host. Keep-awake must still work with no controller.
-  Rig: `FB1GymInputStep::bParked` calls the same jeep function. `B1Park_FirmSlope` (mid firm slope, 10 s): `lastDisp` ≤ 5 cm. `B1Park_MediumSlope` (mid medium slope, 10 s): slides ≥ 1 m.
-  **Done:** builds; park rigs PASS headless; a headless run logs no fuel drain while parked.
+  ⚠️ Note: since ADR-016 (anti-slide off) nothing but tire friction and sleep holds a jeep on firm ground, and locked rear wheels may creep. Measure first, then set the threshold. If the creep is large, let Chaos sleep hold the parked jeep off mud (keep-awake only fires on mud slopes); don't add a hold force.
+  Rig: `FB1GymInputStep::bParked` calls the same jeep function. Metric `seated=` (character attached to the rig's jeep).
+  - `B1Park_FirmSlope` (mid firm slope, 10 s): `lastDisp` ≤ measured creep + margin, target 5 cm.
+  - `B1Park_MediumSlope` (mid medium slope, 10 s): slides ≥ 1 m.
+  **Done:** builds; park rigs PASS headless with `seated=1`; a headless run logs no fuel drain while parked.
   **User check:** —
 
-- [ ] **S4-06** `GA_B1EnterExitVehicle` + cheats (3 h) _(requires S4-02, S4-04, S4-05)_
-  Exit: place the character at the driver door (fallback spots if blocked), unhide, possess it, ASC avatar → character, `State.Avatar.OnFoot`; park the jeep and cut the engine. Enter: within range of the jeep, possess it, avatar → jeep, re-seat the character. Tag-gated per ADR-004. `State.Avatar.*` moves from `AB1PlayerController::OnPossess` to the ability (or stays there keyed on pawn type; pick one). Cheats `B1ExitVehicle`, `B1EnterVehicle`.
-  Rig `B1OnFoot_ExitEnter10`: 10 × exit/enter via `AbilityInputTag` steps; checks possessed pawn class and avatar tag after each step, fuel unchanged while outside, no errors or ensures.
+- [ ] **S4-11** Interaction scan + `GA_B1Interact` (ADR-017) (2.5 h) _(requires S4-03)_
+  Added after the round 1 critique: the jeep door, the jeep front and the anchors all share one interact key, and S4-06/07/08 each needed the same "what's in range, which wins" logic. Needed before S4-06, not backlog.
+  - `IB1Interactable::GatherInteractionOptions(Character, Options)`. `FB1InteractionOption`: text, trigger event tag, priority, interaction point. Lyra's `IInteractableTarget` / `FInteractionOption`, minus the per-option granted ability.
+  - `UB1InteractionScanComponent` on `AB1Character`: overlap query at ~10 Hz within a range, keeps the best option (priority, then distance to the point).
+  - `GA_B1Interact` on `InputTag.Interact`, gated by `State.Avatar.OnFoot`: sends the best option's event, and the target ability triggers from it (`AbilityTriggers`, GameplayEvent). Pad + key binding in `IMC_B1Abilities`.
+  - ADR-017 (interaction options + one interact ability) → accepted when the rig passes.
+  Rig: `AB1TestInteractable` (option "Ping" → event that triggers `GA_B1TestPing`). `B1OnFoot_Interact` (`Lvl_Gym_Core`): walk to it, press interact (`AbilityInputTag`), `abilities` = 2 (interact + ping); press again out of range: no change.
+  **Done:** builds; `B1OnFoot_Interact` PASS headless; ADR-017 added.
+  **User check:** —
+
+- [ ] **S4-06** Enter/exit vehicle + cheats (3.5 h) _(requires S4-04, S4-05, S4-11)_
+  - Controller does the swap: `AB1PlayerController::ExitVehicle()` puts the character at the driver door (fallback spots if blocked), unhides it, parks the jeep, cuts the engine and possesses the character. `EnterVehicle(AB1Jeep*)` possesses the jeep, which re-seats the character (S4-05).
+  - `State.Avatar.*` stays in `OnPossess`, keyed on pawn type (ADR-004).
+  - `GA_B1ExitVehicle` (`InputTag.Interact`, gated by `State.Avatar.InVehicle`) and `GA_B1EnterVehicle` (triggered by the jeep door's "Enter" option, S4-11) are instant: validate, call the controller, end in the same frame. Cheats `B1ExitVehicle` / `B1EnterVehicle` call the same functions.
+  - On exit, check what happens to `Vehicle.State.*` on the ASC (fuel/mud components drop their state when the controller changes, ADR-004) and log it.
+  Rig `B1OnFoot_ExitEnter10`: 10 × exit (interact in the jeep) and enter (interact at the door). After each step it checks `pawn=` and `avatar=`. Fuel must be unchanged while outside, with no errors or ensures.
   **Done:** builds; rig PASS headless; all suites PASS.
   **User check:** get out and in on firm ground, in mud and on the slope; camera and controls switch cleanly; the parked jeep stays put on firm ground and slides on the muddy slope.
 
-- [ ] **S4-07** `GA_B1CarryWinchHook` (3.5 h) _(requires S4-06)_
-  On foot at the jeep's front: take the hook; the cable runs from the winch point to the character's hand, no tension; the character can't walk past `MaxCableLength` (80 m leash). Interact near an anchor attaches (rest length = distance); interact at the jeep puts the hook back.
-  In the car, `IA_B1WinchToggle` becomes release-only (ADR-007: the carry replaces attaching from the seat). `B1WinchAttachNearest` and the Winch window's Attach button stay as debug.
-  Rig: step `TeleportPawnTo` (actor) stands in for walking. `B1OnFoot_HookCarry`: exit, take, teleport by the tree, attach, teleport back, enter, full pull: the jeep moves toward the tree.
-  **Done:** builds; `B1OnFoot_HookCarry` PASS headless; S3-15 rigs still PASS.
-  **User check:** carry the hook up the slope to the tree, attach, walk back, get in, winch up.
+- [ ] **S4-07** Winch hook carry (4.5 h) _(requires S4-06)_
+  - Hook states on `UB1WinchComponent`: stowed / carried / attached.
+    - **Carried** is visual only: the cable runs to the character's hand, and no `FB1WinchSimInput` anchor is sent, so there is no tension.
+    - **Attached** works as today (rest length = distance at attach).
+  - Leash on the character side: past `MaxCableLength` (80 m) from the winch point, the character is pulled back onto that radius. A jeep sliding away therefore drags the character (user).
+  - Interaction options (S4-11), each triggering its own small ability:
+    - Jeep front: "Take hook" when stowed, "Return hook" when carried.
+    - Anchor: "Attach" when carried, "Detach" when this anchor is hooked; the hook goes back to carried.
+  - Getting in while carrying stows the hook (user).
+  - In the car, `IA_B1WinchToggle` becomes release-only (ADR-007: the carry replaces attaching from the seat). `B1WinchAttachNearest` and the Winch window's Attach button stay as debug.
+  Rig: step `TeleportPawnTo` (actor) for long trips only. Metrics `hook=` (state) and `carryMax=` (peak hand-to-winch-point distance).
+  - `B1OnFoot_HookCarry`: exit, take, teleport by the tree, attach, teleport back, enter, full pull: the jeep moves toward the tree.
+  - `B1OnFoot_Leash`: take, walk away 30 s (`Move`): `carryMax` ≤ 80.5 m.
+  - `B1OnFoot_EnterWithHook`: take, enter: `hook=stowed`.
+  **Done:** builds; the three rigs PASS headless; S3-15 rigs still PASS.
+  **User check:** carry the hook up the slope to the tree, attach, walk back, get in, winch up; on the medium slope, walk out to full length and feel the sliding jeep drag you.
 
-- [ ] **S4-08** Interaction prompt, cable from hand, carry debug (2 h) _(requires S4-07)_
-  Minimal UMG/ShowDebug-style prompt: "Take hook", "Attach", "Return hook", "Enter" when in range. Cable end follows a hand socket on the first-person camera. Winch window and `ShowDebug B1Winch` show the hook state (stowed / carried / attached) and the carry distance vs `MaxCableLength`.
-  **Done:** builds.
-  **User check:** you always know what the interact key will do; the debug views read the carry state.
+- [ ] **S4-08** Interaction prompt, cable from hand, debug panels (3 h) _(requires S4-07)_
+  - Minimal UMG prompt showing the scan's best option ("Enter", "Take hook", "Attach", "Return hook", "Detach") and its key, read from `UB1InteractionScanComponent`, so it can't disagree with what interact does.
+  - Cable end follows a hand socket on the first-person camera.
+  - Winch window and `ShowDebug B1Winch` show the hook state and carry distance vs `MaxCableLength`.
+  - NetImGui "Abilities" panel (Debug → Abilities, user): granted specs with input tags, active abilities, loose tags on the ASC, current avatar and possessed pawn, the scan's options in range.
+  **Done:** builds; the panel opens in PIE (capture).
+  **User check:** you always know what the interact key will do; the debug views read the carry state and the abilities panel helps while testing.
 
 - [ ] **S4-09** Winchable log (3 h) _(requires S4-01)_
-  `BP_B1WinchLog`: simulating trunk mesh with `UB1WinchAnchorComponent`. The opposite cable force is applied in the log's async physics tick (`bAsyncPhysicsTickEnabled`), reading the winch's published tension and direction. Log lane in `Lvl_Gym_Winch` (not built in S3-14). Pick mass and friction so the 60 kN cap moves it but not trivially. Rig `B1Winch_Log`: braked jeep, full pull, log moves ≥ 3 m toward the jeep, `tensionMax` ≤ 63 kN.
-  🔍 Research first: `AActor::AsyncPhysicsTickActor` in 5.8 and reading game-thread data safely from it. Fallback: game-thread `AddForce` on the log only.
+  `BP_B1WinchLog`: simulating trunk mesh with `UB1WinchAnchorComponent`; it gets the opposite cable force. Log lane in `Lvl_Gym_Winch` (not built in S3-14). Pick mass and friction so the 60 kN cap moves it, but not trivially. Rig `B1Winch_Log`: braked jeep, full pull, the log moves ≥ 3 m toward the jeep, `tensionMax` ≤ 63 kN.
+  🔍 Research first, in this order:
+  1. Apply the opposite force to the log's body handle from `FB1VehicleSimulation::UpdateWinch` in the same physics step: exactly equal and opposite, no cross-thread read.
+  2. The log's `AsyncPhysicsTickActor` reading the published tension.
+  3. Game-thread `AddForce` on the log.
+  Amend ADR-007 ("Log") if 1 wins.
+  ⚠️ Note: slip candidate if the sprint runs long (it doesn't block the on-foot loop); Phase 2's done-when then waits for it.
   **Done:** rig PASS headless.
   **User check:** winch the log off the lane; it slides and rolls believably.
 
-- [ ] **S4-10** Phase 2 playtest (user + agent, 1–2 h) _(requires S4-06..S4-09)_
+- [ ] **S4-10** Phase 2 playtest (user + agent, 1–2 h) _(requires S4-06..S4-09, S4-11)_
   Full loop on foot in `Lvl_Gym_Winch`: get stuck, get out, carry the hook, attach, get in, winch out; same on both slopes; log lane. All suites headless.
   **Done:** all suites PASS; ROADMAP Phase 2 ticked.
   **User check:** sign-off on Phase 2.

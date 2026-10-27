@@ -18,4 +18,8 @@ public:
 	bool ApplyVehicleDamage(float Amount);
 	bool SetVehicleCondition(float Value);
 	bool AddVehicleFuel(float Litres);
+
+	// Activates, or forwards input to, every spec whose dynamic tags hold InputTag (ADR-014).
+	void AbilityInputTagPressed(const FGameplayTag& InputTag);
+	void AbilityInputTagReleased(const FGameplayTag& InputTag);
 };

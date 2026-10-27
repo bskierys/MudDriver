@@ -26,6 +26,7 @@ Applies whenever you use the `unreal-mcp` server (Epic's ModelContextProtocol pl
 - **Nothing is saved automatically.** Finish with `AssetTools.save_assets` (assets) or `SceneTools.save_actor` (level actors).
 - **Property names can't be guessed.** Run `ObjectTools.list_properties` before `get_properties` / `set_properties`. Setting an unknown name can fail silently.
 - **Blueprint defaults** live on the CDO: `BlueprintTools.get_default_object`, then `ObjectTools.set_properties`. Compile with `compile_blueprint` after structural changes.
+- **Child BPs don't pick up a parent CDO edit.** Setting a property on a parent BP's CDO doesn't propagate, and once the child is saved its old value becomes an override that compiling the parent won't clear. Set the same value on each child BP's CDO too (e.g. `BP_B1GymGameMode` under `BP_B1GameMode`) and check it with `get_properties`.
 - **Verify visually** with `EditorAppToolset.CaptureViewport` / `CaptureAssetImage` after level or asset edits.
 - **New actors in World Partition maps** (all `B1/Gym` maps) live in their own `__ExternalActors__` package. `save_actor` and `save_assets([map])` both skip a package that isn't on disk yet. `save_assets([])` (save all dirty) writes it; check `git status` after.
 - **WP landscape isn't loaded in the editor**, so `SceneTools.trace_world` hits nothing there. Place actors relative to known actors (e.g. PlayerStart) and let PIE settle them.

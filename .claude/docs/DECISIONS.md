@@ -155,7 +155,8 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 - **Drag caps, corrected premise.** Before counting the winch, mud barely resisted it: the caps let only the tire push through, so the winch dragged a stuck jeep almost freely, the opposite of what the amendment above expected. Counting the winch as push (`FB1MudSimulation::SetExternalForce`, a generic host hook) lets mud resist it at full strength.
 - **Input until on foot.** One toggle (attach nearest / release) plus pull, in the vehicle mapping context, until the on-foot hook carry (S4-07) replaces attaching from the seat. User's pad layout: D-pad Up pull, D-pad Down toggle.
 
-**Accepted 2026-10-27 (S3-15/16).** Stability rigs pass at 20 and 120 fps with the same tension (21.1 kN peak, ~1 kN range in the last 3 s). After the playtest the user tuned `BP_B1Jeep` to `MaxPullForce` 60 kN and `MaxCableLength` 80000 cm; winch, slope and flat suites all pass with these values. Still open: tension stays capped while a cable is being stretched, so a jeep that drives into a taut cable at speed overruns it (`B1Winch_CableSnatch`: 2.9 m past rest at 60 kN). Sprint 3 backlog.
+**Accepted 2026-10-27 (S3-15/16).** Stability rigs pass at 20 and 120 fps with the same tension (21.1 kN peak, ~1 kN range in the last 3 s). After the playtest the user tuned `BP_B1Jeep` to `MaxPullForce` 60 kN and `MaxCableLength` 8000 cm (80 m, S4-01); winch, slope and flat suites all pass with these values.
+- **Snatch overrun = drum slip (user, 2026-10-27).** Tension stays capped while a cable is being stretched, so a jeep that drives into a taut cable at speed pulls cable off the drum (`B1Winch_CableSnatch`: 4.9 m past a 77.8 m rest at 60 kN). Accepted as a slipping drum brake; no hold cap above `MaxPullForce`.
 
 ---
 
@@ -278,7 +279,7 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 
 ## ADR-014 — Abilities are granted by ability sets and activated by input tags
 
-**Status:** proposed (2026-10-26, built in Sprint 4)
+**Status:** accepted (2026-10-27, S4-02)
 
 **Problem.** Phase 2 adds the first real abilities (enter/exit, carry the winch hook; the machete follows in Phase 4). Nothing grants abilities or binds input to them yet, and the player swaps between two pawns while keeping one ASC on the PlayerState (ADR-004).
 
@@ -291,6 +292,11 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 **Rationale.** Lyra's pattern, and the user wants Lyra practices. Granting once on the PlayerState fits the single ASC; tags keep on-foot abilities from firing in the jeep and the other way round. Data assets keep bindings editable without code.
 
 **Alternatives.** Grant and remove abilities per pawn on possession (churn on every swap, and specs are lost). Activate by class from pawn input handlers (couples input code to ability classes). Lyra's full `ULyraInputComponent` / pawn data stack (more than a two-pawn prototype needs).
+
+**Accepted 2026-10-27 (S4-02, built).**
+- **Where sets come from.** `UB1GASSettings::AbilitySets` (Project Settings → B1 GAS), granted in `AB1PlayerState::BeginPlay`. There is no pawn data or experience, so the settings stand in for Lyra's pawn data.
+- **Where input binds.** `UB1InputConfig` sits on the controller (`BP_B1PlayerController`), not per pawn, so ability keys work on both pawns. Its contexts (`IMC_B1Abilities`) stay in `DefaultMappingContexts`; only the vehicle and on-foot contexts swap (S4-04).
+- **Immediate activation.** Pressed/released go straight to the ASC. Lyra's per-frame `ProcessAbilityInput` queue and activation policies (on spawn, while held) are left out until an ability needs them.
 
 ---
 

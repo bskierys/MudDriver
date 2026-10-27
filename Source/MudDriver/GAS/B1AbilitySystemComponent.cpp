@@ -3,6 +3,7 @@
 #include "B1GameplayTags.h"
 #include "B1VehicleAttributeSet.h"
 #include "GameplayEffect.h"
+#include "Abilities/GameplayAbility.h"
 
 bool UB1AbilitySystemComponent::ApplySetByCallerEffectToSelf(TSubclassOf<UGameplayEffect> EffectClass, FGameplayTag DataTag, float Magnitude)
 {
@@ -31,6 +32,76 @@ bool UB1AbilitySystemComponent::SetVehicleCondition(float Value)
 {
 	// Negative damage repairs; the attribute set clamps to [0, MaxCondition].
 	return ApplyVehicleDamage(GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute()) - Value);
+}
+
+namespace
+{
+	FPredictionKey GetOriginalPredictionKey(const FGameplayAbilitySpec& Spec)
+	{
+		const UGameplayAbility* Instance = Spec.GetPrimaryInstance();
+		return Instance ? Instance->GetCurrentActivationInfo().GetActivationPredictionKey() : FPredictionKey();
+	}
+}
+
+void UB1AbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& InputTag)
+{
+	if (!InputTag.IsValid())
+	{
+		return;
+	}
+
+	// Collected first: activation can change ActivatableAbilities.
+	TArray<FGameplayAbilitySpecHandle> ToActivate;
+	for (FGameplayAbilitySpec& Spec : ActivatableAbilities.Items)
+	{
+		if (!Spec.Ability || !Spec.GetDynamicSpecSourceTags().HasTagExact(InputTag))
+		{
+			continue;
+		}
+
+		if (Spec.IsActive())
+		{
+			AbilitySpecInputPressed(Spec);
+			// For WaitInputPress tasks.
+			InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputPressed, Spec.Handle, GetOriginalPredictionKey(Spec));
+		}
+		else
+		{
+			Spec.InputPressed = true;
+			ToActivate.Add(Spec.Handle);
+		}
+	}
+
+	for (const FGameplayAbilitySpecHandle& Handle : ToActivate)
+	{
+		TryActivateAbility(Handle);
+	}
+}
+
+void UB1AbilitySystemComponent::AbilityInputTagReleased(const FGameplayTag& InputTag)
+{
+	if (!InputTag.IsValid())
+	{
+		return;
+	}
+
+	for (FGameplayAbilitySpec& Spec : ActivatableAbilities.Items)
+	{
+		if (!Spec.Ability || !Spec.GetDynamicSpecSourceTags().HasTagExact(InputTag))
+		{
+			continue;
+		}
+
+		if (Spec.IsActive())
+		{
+			AbilitySpecInputReleased(Spec);
+			InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputReleased, Spec.Handle, GetOriginalPredictionKey(Spec));
+		}
+		else
+		{
+			Spec.InputPressed = false;
+		}
+	}
 }
 
 bool UB1AbilitySystemComponent::AddVehicleFuel(float Litres)

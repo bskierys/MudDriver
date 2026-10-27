@@ -40,6 +40,10 @@ public:
 	UFUNCTION(Exec)
 	void B1WinchDetach();
 
+	/** Spawns the game mode's CharacterClass in front of the current pawn and possesses it */
+	UFUNCTION(Exec)
+	void B1SpawnCharacter();
+
 private:
 
 	class UB1WinchComponent* GetPlayerWinch(const TCHAR* CheatName) const;

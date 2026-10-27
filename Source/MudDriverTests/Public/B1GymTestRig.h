@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "FunctionalTest.h"
 #include "B1VehicleSimInput.h"
+#include "GameplayTagContainer.h"
 #include "B1GymTestRig.generated.h"
 
 class AWheeledVehiclePawn;
@@ -11,6 +12,8 @@ class UB1VehicleMovementComponent;
 class UB1MudVehicleComponent;
 class UB1AbilitySystemComponent;
 class UB1WinchComponent;
+class UGameplayAbility;
+class AB1Character;
 
 USTRUCT(BlueprintType)
 struct FB1GymInputStep
@@ -39,6 +42,14 @@ struct FB1GymInputStep
 	/** Winch reel-in fraction for this step; needs the rig's WinchAnchor */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (ClampMin = "0", ClampMax = "1"))
 	float WinchPull = 0.0f;
+
+	/** Pressed through player 0's controller at step start, released at its end; needs bPossessWithPlayer */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Categories = "InputTag"))
+	FGameplayTag AbilityInputTag;
+
+	/** On-foot movement input, X forward and Y right relative to the character; needs StartOnFootClass */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	FVector2D Move = FVector2D::ZeroVector;
 };
 
 /** Pass criteria. Negative values disable a check */
@@ -122,6 +133,20 @@ struct FB1GymThresholds
 	/** Peak winch point to anchor distance */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
 	float MaxAnchorDistance = -1.0f;
+
+	/** Abilities activated on the PlayerState ASC during the script; needs bPossessWithPlayer */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	int32 MinAbilityActivations = -1;
+
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	int32 MaxAbilityActivations = -1;
+
+	/** Lowest capsule bottom above the rig actor during the script; needs StartOnFootClass */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m", EditCondition = "bCheckCharZmin"))
+	FFloatInterval CharZminRange = FFloatInterval(0.0f, 0.0f);
+
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (InlineEditConditionToggle))
+	bool bCheckCharZmin = false;
 };
 
 /**
@@ -156,6 +181,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
 	TSubclassOf<AWheeledVehiclePawn> VehicleClass;
+
+	/** Spawns this character at the rig and player 0 possesses it instead of a vehicle */
+	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
+	TSubclassOf<AB1Character> StartOnFootClass;
 
 	/** Player 0 possesses the spawned vehicle, so it gets the PlayerState ASC (fuel, tags). One such rig per PIE round */
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
@@ -208,14 +237,28 @@ protected:
 private:
 
 	AWheeledVehiclePawn* ResolveVehicle();
+	AB1Character* SpawnOnFoot();
+	void PossessWithPlayer(APawn* NewPawn);
 	void ApplyInput(const FB1GymInputStep& Step);
 	void EnterStep(int32 StepIndex);
 	void Sample(float DeltaSeconds);
 	void SampleSpring();
 	void FinishScript();
+	void SetAbilityInput(const FGameplayTag& InputTag);
+	void OnAbilityActivated(UGameplayAbility* Ability);
+
+	/** The rig's vehicle or on-foot character; what the metrics sample */
+	UPROPERTY(Transient)
+	TObjectPtr<APawn> Subject;
 
 	UPROPERTY(Transient)
 	TObjectPtr<AWheeledVehiclePawn> Vehicle;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AB1Character> Character;
+
+	/** Lowest capsule bottom, world cm */
+	float CharZmin = 0.0f;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UChaosWheeledVehicleMovementComponent> Movement;
@@ -238,6 +281,11 @@ private:
 	TObjectPtr<UB1AbilitySystemComponent> AbilitySystem;
 
 	float FuelAtStart = 0.0f;
+
+	/** Ability input tag currently held through the player controller */
+	FGameplayTag HeldAbilityInputTag;
+	int32 AbilityActivations = 0;
+	FDelegateHandle AbilityActivatedHandle;
 
 	/** s with Vehicle.State.InMud on the ASC */
 	float TimeInMud = 0.0f;

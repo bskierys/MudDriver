@@ -1,7 +1,10 @@
 #include "B1GymTestRig.h"
 #include "B1Log.h"
 #include "B1AbilitySystemComponent.h"
+#include "B1Character.h"
+#include "Components/CapsuleComponent.h"
 #include "B1GameplayTags.h"
+#include "B1PlayerController.h"
 #include "B1VehicleAttributeSet.h"
 #include "B1VehicleMovementComponent.h"
 #include "B1MudVehicleComponent.h"
@@ -63,13 +66,23 @@ void AB1GymTestRig::PrepareTest()
 		SetConsoleVariableFromFloat(TEXT("t.MaxFPS"), MaxFPS);
 	}
 
-	Vehicle = ResolveVehicle();
+	Character = StartOnFootClass ? SpawnOnFoot() : nullptr;
+	Vehicle = Character ? nullptr : ResolveVehicle();
+	Subject = Character ? static_cast<APawn*>(Character) : Vehicle;
 	Movement = Vehicle ? Cast<UChaosWheeledVehicleMovementComponent>(Vehicle->GetVehicleMovementComponent()) : nullptr;
 	B1Movement = Cast<UB1VehicleMovementComponent>(Movement);
 	MudVehicle = Vehicle ? Vehicle->FindComponentByClass<UB1MudVehicleComponent>() : nullptr;
-	if (!Movement)
+	if (StartOnFootClass && !Character)
+	{
+		FinishTest(EFunctionalTestResult::Error, TEXT("StartOnFootClass didn't spawn, or there is no player 0"));
+	}
+	else if (!Character && !Movement)
 	{
 		FinishTest(EFunctionalTestResult::Error, TEXT("no wheeled vehicle to drive"));
+	}
+	else if (Character && (TestForce != EB1TestForce::Off || WinchAnchor || bDisableVehicleSleep))
+	{
+		FinishTest(EFunctionalTestResult::Error, TEXT("TestForce, WinchAnchor and bDisableVehicleSleep need a vehicle"));
 	}
 	else if (TestForce != EB1TestForce::Off && !B1Movement)
 	{
@@ -109,10 +122,9 @@ AWheeledVehiclePawn* AB1GymTestRig::ResolveVehicle()
 	}
 
 	RegisterAutoDestroyActor(Spawned);
-	if (APlayerController* PC = bPossessWithPlayer ? GetWorld()->GetFirstPlayerController() : nullptr)
+	if (bPossessWithPlayer)
 	{
-		PreviousPlayerPawn = PC->GetPawn();
-		PC->Possess(Spawned);
+		PossessWithPlayer(Spawned);
 	}
 	else
 	{
@@ -122,9 +134,42 @@ AWheeledVehiclePawn* AB1GymTestRig::ResolveVehicle()
 	return Spawned;
 }
 
+AB1Character* AB1GymTestRig::SpawnOnFoot()
+{
+	if (!GetWorld()->GetFirstPlayerController())
+	{
+		return nullptr;
+	}
+
+	// The rig marks the ground; the capsule centre goes half its height above it.
+	const float HalfHeight = StartOnFootClass->GetDefaultObject<AB1Character>()->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	AB1Character* Spawned = GetWorld()->SpawnActor<AB1Character>(StartOnFootClass,
+		GetActorLocation() + FVector(0.0f, 0.0f, HalfHeight + 2.0f), FRotator(0.0f, GetActorRotation().Yaw, 0.0f), Params);
+	if (!Spawned)
+	{
+		return nullptr;
+	}
+
+	RegisterAutoDestroyActor(Spawned);
+	PossessWithPlayer(Spawned);
+	GetWorld()->GetFirstPlayerController()->SetControlRotation(Spawned->GetActorRotation());
+	return Spawned;
+}
+
+void AB1GymTestRig::PossessWithPlayer(APawn* NewPawn)
+{
+	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+	{
+		PreviousPlayerPawn = PC->GetPawn();
+		PC->Possess(NewPawn);
+	}
+}
+
 bool AB1GymTestRig::IsReady_Implementation()
 {
-	return Movement && TotalTime >= SettleTime;
+	return Subject && TotalTime >= SettleTime;
 }
 
 void AB1GymTestRig::StartTest()
@@ -134,7 +179,8 @@ void AB1GymTestRig::StartTest()
 	bScriptRunning = true;
 	ScriptTime = 0.0f;
 	NumFrames = 0;
-	StartLocation = LastLocation = Vehicle->GetActorLocation();
+	StartLocation = LastLocation = Subject->GetActorLocation();
+	CharZmin = Character ? Character->GetCapsuleBottomZ() : 0.0f;
 	PathLength = 0.0f;
 	MaxSpeed = 0.0f;
 	StuckTimer = 0.0f;
@@ -180,18 +226,31 @@ void AB1GymTestRig::StartTest()
 	}
 
 	TimeInMud = 0.0f;
-	AbilitySystem = Cast<UB1AbilitySystemComponent>(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Vehicle));
-	if (bPossessWithPlayer)
+	AbilitySystem = Cast<UB1AbilitySystemComponent>(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Subject));
+	if (bPossessWithPlayer || Character)
 	{
 		if (!AbilitySystem)
 		{
-			FinishTest(EFunctionalTestResult::Error, TEXT("bPossessWithPlayer but the vehicle has no B1 ASC (game mode isn't AB1GameMode?)"));
+			FinishTest(EFunctionalTestResult::Error, TEXT("the player's pawn has no B1 ASC (game mode isn't AB1GameMode?)"));
 			return;
 		}
 		const float MaxFuel = AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetMaxFuelAttribute());
 		const float TargetFuel = StartFuel < 0.0f ? MaxFuel : FMath::Min(StartFuel, MaxFuel);
 		AbilitySystem->AddVehicleFuel(TargetFuel - AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute()));
 		FuelAtStart = AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute());
+
+		AbilityActivations = 0;
+		AbilityActivatedHandle = AbilitySystem->AbilityActivatedCallbacks.AddUObject(this, &AB1GymTestRig::OnAbilityActivated);
+	}
+	else if (InputScript.ContainsByPredicate([](const FB1GymInputStep& Step) { return Step.AbilityInputTag.IsValid(); }))
+	{
+		FinishTest(EFunctionalTestResult::Error, TEXT("AbilityInputTag steps need bPossessWithPlayer"));
+		return;
+	}
+	if (!Character && InputScript.ContainsByPredicate([](const FB1GymInputStep& Step) { return !Step.Move.IsZero(); }))
+	{
+		FinishTest(EFunctionalTestResult::Error, TEXT("Move steps need StartOnFootClass"));
+		return;
 	}
 
 	CurrentStep = INDEX_NONE;
@@ -214,15 +273,53 @@ void AB1GymTestRig::EnterStep(int32 StepIndex)
 	{
 		MudVehicle->Unstuck();
 	}
+	SetAbilityInput(InputScript[StepIndex].AbilityInputTag);
+}
+
+void AB1GymTestRig::SetAbilityInput(const FGameplayTag& InputTag)
+{
+	if (InputTag == HeldAbilityInputTag)
+	{
+		return;
+	}
+
+	AB1PlayerController* PC = Cast<AB1PlayerController>(GetWorld()->GetFirstPlayerController());
+	if (!PC)
+	{
+		HeldAbilityInputTag = FGameplayTag();
+		return;
+	}
+
+	if (HeldAbilityInputTag.IsValid())
+	{
+		PC->AbilityInputTagReleased(HeldAbilityInputTag);
+	}
+	HeldAbilityInputTag = InputTag;
+	if (HeldAbilityInputTag.IsValid())
+	{
+		PC->AbilityInputTagPressed(HeldAbilityInputTag);
+	}
+}
+
+void AB1GymTestRig::OnAbilityActivated(UGameplayAbility* Ability)
+{
+	++AbilityActivations;
 }
 
 void AB1GymTestRig::FinishTest(EFunctionalTestResult TestResult, const FString& Message)
 {
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
-	if (PC && PreviousPlayerPawn && Vehicle && PC->GetPawn() == Vehicle)
+	SetAbilityInput(FGameplayTag());
+	if (AbilitySystem)
 	{
-		// The template controller respawns a vehicle when its pawn is destroyed; the rig's jeep is about to be.
-		Vehicle->OnDestroyed.RemoveAll(PC);
+		AbilitySystem->AbilityActivatedCallbacks.Remove(AbilityActivatedHandle);
+	}
+	AbilityActivatedHandle.Reset();
+
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (PC && PreviousPlayerPawn && Subject && PC->GetPawn() == Subject)
+	{
+		// The template controller respawns a vehicle when its pawn is destroyed; the rig's pawn is about to be.
+		Subject->OnDestroyed.RemoveAll(PC);
 		PC->Possess(PreviousPlayerPawn);
 
 		if (AbilitySystem && AbilitySystem->HasMatchingGameplayTag(B1GameplayTags::Vehicle_State_InMud))
@@ -248,7 +345,7 @@ void AB1GymTestRig::Tick(float DeltaSeconds)
 
 	Super::Tick(DeltaSeconds);
 
-	if (!bScriptWasRunning || !bIsRunning || !Movement)
+	if (!bScriptWasRunning || !bIsRunning || !Subject)
 	{
 		return;
 	}
@@ -287,6 +384,13 @@ void AB1GymTestRig::Tick(float DeltaSeconds)
 
 void AB1GymTestRig::ApplyInput(const FB1GymInputStep& Step)
 {
+	if (Character)
+	{
+		Character->AddMovementInput(Character->GetActorForwardVector(), Step.Move.X);
+		Character->AddMovementInput(Character->GetActorRightVector(), Step.Move.Y);
+		return;
+	}
+
 	Movement->SetThrottleInput(Step.Throttle);
 	Movement->SetSteeringInput(Step.Steer);
 	Movement->SetBrakeInput(Step.Brake);
@@ -299,12 +403,16 @@ void AB1GymTestRig::ApplyInput(const FB1GymInputStep& Step)
 
 void AB1GymTestRig::Sample(float DeltaSeconds)
 {
-	const FVector Location = Vehicle->GetActorLocation();
+	const FVector Location = Subject->GetActorLocation();
 	PathLength += FVector::Dist(Location, LastLocation) / CmPerM;
 	LastLocation = Location;
 	MaxHeightZ = FMath::Max(MaxHeightZ, static_cast<float>(Location.Z));
+	if (Character)
+	{
+		CharZmin = FMath::Min(CharZmin, Character->GetCapsuleBottomZ());
+	}
 
-	const FVector Velocity = Vehicle->GetMesh()->GetPhysicsLinearVelocity() / CmPerM;
+	const FVector Velocity = (Vehicle ? Vehicle->GetMesh()->GetPhysicsLinearVelocity() : Subject->GetVelocity()) / CmPerM;
 	const float Speed = Velocity.Size();
 	MaxSpeed = FMath::Max(MaxSpeed, Speed);
 	EndSpeed = Speed;
@@ -372,6 +480,7 @@ void AB1GymTestRig::FinishScript()
 {
 	bScriptRunning = false;
 	ApplyInput(FB1GymInputStep());
+	SetAbilityInput(FGameplayTag());
 	if (TestForce != EB1TestForce::Off)
 	{
 		B1Movement->SetTestForce(EB1TestForce::Off);
@@ -511,15 +620,50 @@ void AB1GymTestRig::FinishScript()
 			Failures.Add(FString::Printf(TEXT("inMud<%.2f"), Thresholds.MinInMudTime));
 		}
 
-		FuelMetrics = FString::Printf(TEXT(" fuelUsed=%.3f fuelPer100m=%.3f fuelPerHour=%.1f cond=%.1f inMud=%.2f"), FuelUsed, FuelPer100m, FuelPerHour,
-			AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute()), TimeInMud);
+		if (Thresholds.MinAbilityActivations >= 0 && AbilityActivations < Thresholds.MinAbilityActivations)
+		{
+			Failures.Add(FString::Printf(TEXT("abilities<%d"), Thresholds.MinAbilityActivations));
+		}
+		if (Thresholds.MaxAbilityActivations >= 0 && AbilityActivations > Thresholds.MaxAbilityActivations)
+		{
+			Failures.Add(FString::Printf(TEXT("abilities>%d"), Thresholds.MaxAbilityActivations));
+		}
+
+		FuelMetrics = FString::Printf(TEXT(" fuelUsed=%.3f fuelPer100m=%.3f fuelPerHour=%.1f cond=%.1f inMud=%.2f abilities=%d"), FuelUsed, FuelPer100m, FuelPerHour,
+			AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute()), TimeInMud, AbilityActivations);
+	}
+
+	FString PlayerMetrics;
+	if (bPossessWithPlayer || Character)
+	{
+		const APlayerController* PC = GetWorld()->GetFirstPlayerController();
+		const APawn* PossessedPawn = PC ? PC->GetPawn() : nullptr;
+		const TCHAR* Avatar = TEXT("none");
+		if (AbilitySystem && AbilitySystem->HasMatchingGameplayTag(B1GameplayTags::State_Avatar_InVehicle))
+		{
+			Avatar = TEXT("InVehicle");
+		}
+		else if (AbilitySystem && AbilitySystem->HasMatchingGameplayTag(B1GameplayTags::State_Avatar_OnFoot))
+		{
+			Avatar = TEXT("OnFoot");
+		}
+		PlayerMetrics = FString::Printf(TEXT(" pawn=%s avatar=%s"), PossessedPawn ? *PossessedPawn->GetClass()->GetName() : TEXT("none"), Avatar);
+	}
+	if (Character)
+	{
+		const float CharZminM = (CharZmin - GetActorLocation().Z) / CmPerM;
+		if (Thresholds.bCheckCharZmin && (CharZminM < Thresholds.CharZminRange.Min || CharZminM > Thresholds.CharZminRange.Max))
+		{
+			Failures.Add(FString::Printf(TEXT("charZmin!=%.3f..%.3f"), Thresholds.CharZminRange.Min, Thresholds.CharZminRange.Max));
+		}
+		PlayerMetrics += FString::Printf(TEXT(" charZmin=%.3f"), CharZminM);
 	}
 
 	const bool bPassed = Failures.Num() == 0;
 	const FString Name = TestLabel.IsEmpty() ? GetName() : TestLabel;
-	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f maxH=%.2f avgDt=%.4f frames=%d%s%s%s%s%s%s"),
+	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f maxH=%.2f avgDt=%.4f frames=%d%s%s%s%s%s%s%s"),
 		*Name, bPassed ? TEXT("PASS") : TEXT("FAIL"),
-		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, PeakHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics, *WinchMetrics, *FuelMetrics,
+		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, PeakHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics, *WinchMetrics, *FuelMetrics, *PlayerMetrics,
 		bPassed ? TEXT("") : TEXT(" failed="), *FString::Join(Failures, TEXT(",")));
 
 	UE_LOG(LogB1Test, Display, TEXT("%s"), *Line);

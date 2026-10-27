@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemInterface.h"
+#include "B1AbilitySet.h"
 #include "B1PlayerState.generated.h"
 
 class UB1AbilitySystemComponent;
@@ -22,7 +23,13 @@ public:
 	UB1AbilitySystemComponent* GetB1AbilitySystemComponent() const { return AbilitySystemComponent; }
 	const UB1VehicleAttributeSet* GetVehicleAttributeSet() const { return VehicleAttributeSet; }
 
+protected:
+	virtual void BeginPlay() override;
+
 private:
+	UPROPERTY()
+	FB1AbilitySet_GrantedHandles GrantedAbilitySetHandles;
+
 	UPROPERTY(VisibleAnywhere, Category = "B1|Abilities")
 	TObjectPtr<UB1AbilitySystemComponent> AbilitySystemComponent;
 

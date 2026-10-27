@@ -6,6 +6,8 @@
 #include "B1WinchComponent.h"
 #include "B1WinchAnchorComponent.h"
 #include "B1PlayerState.h"
+#include "B1Character.h"
+#include "B1GameMode.h"
 #include "B1AbilitySystemComponent.h"
 #include "B1VehicleAttributeSet.h"
 #include "GameFramework/PlayerController.h"
@@ -127,6 +129,41 @@ void UB1CheatManager::B1WinchDetach()
 	{
 		Winch->Detach();
 	}
+}
+
+void UB1CheatManager::B1SpawnCharacter()
+{
+	APlayerController* PC = GetOuterAPlayerController();
+	const APawn* CurrentPawn = PC->GetPawn();
+	const AB1GameMode* GameMode = GetWorld()->GetAuthGameMode<AB1GameMode>();
+	if (!GameMode || !GameMode->CharacterClass)
+	{
+		UE_LOG(LogB1Vehicle, Warning, TEXT("B1SpawnCharacter: game mode isn't AB1GameMode or has no CharacterClass"));
+		return;
+	}
+	if (!CurrentPawn || CurrentPawn->IsA<AB1Character>())
+	{
+		UE_LOG(LogB1Vehicle, Warning, TEXT("B1SpawnCharacter: needs a pawn that isn't already the character"));
+		return;
+	}
+
+	constexpr float SpawnAheadCm = 500.0f;
+	constexpr float SpawnUpCm = 100.0f;
+	const FRotator Yaw(0.0f, CurrentPawn->GetActorRotation().Yaw, 0.0f);
+	const FVector Location = CurrentPawn->GetActorLocation() + Yaw.Vector() * SpawnAheadCm + FVector(0.0f, 0.0f, SpawnUpCm);
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	AB1Character* Character = GetWorld()->SpawnActor<AB1Character>(GameMode->CharacterClass, Location, Yaw, Params);
+	if (!Character)
+	{
+		UE_LOG(LogB1Vehicle, Warning, TEXT("B1SpawnCharacter: spawn failed"));
+		return;
+	}
+
+	PC->Possess(Character);
+	PC->SetControlRotation(Yaw);
+	UE_LOG(LogB1Vehicle, Display, TEXT("B1SpawnCharacter: %s at %s"), *Character->GetName(), *Location.ToCompactString());
 }
 
 UB1AbilitySystemComponent* UB1CheatManager::GetPlayerASC(const TCHAR* CheatName) const

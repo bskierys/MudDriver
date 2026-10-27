@@ -16,8 +16,8 @@ stale: false
 
 | Metric | Value |
 |--------|-------|
-| Files | **56** |
-| Classes | **57** |
+| Files | **55** |
+| Classes | **55** |
 | Circular deps | **0** |
 | Dead code candidates | **0** |
 
@@ -28,21 +28,21 @@ stale: false
 
 ### High-coupling classes (likely God Objects — modify with care)
 
-- `AMudDriverPawn` — 6 dependents
-- `UMudDriverUI` — 5 dependents
 - `UB1PhysicalMaterial_Mud` — 5 dependents
+- `AMudDriverPawn` — 4 dependents
 - `UB1MudVehicleComponent` — 4 dependents
-- `ATimeTrialTrackGate` — 3 dependents
+- `IB1FuelLoadSource` — 3 dependents
+- `UB1VehicleMovementComponent` — 3 dependents
 
 ## GAS Summary
 
-- Abilities (C++): 0
+- Abilities (C++): 1
 - Effects (C++): 0
 - AttributeSets: 1
-- GameplayTags (in assets): 0 high-confidence / 18 low
-- GAS .uassets — IS-A: GA 0 / GE 3 / AS 0 / ABP 1  |  Referencers: 7
+- GameplayTags (in assets): 0 high-confidence / 21 low
+- GAS .uassets — IS-A: GA 1 / GE 3 / AS 0 / ABP 1  |  Referencers: 8
 - Analysis confidence: **HIGH** (cpp_source_regex + binary_pattern_match)
-- Coverage: 138/138 assets (100.0%)
+- Coverage: 140/140 assets (100.0%)
 
 ---
 See [[index]] for the full wiki page catalog.

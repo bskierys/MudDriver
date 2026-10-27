@@ -947,3 +947,54 @@ Sprint 3 closed with the mud + winch checkpoint. Sprint 4 had been outlined on 2
 
 ### Open follow-ups
 - Next: `/work` on S4-01.
+
+## 2026-10-27 — S4-01 winch housekeeping, S4-02 ability set + input config
+
+### Context
+`/work` on Sprint 4, through the first task with a user check (S4-02). Starting state: Sprint 3 closed and Sprint 4 refined; no ability granting or ability input existed yet (ADR-014 proposed).
+
+### What was built
+- S4-01: `BP_B1Jeep` was already at `MaxCableLength` 8000 cm. `B1Winch_CableLimit` / `CableSnatch` moved to X 95.5 m, Y −50 m (77.8 m from `Tree_FirmPull`), CableLimit limit 80.5 m. Winch gym 16/16 PASS (`s401_winchgym.log`).
+- S4-02: `UB1AbilitySet`, `UB1InputConfig`, `UB1AbilitySystemComponent::AbilityInputTagPressed/Released`, `AB1PlayerController::InputConfig` + bindings, `UB1GASSettings::AbilitySets` granted in `AB1PlayerState::BeginPlay`, `UB1GameplayAbility_TestPing` / `GA_B1TestPing`, tag `InputTag.Debug.TestPing`, log `LogB1Ability`. Assets `AbilitySet_B1Player`, `InputConfig_B1Player`, `IA_B1TestPing`, `IMC_B1Abilities` (P), added to `BP_B1PlayerController`'s `DefaultMappingContexts`.
+- Rig: `FB1GymInputStep::AbilityInputTag`, metric `abilities=`, thresholds `Min/MaxAbilityActivations`; `B1Ability_TestPing` in `Lvl_Gym_Core`. Core 9/9 PASS (`s402_core.log`).
+
+### Decisions made
+- Snatch overrun = drum slip, recorded in ADR-007.
+- ADR-014 accepted: sets from project settings (no pawn data), input config on the controller for both pawns, immediate activation without Lyra's per-frame input queue or activation policies.
+
+### What we learned
+- Snatch at 80 m: 82.69 m peak vs 77.79 rest (4.9 m slip at 60 kN).
+- MCP: `save_actor` / `save_assets([path])` can fail with "Asset does not exist" for an external actor package that is on disk and tracked; `save_assets([])` saved it, and `git status` showed only the two rig files.
+- MCP: setting an array whose first element has an empty `FGameplayTag` fails as an ambiguous resize unless the first element is read back (`tagName: "None"`) and reused verbatim.
+
+### Open follow-ups
+- S4-02 user check pending: press P in PIE, `LogB1Ability: TestPing activated #n`.
+- `Lvl_Gym_Mud` (22) not rerun after S4-02; no physics change.
+- Next: S4-03 `AB1Character`.
+
+## 2026-10-27 — S4-03 on-foot character
+
+### Context
+`/work` on Sprint 4 after S4-01/02. Starting state: the controller accepted any pawn but only the jeep existed; no on-foot input, no character in the rigs.
+
+### What was built
+- `AB1Character` (`Player/`) + `BP_B1Character`: first-person capsule 35 × 90, camera at +70 cm with pawn control rotation, ASC from the PlayerState. Adds `IMC_B1OnFoot` at priority 1 in `PawnClientRestart`, removes it and clears `State.Avatar.OnFoot` in `UnPossessed`.
+- Input assets duplicated from the template's `/Game/Input`: `IA_B1Move`, `IA_B1LookMouse`, `IA_B1LookStick`, `IA_B1Jump`, `IMC_B1OnFoot` (`/Game/B1/Input`).
+- `AB1PlayerController::OnPossess` sets `State.Avatar.OnFoot`; `AB1GameMode::CharacterClass` (`BP_B1GameMode` and `BP_B1GymGameMode` → `BP_B1Character`); cheat `B1SpawnCharacter`.
+- Rig: `StartOnFootClass`, `FB1GymInputStep::Move`, metrics `pawn= avatar= charZmin=`, threshold `CharZminRange`. `B1OnFoot_WalkFirm` (core, 29.2 m) and `B1OnFoot_WalkDeep` (winch gym, charZmin −0.669 on the 70 cm bottom). Core 10/10, mud 22/22, winch 17/17 headless.
+
+### Decisions made
+- Until S4-04, the character adds its own mapping context, above the vehicle contexts so shared keys (WASD) walk.
+- Mouse look keeps the template path (`AddControllerYaw/PitchInput`, legacy input scales on); stick look writes deg/s into `RotationInput` (Lyra's 300 / 165), so the legacy ×2.5 and the frame rate don't apply.
+- Stick pitch sign flipped after the user's pad check (stick up looked down).
+
+### What we learned
+- The capsule already ignores mud surfaces: `B1MudSurface` blocks only WorldDynamic, so no collision change was needed for walking on the hard bottom.
+- MCP: a parent BP CDO edit doesn't reach child BPs, and a saved child keeps the old value as an override (cause of "no CharacterClass" in the gyms). Rule added to `mcp-tools.md`.
+- MCP: adding or removing rows in an IMC's `DefaultKeyMappings` scrambles the per-row modifier lists; changing rows in place at the same size works. The Right-arrow row became `Mouse2D`, the Left-arrow row has key None.
+- The legacy `InputPitchScale` is −2.5, so mouse look needs no Negate modifier when the code negates Y.
+
+### Open follow-ups
+- Stick pitch fix is live-coded only; the next full build bakes it in.
+- Mouse sensitivity untuned (`MouseLookScale` on `BP_B1Character` if needed).
+- Next: S4-04 mapping-context swap on possession.

@@ -10,7 +10,8 @@ public class MudDriverTests : ModuleRules
 			"Core",
 			"CoreUObject",
 			"Engine",
-			"FunctionalTesting"
+			"FunctionalTesting",
+			"GameplayTags"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
