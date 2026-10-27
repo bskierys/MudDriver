@@ -777,3 +777,62 @@ The user checked the portability refactor (S2-18..S2-25), the 20 L tank, the HUD
 ### Open follow-ups
 - Sprint 3 (mud + winch core) is next.
 - `B1Mud_DigInMedium`'s external actor package was re-saved with no intended change; left out of the commit.
+
+---
+
+## 2026-10-27 â€” S3-02 slope baseline (before any slope rule)
+
+`Lvl_Gym_Winch`, 20° slope pair (S3-01), headless. Rigs in `B1Tests/Slope`, all 15 s from X 2 m on the run-up (18 m of flat before the foot) unless noted. Plateau top is +9.26 m above a run-up rig.
+
+| Rig | dist | vmax | maxH | endH | sink F/F/R/R | Notes |
+|---|---|---|---|---|---|---|
+| `B1Slope_Base_Firm50` | 58.5 | 8.99 | 9.34 | 9.27 | – | climbs, stops at the kerb |
+| `B1Slope_Base_Medium30` | 26.7 | 5.22 | 1.79 | 1.79 | 17/17/21/21 | stalls low on the slope |
+| `B1Slope_Base_Medium50` | 46.8 | 8.96 | 8.67 | 8.67 | 18/17/23/23 | still climbing at 15 s (vend 1.92) |
+| `B1Slope_Base_Medium100` | 56.4 | 16.84 | 9.34 | 9.24 | 35×4 | tops out; 16.8 m/s at the foot carries ~14 m of height |
+| `B1Slope_Base_MediumIdle` | 0.06 | 0.19 | – | −0.74 | 14/14/20/20 | mid-slope, 10 s, zero input: holds |
+| `B1Slope_Base_MediumIdleAwake` | 0.10 | 0.19 | – | −0.76 | 14/14/20/20 | same with `bDisableVehicleSleep`: still holds |
+
+- Why it holds: below 10 cm/s with no input Chaos brakes fully (`StopThreshold`), and the vehicle sleeps on slopes under 30° (`SleepThreshold` 10 cm/s, `SleepSlopeLimit` 0.866). Even awake, locked wheels on medium at resting depth have μ ≈ 0.5 × 0.78 ≈ 0.39 > tan 20° = 0.36.
+- Why medium climbs: at 50 % the wheels barely dig (17–23 cm), so grip stays above tan 20°; at 100 % the run-up's momentum does it.
+- Rig: new `maxH=` (peak height above the rig) with `MaxPeakHeight` + toggle, and `bDisableVehicleSleep`.
+- The duplicate of `Lvl_Gym_Mud` had carried over its five `B1Fuel_*` rigs (root folder); removed.
+
+---
+
+## 2026-10-27 — Sprint 3 slopes: S3-01..S3-06
+
+### Context
+Sprint 3 opened with the muddy slope from the replan: firm climbs, medium can't, a stopped jeep slides. S3-01 built a 20° test pair; the user's first drive showed medium climbing easily and a stopped jeep never sliding. The user asked to run S3-02..S3-06 in one go and batch the user checks at S3-06.
+
+### What was built
+- `Lvl_Gym_Winch`: final slope lanes at 20°, 40 m long: firm / medium / deep, a shared plateau with a kerb, anchor posts, three spawns and labels (S3-01, S3-05).
+- Rig `maxH` + `MaxPeakHeight`, `bDisableVehicleSleep`, `pull=`; baseline and final slope rigs (S3-02, S3-06; 8 in `B1Tests/Slope`).
+- Net-force standstill rule in rolling resistance and belly drag (S3-03).
+- Keep-awake on muddy slopes: `IB1MudSimHost::SetMudKeepAwake` → `SleepSlopeLimit` 1 (S3-03).
+- No engine braking on mud wheels on a slope with no input (S3-04).
+- Slope pull: `SlopePull` × gravity along the ground on every mud wheel on a slope (S3-04 rework). `BP_B1Jeep` 0.3.
+- `p.Chaos.Suspension.SlopeThreshold=1.0` in `DefaultEngine.ini` (ADR-016).
+- Mud window `Pull N` column, `Slope pull` and slope-angle fields; telemetry `pull=`.
+
+### Decisions made
+- Chaos suspension anti-slide off project-wide (ADR-016).
+- Release the brake on muddy slopes with no input (the user's choice over a per-material grip factor).
+- Slope pull replaces the depth-based slope hold (the user's call after the S3-06 playtest: a dug-in jeep couldn't climb or reverse). ADR-001 amendment updated.
+- θ = 20°, 40 m: steepest angle where firm 50 % climbs without the anti-slide; 40 m so the medium 100 % run can't clear the top on run-up momentum.
+
+### What we learned
+- Three Chaos features hold a stopped vehicle on slopes:
+  - sleep (under 10 cm/s, slopes up to 30°);
+  - engine braking as brake torque (RPM × `EngineBrakeEffect`, 180 Nm at idle), whose brake model locks a near-stopped wheel;
+  - the suspension constraint's anti-slide (pushes straight up below 10 mph on slopes up to 45°). This one also helps every slow climb.
+- `FSimpleWheelSim` produces no longitudinal force with zero drive and brake torque: free wheels roll without resistance except ours.
+- `GetRoadSpeed()` is the wheel's rolling speed; a braked wheel reads ~0 while the jeep slides. Use body ground speed for sliding.
+- A rig's `lastDisp` includes coasting from the previous step; add a settle step before the measured one.
+- MCP: `set_properties` can't change and resize an array in one call in either direction (set the elements at the current size first). A `StopEditor` save dialog blocks MCP; `save_assets([])` clears it and the close then finishes.
+- `RunGymTests.ps1 -ExtraArgs '-dpcvars=b1.Mud.Telemetry=1,...'` gets telemetry from headless runs.
+
+### Open follow-ups
+- `Lvl_Offroad` moved with the anti-slide off (FullThrottle5s 85.3 → 89.0 m, Push drift 7.6 → 0.7 m); all PASS. Worth a feel check on its hills and the swamp.
+- `SlopePull` is per vehicle, not per mud preset; move it onto `PM_B1Mud_*` if medium and deep should differ.
+- Next: S3-07 winch + anchor components.

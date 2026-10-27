@@ -560,34 +560,74 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
 
 ### Slopes (ADR-001 amendment)
 
-- [ ] **S3-01** `Lvl_Gym_Winch` base + test slope (3 h)
+- [x] **S3-01** `Lvl_Gym_Winch` base + test slope (3 h) <!-- done: 2026-10-27 -->
+  Result: `/Game/B1/Gym/Lvl_Gym_Winch`, a duplicate of `Lvl_Gym_Mud` with lanes, pit, rigs and ground tiles removed. Floor `G_Floor`: one 1 m tile, X −50..120, Y −60..80 m; walls, lighting and `BP_B1GymGameMode` kept.
+  - Slopes (`Gym/Slope`) at 20°, 30 m long, foot at X 20 m, top at X 48.19 m / Z 10.26 m: `Slope_Firm` (1 m slab, Y −5..5) and `Mud_Slope_Medium` (`Gym/Mud`, Y 15..25, `PM_B1Mud_Medium`, hard bottom 35 cm, ramp only on −X). `Slope_Plateau` spans both lanes (10 m, Y −5..25) with a 1.5 m `Slope_Kerb` at its end. Run-ups X 0..20 m. No CDO/code changes.
+  - Spawns `Spawn_1_FirmSlope` (`Player0`, X 2 m, Y 0) and `Spawn_2_MudSlope` (Y 20 m); labels `1 FIRM 20 DEG`, `2 MEDIUM 20 DEG`. PIE spawns the jeep on the firm run-up.
+  - Rig `B1Slope_DropMedium` (mid mud slope, 1 m up along the normal, pitch 20°, 3 s handbrake) PIE PASS: sink=15.4/15.4/23.6/23.6, so mud reads on the rotated patch. The jeep slides ~1 m during the settle (no slope hold yet).
+  - The ⚠️ note didn't apply: the hard-ground trace runs along the suspension direction (≈ the slope normal), not vertically, so a 35 cm bottom stays 35 cm away. `trace_world` confirms the bottom 37.2 cm below the surface vertically (35 / cos 20°).
   Duplicate `Lvl_Gym_Mud`'s setup (floor tiles, hidden walls, sky, `BP_B1GymGameMode`), strip the lanes. Add one test slope pair at 20°: a firm slope (rotated cube tiles) and a medium-mud slope (rotated `BP_B1MudPatch` with `PM_B1Mud_Medium`, own hard bottom, ramp only at the foot), each ~30 m long with a 20 m flat run-up and a 10 m flat top. Spawns at each run-up.
   ⚠️ Note: `AB1MudPatch` builds with the actor rotation (`B1MudPatch.cpp:88`), but the hard-ground cap trace is vertical and `MaxSinkDepth` long. On a slope the bottom is `depth / cos θ` away, so lengthen the trace if needed.
+    - User check ✅ (today's behaviour on the medium slope): "goes up with more difficulty because of reduced traction, but it is easy to climb"; "when stopped, the car stays in place, no sliding down". Medium at 20° is the opposite of the S3-05 target (must fail) and the S3-04 premise (idle slides). S3-02's baseline has to show whether the hold comes from the idle brake or from tire grip, before S3-03/04 are designed further.
   **Done:** builds; viewport capture of the slopes; PIE spawns the jeep at the run-up; a rig dropped on the mud slope shows `sink=` > 0 (mud is read on the rotated patch).
   **User check:** drive both slopes once as they are: describe what the jeep does on the mud slope today.
 
-- [ ] **S3-02** Rig `maxH` + slope baseline (2 h) _(requires S3-01)_
+- [x] **S3-02** Rig `maxH` + slope baseline (2 h) _(requires S3-01)_ <!-- done: 2026-10-27 -->
+  Result: rig `maxH=` + `MaxPeakHeight` (toggle `bCheckPeakHeight`) and `bDisableVehicleSleep`. Six `B1Slope_Base_*` rigs in `Lvl_Gym_Winch` (`B1Tests/Slope`); player spawns moved to X −10 m so run-up rigs don't hit the player jeep. Numbers in HISTORY.md: firm 50 % and medium 100 % top out, medium 50 % reaches 8.7 of 9.3 m, medium 30 % stalls at 1.8 m; medium idle holds with sleep on and off. Holding comes from Chaos's auto-brake + sleep and from medium's grip (~0.39) beating tan 20° (0.36). Flat suites run with S3-03.
   New rig metric `maxH` (peak height above the rig) and threshold `MaxPeakHeight`. Baseline rigs on the test slopes, measured **before** any rule change: firm 50 %, medium 30/50/100 % (15 s from the run-up), medium idle from mid-slope (10 s). Record numbers in HISTORY.md.
   **Done:** builds; baseline numbers recorded; existing suites still pass.
   **User check:** —
 
-- [ ] **S3-03** Net-force standstill rule (2.5 h) _(requires S3-02)_
+- [x] **S3-03** Net-force standstill rule (2.5 h) _(requires S3-02)_ <!-- done: 2026-10-27 -->
+  Result: `FB1MudSimulation::ApplyRollingResistance` uses net push = tire force − weight share × wheel-forward Z (gravity along the steered ground forward from the hit normal); `ApplyBellyDrag` adds mass·g projected on the average wheel-hit ground plane to the summed tire push.
+  - Keep-awake: Chaos sleeps below 10 cm/s on slopes up to 30°, so a jeep on a muddy slope could never slide. The sim outputs `MudGroundUpZ` (lowest hit normal Z under mud wheels); `UB1MudVehicleComponent` calls the new `IB1MudSimHost::SetMudKeepAwake` when it's steeper than `KeepAwakeSlope` (3°). `UB1VehicleMovementComponent` sets `SleepSlopeLimit` to 1 (restores on false) and wakes a sleeping body; it leaves `SleepThreshold` to the test force. MIGRATION.md updated.
+  - Headless: gym 22/22 and `Lvl_Offroad` 8/8 PASS within 1 % of Sprint 2 (`s224*.log`); winch gym 7/7. `B1Slope_Base_MediumIdle` now stays awake and still holds (lastDisp 0.050 vs 0.022): at 20° locked-wheel grip holds it, and resistance no longer pushes it downhill.
   Rolling resistance (`ApplyWheelFrictionForces`) and belly drag (`ApplyBellyDrag`) judge "push" from the net force along the ground: tire force + gravity along the ground (+ winch later, S3-10), not `GetForceFromFriction().X` alone. On flat ground gravity along the ground is 0, so nothing changes there.
   ⚠️ Note: at rest on a slope the tire force is mostly the tire holding against gravity; the old rule applied resistance downhill. Gravity along the ground per wheel = weight share × (gravity · ground forward); for belly drag use the whole-body component on the ground plane.
   **Done:** builds; both flat suites within 5 % of Sprint 2; the medium idle rig no longer accelerates downhill from the resistance itself (compare with the S3-02 baseline).
   **User check:** —
 
-- [ ] **S3-04** Slope hold by sink depth (3 h) _(requires S3-03)_
+- [x] **S3-04** Slope hold by sink depth (3 h) _(requires S3-03)_ <!-- done: 2026-10-27 -->
+  Result:
+  - `SlopeHoldVsSinkDepth` on `UB1MudVehicleComponent` (linear 0 @ 24 cm → 1 @ 30 cm; medium rests at 14–24 cm), copied to the sim. `B1MudWheelModel::GetSlopeHold` acts per mud wheel along the wheel forward, only on mud steeper than `KeepAwakeSlope` (3°):
+    - at rest it cancels the net downhill push up to curve × weight share;
+    - sliding downhill (ground speed, since a braked wheel's RoadSpeed reads ~0) it applies min(limit + `SlopeSlideDrag` (0.6 of load at ≥ 1 m/s), push + stop share);
+    - zero while climbing.
+    - It runs before rolling resistance, which sees the remainder.
+  - Why the idle jeep never slid (found while testing):
+    - Chaos's engine braking (900 rpm × 0.2 = 180 Nm brake torque at zero throttle) locks a near-stopped wheel. User decision: with no input on a muddy slope, `PreFriction` zeroes the mud wheels' brake torque.
+    - Chaos's suspension anti-slide pushes straight up below 10 mph on slopes ≤ 45°. Off project-wide (ADR-016, `DefaultEngine.ini`).
+  - Mud window: `Hold N` column, live curve keys (drag + typed, `sink cm`), slide drag and slope angle fields. Telemetry `hold=`; rig `hold=` (peak sum).
+  - Headless: flat suites unchanged (hold=0 everywhere; gym 22/22 within 1 %). With the anti-slide off, `Lvl_Offroad` 8/8 PASS but moves: FullThrottle5s 85.3 → 89.0 m, Push drift 7.6 → 0.7 m (frame-rate pair still agrees).
+  - At 20° on the final lanes: medium idle slides 4.45 m at 0.45 m/s; dug in to 35 cm it holds (gain 0.2 m).
+  - **Reworked after your S3-06 feedback (2026-10-27):** "dug deep, I'm stuck, can't go up nor reverse". The hold curve and slide drag are removed. Instead, every mud wheel on a slope gets `SlopePull` (0.5) × gravity along the ground as an extra force down the slope, always on. The brake release, keep-awake and anti-slide off all stay. Mud window: `Slope pull` field + `Pull N` column; telemetry/rig `pull=`.
   `SlopeHoldVsSinkDepth` (`FRuntimeFloatCurve` over absolute cm, fraction of wheel load) on `UB1MudVehicleComponent` (`Mud|Config`, per the S2-20 ADR-001 amendment), copied to `FB1MudSimulation`. Per mud wheel: a force that cancels the net downhill force along the ground up to `curve(SinkDepth) × wheel load`, never more, so it can't push the jeep uphill. Start curve: 0 at 0–15 cm, 1 at 30 cm. Mud window: editable curve keys (typed fields per `imgui.md`) and a per-wheel `hold` column; `B1Mud` telemetry gets `hold=`.
   **Done:** builds; flat suites unchanged (the term is 0 on flat ground); medium idle on the test slope slides; a jeep dug in to ≥ 30 cm on the slope holds.
   **User check:** on the medium slope, stop and let go: the jeep slides back slowly. Floor it until it digs in, let go: it stays. Edit the curve live and feel the change.
 
-- [ ] **S3-05** Slope angle + final slope lanes (2.5 h) _(requires S3-04)_
+- [x] **S3-05** Slope angle + final slope lanes (2.5 h) _(requires S3-04)_ <!-- done: 2026-10-27 -->
+  Result:
+  - **θ = 20°, 40 m long.** With the anti-slide on, every angle in 20–30° let medium climb at 50 %. With it off, firm 50 % rolls back at 25° (maxH 8.9 of 11.7) and 30° (6.3 of 14.0), so 20° is the steepest that works. At 30 m, medium 100 % topped out on run-up momentum (16.8 m/s at the foot); at 40 m it stops at 8.65 of 12.68.
+  - Lanes: firm (Y 0), medium (Y 20), deep (Y 40, `Mud_Slope_Deep`, hard bottom 70, ramp 400 at the foot). Plateau Y −5..45 with kerb. Anchor posts `Anchor_Medium` / `Anchor_Deep` 8 m past each mud top. `Spawn_3_DeepSlope` and `Label_3_DeepSlope` added. Viewport capture checked; layout in ARCHITECTURE.md (Winch gym).
   Pick θ: firm climbs at 50 %, medium fails at 30/50/100 %. If no θ in 15–30° does both, stop and raise a per-material slope grip factor (ADR-001 fallback) with the user. Build three lanes at θ: firm, medium, deep (`PM_B1Mud_Deep`), each with run-up and top plateau, and an anchor marker 8 m past each mud top. Record θ, lengths and anchor spots in ARCHITECTURE.md (Winch gym).
   **Done:** viewport capture; θ and layout in ARCHITECTURE.md.
   **User check:** the slopes read clearly; θ looks like a hill you'd expect a jeep to climb on dry ground.
 
-- [ ] **S3-06** Slope rig suite, unwinched (2.5 h) _(requires S3-05)_
+- [x] **S3-06** Slope rig suite, unwinched (2.5 h) _(requires S3-05)_ <!-- done: 2026-10-27 -->
+  Result: 7/7 PASS headless (`B1Tests/Slope`; plateau +12.68 m above a run-up rig). FirmClimb endH 12.69; Medium30/50/100 maxH 0.22/3.19/8.65 (limit 11.68); MediumIdle dist 4.45, vend 0.45; MediumDugIn maxH −0.69 (limit −0.39); DeepIdle dist 1.05, lastDisp 0.001 (settle 0.2 s so the slide is measured). The base rigs became these; `MediumIdleAwake` and `DropMedium` were removed. Gym 22/22 and `Lvl_Offroad` 8/8 PASS.
+  **After the slope-pull rework:** 8/8 PASS headless, gym 22/22 PASS.
+  - FirmClimb 12.69.
+  - Medium30/50/100 maxH −0.19/1.88/5.64; they end lower than they started.
+  - MediumDugIn slides back at 50 % (maxH −2.00).
+  - New `B1Slope_MediumDugInReverse` (3 s full, 6 s reverse): backs out, 88 m.
+  - MediumIdle and DeepIdle (now "slides ≥ 1 m") roll to the bottom: 42.8 m at up to 7.2 m/s, and 33.1 m at up to 5.5 m/s.
+  ✅ First user check (2026-10-27): the hold trapped a dug-in jeep (fixed above); the rest was not reported.
+  ✅ User check (repeat, 2026-10-27): user tuned `SlopePull` to 0.3 on `BP_B1Jeep` and likes the effect. Signed off.
+  **User check (repeat):** in `Lvl_Gym_Winch`:
+  1. Medium: you keep sliding down, you can't climb, and dug in you can still reverse out.
+  2. Idle on medium/deep: the roll-back speed feels right. Tune `Slope pull` live in the Mud window.
+  3. Firm lane: still an easy climb.
+  4. `Lvl_Offroad` and the swamp: hills feel right with Chaos's anti-slide off.
   - `B1Slope_FirmClimb`: 50 % from the run-up, reaches the top (`endH` ≥ top − 0.5 m).
   - `B1Slope_Medium30/50/100`: 15 s from the run-up, `maxH` ≤ top − 1 m.
   - `B1Slope_MediumIdle`: mid-slope, zero throttle 10 s, slides ≥ 1 m, `vmax` ≤ 1.5 m/s.

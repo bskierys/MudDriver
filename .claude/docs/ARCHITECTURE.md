@@ -62,6 +62,12 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
   - `UB1MudVehicleComponent` keeps `KnownMudMaterials` (every mud material its wheels have touched) and sends copies of their params (`FB1MudSimParams`). The sim matches `TraceResult.PhysMaterial` by weak-pointer equality, so new mud reads as firm for about a frame.
 - **Traction and resistance (ADR-001):** `ApplyWheelFrictionForces` scales each mud wheel's `FrictionMultiplier` by `FrictionVsDepth` around the base call. After the call, it adds a rolling resistance force along the steered wheel forward at the contact point: (`RollingResistanceVsDepth` + `SpeedDragCoefficient`·depth·v²) × the wheel's weight share. Below 1 cm/s it opposes the tire's push, like static friction, and it's capped at the tire push plus 0.4 × the stopping force. `SinkOffset` rises at max(30 cm/s, 0.5 × wheel speed). The `B1Mud` telemetry shows `mu=` and `rr=`. <!-- updated 2026-10-26 -->
 - **Belly drag (ADR-012):** after rolling resistance, `ApplyBellyDrag` takes the average `SinkDepth` of all wheels minus `BellyClearance` (`UB1MudVehicleComponent`, 45 cm = axle height; the body underside measures 60–64 cm, logged once per vehicle). Drag = mean `BellyDragCoefficient` of the mud wheels × excess (m) × weight, at the centre of mass against ground velocity, with the same standstill and no-reversal rules as rolling resistance. Only Heavy and Deep reach it. Telemetry `belly=<cm>/<N>`. <!-- updated 2026-10-26 -->
+- **Slopes (ADR-001 amendment, S3-03/04):**
+  - Standstill rule: rolling resistance and belly drag judge push from the net force along the ground. That's tire force + gravity along the ground (per wheel: weight share × −wheel-forward Z; belly: mass·g on the averaged hit-normal plane).
+  - Slope pull (user design after the S3-06 playtest): muddy slopes are slippery. Every mud wheel on mud steeper than `KeepAwakeSlope` (3°) gets an extra force down the slope at its contact: `SlopePull` (`UB1MudVehicleComponent`, C++ default 0.5; `BP_B1Jeep` 0.3 after the user's playtest) × gravity along the ground for its weight share (`B1MudWheelModel::GetSlopePull`). It's always on, climbing, idling or reversing, and counts in the rolling-resistance net push. With the lower mud grip it makes muddy hills hard or impossible to climb. There's no hold: a dug-in jeep can still reverse out.
+  - On such mud the vehicle stays awake (`IB1MudSimHost::SetMudKeepAwake` → `SleepSlopeLimit` 1). With no throttle, brake or handbrake, `PreFriction` zeroes the mud wheels' brake torque, because Chaos's engine braking (900 rpm × 0.2 = 180 Nm) would lock them. So an idle jeep rolls down the muddy slope (20° medium: 42 m to the bottom, up to 7 m/s).
+  - Chaos's suspension anti-slide (`p.Chaos.Suspension.SlopeThreshold`, pushes straight up below 10 mph on slopes ≤ 45°) is off project-wide in `DefaultEngine.ini` (ADR-016).
+  - Mud window: `Pull N` column, live `Slope pull` and slope angle. Telemetry `pull=`; rig `pull=` (peak sum). <!-- updated 2026-10-27 -->
 - Forces from the sim use `AddForce` in kg·cm/s² (N × 100).
 - **Test forces** (`EB1TestForce`: Off / Push / Spring, settings in `TestForceSettings`, category `TestForce|Config`): push = constant world +Y force; spring = one-sided spring-damper to an anchor captured at toggle time. While active, the component zeroes `SleepThreshold`, because a sleeping vehicle skips the simulation, and restores it on Off.
 - Steps at a fixed 1/60 s (see Physics settings).
@@ -143,6 +149,20 @@ Physical materials: `Vehicles/PhysicsMaterials/Slippery`, `NonSlippery`.
 - **Basin** (X 75..105, Y −78..−40, floor −3 m, `Gym/Basin`): medium and heavy mud at −3 m; west and east ramps 11°, north ramp 21°.
 - Layout is generated: rectangles in metres, firm tiles fill what's left. Edit `Gym/` actors by hand for small changes. <!-- updated 2026-10-26 -->
 
+## Winch gym (Sprint 3)
+
+`/Game/B1/Gym/Lvl_Gym_Winch`: a copy of `Lvl_Gym_Mud`'s base (walls, lighting, `BP_B1GymGameMode`). Floor `G_Floor`, one tile, top Z=0, X −50..120 m, Y −60..80 m.
+- **Slope lanes** (`Gym/Slope`, S3-05): θ = 20°, 40 m along the slope, foot at X 20 m, top edge at X 57.59 m / Z 13.68 m. Lanes 10 m wide:
+  - firm slab `Slope_Firm` (Y 0);
+  - medium patch `Mud_Slope_Medium` (Y 20, hard bottom 35 cm);
+  - deep patch `Mud_Slope_Deep` (Y 40, hard bottom 70 cm, `MI_B1Mud_Deep`).
+  - Mud patches ramp only at the foot (300 / 400 cm). `Slope_Plateau` (10 m, Y −5..45) ends at a 1.5 m `Slope_Kerb`. Flat run-ups from the spawns.
+- **Anchors** (`Gym/Anchors`): `Anchor_Medium`, `Anchor_Deep`, 1 × 2 m posts on the plateau 8 m past each mud top (X 65.59 m, Y 20 / 40). S3-14 swaps in trees.
+- **Spawns:** `Spawn_1_FirmSlope` (`Player0`), `Spawn_2_MudSlope`, `Spawn_3_DeepSlope` at X −10 m, Y 0 / 20 / 40; labels at X 6 m.
+- **Angle:** 20° is the steepest where firm 50 % still climbs with the Chaos anti-slide off (25° and 30° roll back). At 30 m the medium 100 % run carried over the top on run-up momentum (16.8 m/s at the foot), so the lanes are 40 m long.
+- On a rotated patch the hard-ground trace follows the suspension direction, so the bottom stays `HardBottomDepth` away measured along the slope normal.
+- **Slope rigs** (`B1Tests/Slope`, plateau +12.68 m above a run-up rig): `B1Slope_FirmClimb` (50 %, endH ≥ 12.18), `B1Slope_Medium30/50/100` (15 s, maxH ≤ 11.68), `B1Slope_MediumIdle` / `B1Slope_DeepIdle` (mid-slope, 10 s zero input, slide ≥ 1 m), `B1Slope_MediumDugIn` (3 s full, 10 s 50 %, maxH ≤ −0.39), `B1Slope_MediumDugInReverse` (3 s full, 6 s reverse, dist ≥ 5). <!-- updated 2026-10-27 -->
+
 ## Debug tooling
 
 - `UB1ImGuiSubsystem` (GameInstance subsystem) owns the NetImGui main menu bar. New windows are registered with `RegisterWindow(Menu, Name, DrawFn)`. Vehicle Basics window (`B1ImGui::DrawVehicleBasics`) includes a per-wheel table; slipping/skidding cells are orange.
@@ -185,6 +205,8 @@ It also has `B1Gym_FirmSmoke` (6 s at 50 % throttle on the firm lane, ≥ 20 m; 
 ## Physics settings
 
 Async physics, fixed step (ADR-003): `bTickPhysicsAsync=True`, `AsyncFixedTimeStepSize=0.016667`, `MaxPhysicsDeltaTime=0.1` (real time down to 10 fps), `bSubstepping=False`. The Chaos vehicle sim and our forces run once per 1/60 s step on the physics thread. Game-thread reads of physics state are interpolated, about a frame behind. <!-- updated 2026-10-25 -->
+
+`[ConsoleVariables] p.Chaos.Suspension.SlopeThreshold=1.0` turns off Chaos's suspension anti-slide (ADR-016). <!-- updated 2026-10-27 -->
 
 ## Rendering settings
 

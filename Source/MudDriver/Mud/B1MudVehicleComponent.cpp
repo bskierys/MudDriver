@@ -73,11 +73,14 @@ void UB1MudVehicleComponent::OnPhysSceneStep(FPhysScene_Chaos* Scene, float Delt
 	FB1MudSimInput Input;
 	GatherMudParams(Input.MudMaterials);
 	Input.BellyClearance = BellyClearance;
+	Input.SlopePull = SlopePull;
+	Input.SlopeUpZ = FMath::Cos(FMath::DegreesToRadians(KeepAwakeSlope));
 	Input.SinkResetSerial = SinkResetSerial;
 	Input.UnstuckAssistForce = GetUnstuckAssistForce(DeltaTime);
 	Simulation->SetGameThreadInput(Input);
 
 	SimOutput = Simulation->GetGameThreadOutput();
+	Host->SetMudKeepAwake(SimOutput.MudGroundUpZ < Input.SlopeUpZ);
 
 	if (bLogSinkReset && SimOutput.SinkResetSerial == SinkResetSerial)
 	{
@@ -191,6 +194,11 @@ float UB1MudVehicleComponent::GetWheelMudFrictionScale(int32 WheelIndex) const
 float UB1MudVehicleComponent::GetWheelRollingResistance(int32 WheelIndex) const
 {
 	return SimOutput.RollingResistance.IsValidIndex(WheelIndex) ? SimOutput.RollingResistance[WheelIndex] : 0.0f;
+}
+
+float UB1MudVehicleComponent::GetWheelSlopePull(int32 WheelIndex) const
+{
+	return SimOutput.SlopePull.IsValidIndex(WheelIndex) ? SimOutput.SlopePull[WheelIndex] : 0.0f;
 }
 
 float UB1MudVehicleComponent::GetAverageSinkDepth() const

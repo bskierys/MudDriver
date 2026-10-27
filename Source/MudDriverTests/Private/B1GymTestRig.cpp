@@ -73,6 +73,11 @@ void AB1GymTestRig::PrepareTest()
 	{
 		FinishTest(EFunctionalTestResult::Error, TEXT("test force needs a UB1VehicleMovementComponent"));
 	}
+	else if (bDisableVehicleSleep)
+	{
+		Movement->SleepThreshold = 0.0f;
+		Movement->SetSleeping(false);
+	}
 }
 
 AWheeledVehiclePawn* AB1GymTestRig::ResolveVehicle()
@@ -134,8 +139,10 @@ void AB1GymTestRig::StartTest()
 	TimeToStuck = -1.0f;
 	SettleTimeMeasured = 0.0f;
 	PeakOscillation = 0.0f;
+	MaxHeightZ = StartLocation.Z;
 	MaxSinkDepth.Init(0.0f, MudVehicle ? MudVehicle->GetNumWheels() : 0);
 	MaxBellyDrag = 0.0f;
+	MaxSlopePull = 0.0f;
 	EndSpeed = 0.0f;
 	bInLastStep = false;
 	LastStepStart = StartLocation;
@@ -261,6 +268,7 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 	const FVector Location = Vehicle->GetActorLocation();
 	PathLength += FVector::Dist(Location, LastLocation) / CmPerM;
 	LastLocation = Location;
+	MaxHeightZ = FMath::Max(MaxHeightZ, static_cast<float>(Location.Z));
 
 	const FVector Velocity = Vehicle->GetMesh()->GetPhysicsLinearVelocity() / CmPerM;
 	const float Speed = Velocity.Size();
@@ -273,10 +281,13 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 		SettleTimeMeasured = ScriptTime;
 	}
 
+	float SlopePull = 0.0f;
 	for (int32 WheelIndex = 0; WheelIndex < MaxSinkDepth.Num(); ++WheelIndex)
 	{
 		MaxSinkDepth[WheelIndex] = FMath::Max(MaxSinkDepth[WheelIndex], MudVehicle->GetWheelSinkDepth(WheelIndex));
+		SlopePull += MudVehicle->GetWheelSlopePull(WheelIndex);
 	}
+	MaxSlopePull = FMath::Max(MaxSlopePull, SlopePull);
 	if (MudVehicle)
 	{
 		MaxBellyDrag = FMath::Max(MaxBellyDrag, MudVehicle->GetBellyDrag());
@@ -324,6 +335,7 @@ void AB1GymTestRig::FinishScript()
 	const float Displacement = FVector::Dist(LastLocation, StartLocation) / CmPerM;
 	const float LastStepDisplacement = FVector::Dist2D(LastLocation, LastStepStart) / CmPerM;
 	const float EndHeight = (LastLocation.Z - GetActorLocation().Z) / CmPerM;
+	const float PeakHeight = (MaxHeightZ - GetActorLocation().Z) / CmPerM;
 	const float AvgDt = NumFrames > 0 ? ScriptTime / NumFrames : 0.0f;
 
 	// Still above the settle speed on the last sample means it never settled.
@@ -366,6 +378,10 @@ void AB1GymTestRig::FinishScript()
 	{
 		Failures.Add(FString::Printf(TEXT("endH<%.2f"), Thresholds.MinEndHeight));
 	}
+	if (Thresholds.bCheckPeakHeight && PeakHeight > Thresholds.MaxPeakHeight)
+	{
+		Failures.Add(FString::Printf(TEXT("maxH>%.2f"), Thresholds.MaxPeakHeight));
+	}
 
 	FString SpringMetrics;
 	if (TestForce == EB1TestForce::Spring)
@@ -397,7 +413,7 @@ void AB1GymTestRig::FinishScript()
 		{
 			PerWheel.Add(FString::Printf(TEXT("%.1f"), Depth));
 		}
-		SinkMetrics = TEXT(" sink=") + FString::Join(PerWheel, TEXT("/")) + FString::Printf(TEXT(" belly=%.0f"), MaxBellyDrag);
+		SinkMetrics = TEXT(" sink=") + FString::Join(PerWheel, TEXT("/")) + FString::Printf(TEXT(" belly=%.0f pull=%.0f"), MaxBellyDrag, MaxSlopePull);
 	}
 
 	FString FuelMetrics;
@@ -432,9 +448,9 @@ void AB1GymTestRig::FinishScript()
 
 	const bool bPassed = Failures.Num() == 0;
 	const FString Name = TestLabel.IsEmpty() ? GetName() : TestLabel;
-	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f avgDt=%.4f frames=%d%s%s%s%s%s"),
+	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f maxH=%.2f avgDt=%.4f frames=%d%s%s%s%s%s"),
 		*Name, bPassed ? TEXT("PASS") : TEXT("FAIL"),
-		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics, *FuelMetrics,
+		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, PeakHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics, *FuelMetrics,
 		bPassed ? TEXT("") : TEXT(" failed="), *FString::Join(Failures, TEXT(",")));
 
 	UE_LOG(LogB1Test, Display, TEXT("%s"), *Line);

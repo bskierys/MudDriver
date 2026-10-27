@@ -74,4 +74,7 @@ namespace B1MudWheelModel
 
 	/** Resistance never reverses the motion: at most the push along the motion plus a share of the stopping force */
 	float LimitResistance(float Limit, float PushAlongMotion, float StopForce);
+
+	/** World force down the slope: Fraction × gravity along the ground for the wheel's WeightShare. Zero on flat ground */
+	FVector GetSlopePull(const FVector& GroundNormal, float WeightShare, float Fraction);
 }

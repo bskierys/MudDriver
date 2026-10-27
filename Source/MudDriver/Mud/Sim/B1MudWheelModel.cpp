@@ -71,4 +71,9 @@ namespace B1MudWheelModel
 	{
 		return FMath::Min(Limit, PushAlongMotion + StopForce);
 	}
+
+	FVector GetSlopePull(const FVector& GroundNormal, float WeightShare, float Fraction)
+	{
+		return FVector::VectorPlaneProject(FVector(0.0f, 0.0f, -WeightShare * Fraction), GroundNormal);
+	}
 }

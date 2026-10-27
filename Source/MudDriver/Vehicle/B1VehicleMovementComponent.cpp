@@ -127,6 +127,29 @@ float UB1VehicleMovementComponent::GetMudDriveInput() const
 	return FMath::Clamp(RawThrottleInput - RawBrakeInput, -1.0f, 1.0f);
 }
 
+void UB1VehicleMovementComponent::SetMudKeepAwake(bool bKeepAwake)
+{
+	if (bKeepAwake != bMudKeepAwake)
+	{
+		bMudKeepAwake = bKeepAwake;
+		if (bKeepAwake)
+		{
+			// Chaos sleeps only while the up axis Z is above the limit, which never holds at 1.
+			SavedSleepSlopeLimit = SleepSlopeLimit;
+			SleepSlopeLimit = 1.0f;
+		}
+		else
+		{
+			SleepSlopeLimit = SavedSleepSlopeLimit;
+		}
+	}
+
+	if (bKeepAwake && UpdatedPrimitive && !UpdatedPrimitive->IsAnyRigidBodyAwake())
+	{
+		SetSleeping(false);
+	}
+}
+
 FB1VehicleSimulation* UB1VehicleMovementComponent::GetB1Simulation() const
 {
 	// CreatePhysicsVehicle always creates an FB1VehicleSimulation.

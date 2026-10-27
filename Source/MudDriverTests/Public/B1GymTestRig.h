@@ -98,6 +98,13 @@ struct FB1GymThresholds
 
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (InlineEditConditionToggle))
 	bool bCheckEndHeight = false;
+
+	/** Highest vehicle height above the rig actor during the script; a climb limit */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m", EditCondition = "bCheckPeakHeight"))
+	float MaxPeakHeight = 0.0f;
+
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (InlineEditConditionToggle))
+	bool bCheckPeakHeight = false;
 };
 
 /**
@@ -155,6 +162,10 @@ protected:
 	/** Sets t.MaxFPS for the run; 0 leaves it alone */
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
 	float MaxFPS = 0.0f;
+
+	/** Zeroes the vehicle's SleepThreshold, to see what the physics does without Chaos sleep holding it */
+	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
+	bool bDisableVehicleSleep = false;
 
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
 	FB1GymThresholds Thresholds;
@@ -220,12 +231,16 @@ private:
 	float TimeToStuck = -1.0f;
 	float SettleTimeMeasured = 0.0f;
 	float PeakOscillation = 0.0f;
+	float MaxHeightZ = 0.0f;
 
 	/** Per wheel, cm */
 	TArray<float> MaxSinkDepth;
 
 	/** N */
 	float MaxBellyDrag = 0.0f;
+
+	/** N, peak of the summed per-wheel slope pull */
+	float MaxSlopePull = 0.0f;
 	float EndSpeed = 0.0f;
 
 	FVector LastStepStart = FVector::ZeroVector;

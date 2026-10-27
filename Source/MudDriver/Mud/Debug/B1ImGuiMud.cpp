@@ -17,7 +17,7 @@ namespace B1ImGui
 	static void DrawWheelTable(const UB1MudVehicleComponent& Mud)
 	{
 		constexpr ImGuiTableFlags Flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
-		if (!ImGui::BeginTable("MudWheels", 6, Flags))
+		if (!ImGui::BeginTable("MudWheels", 7, Flags))
 		{
 			return;
 		}
@@ -28,6 +28,7 @@ namespace B1ImGui
 		ImGui::TableSetupColumn("Slip");
 		ImGui::TableSetupColumn("Friction x");
 		ImGui::TableSetupColumn("Resist N");
+		ImGui::TableSetupColumn("Pull N");
 		ImGui::TableHeadersRow();
 
 		for (int32 WheelIndex = 0; WheelIndex < Mud.GetNumWheels(); ++WheelIndex)
@@ -49,6 +50,7 @@ namespace B1ImGui
 			ImGui::TableNextColumn(); ImGui::Text("%.2f", Status.SlipMagnitude);
 			ImGui::TableNextColumn(); ImGui::Text("%.2f", Mud.GetWheelMudFrictionScale(WheelIndex));
 			ImGui::TableNextColumn(); ImGui::Text("%.0f", Mud.GetWheelRollingResistance(WheelIndex));
+			ImGui::TableNextColumn(); ImGui::Text("%.0f", Mud.GetWheelSlopePull(WheelIndex));
 		}
 
 		ImGui::EndTable();
@@ -174,6 +176,9 @@ namespace B1ImGui
 			ImGui::Text("Belly: %.1f cm past clearance, drag %.0f N", Mud->GetBellyDepth(), Mud->GetBellyDrag());
 			DragFloatTyped("Belly clearance cm", &Mud->BellyClearance, 0.5f, 0.0f, 200.0f);
 			DrawWheelTable(*Mud);
+			// Component values on the player's vehicle, live only; set the defaults on the vehicle BP.
+			DragFloatTyped("Slope pull", &Mud->SlopePull, 0.01f, 0.0f, 5.0f);
+			DragFloatTyped("Slope from deg", &Mud->KeepAwakeSlope, 0.1f, 0.0f, 45.0f);
 		}
 		else
 		{

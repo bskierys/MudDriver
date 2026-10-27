@@ -71,8 +71,10 @@ private:
 	TArray<float> MudFrictionScale;
 	TArray<float> SavedFrictionMultiplier;
 	TArray<float> RollingResistance;
+	TArray<float> SlopePull;
 	float BellyDepth = 0.0f;
 	float BellyDrag = 0.0f;
+	float MudGroundUpZ = 1.0f;
 
 	/** Per wheel, cm */
 	TArray<float> SinkDepth;

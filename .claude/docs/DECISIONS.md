@@ -29,6 +29,9 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 - **Slope hold.** Per mud wheel, a force opposes the net downhill force along the ground (gravity along the ground minus the tire's uphill push), up to `SlopeHoldVsSinkDepth(SinkDepth cm) × wheel load`. It only cancels a net downhill force, so it never helps the jeep up. The curve is over absolute depth and sits on `UB1VehicleMovementComponent` (`Mud|Config`, next to `BellyClearance`). Start: ~0 up to 15 cm, full hold around 30 cm.
 - **Standstill rule.** Rolling resistance and belly drag judge "push" from the net force along the ground (tire force + gravity along the ground + winch pull), not the tire force alone. On a slope the old rule read the tire's holding force as push and applied resistance downhill.
 - **Flat ground is unchanged.** Gravity along the ground is zero there, so the S1-24 tuning holds; the flat mud suite guards it.
+- **No sleep on muddy slopes (S3-03, 2026-10-27).** Chaos puts a vehicle to sleep under 10 cm/s on slopes up to 30°, which holds it regardless of mud. While mud under a wheel is steeper than `KeepAwakeSlope` (3°), the mud component asks the host to stay awake (`IB1MudSimHost::SetMudKeepAwake`); flat mud still sleeps.
+- **Rolling back on a muddy slope (S3-04, 2026-10-27, user decision).** With no throttle, brake or handbrake on mud steeper than `KeepAwakeSlope`, the mud wheels' brake torque is zeroed. Chaos's engine braking (RPM × `EngineBrakeEffect`) would otherwise lock them. Holding the brake pedal still brakes. Chaos's suspension anti-slide is off (ADR-016).
+- **Superseded after the S3-06 playtest (2026-10-27, user decision): slope pull instead of slope hold.** Dug in on medium, the hold left the jeep unable to climb *or* reverse. The intended feel: mud is slippery, the jeep keeps sliding down, and the low wheel grip makes climbing very hard. So the hold curve and slide drag are gone. Every mud wheel on a slope gets an extra pull down the slope: `SlopePull` (on `UB1MudVehicleComponent`; 0.3 on `BP_B1Jeep`, tuned by the user) × gravity along the ground for its weight share. It's always on, and deep mud's other mechanics (rolling resistance, belly drag) stay as they are. The "Slope hold" and "dug in holds / deep slides then stops" lines above no longer apply. Slope angle 20°.
 - **Alternatives.** Hold by preset (rejected by the user: a Deep jeep that hasn't sunk yet should still slide). Lowering grip on slopes (doesn't give "held when deep"). A per-material slope grip factor stays as the fallback if no slope angle gives "firm climbs, medium fails".
 
 **Amended 2026-10-27 (S2-20, portability).** Mud config moved off the movement component onto `UB1MudVehicleComponent` (`BellyClearance`, unstuck settings). `SlopeHoldVsSinkDepth` goes there too (`Mud|Config`), not on `UB1VehicleMovementComponent`; the force itself lives in `FB1MudSimulation`.
@@ -304,3 +307,29 @@ Visual ruts are optional and separate: a surface that wants them owns a trail re
 **Rationale.** The wheel side already works this way: it reads the trace hit's material and traces for the hard ground. Writing it down lets new producers skip `AB1MudPatch` and keeps the vehicle code producer-agnostic.
 
 **Alternatives.** A mud volume or actor registry the vehicle queries (extra overlaps, ADR-002 already rejected volumes). Requiring every producer to derive from `AB1MudPatch` (rectangles only, no PCG).
+
+---
+
+## ADR-016 — Chaos suspension anti-slide off
+
+**Status:** accepted (2026-10-27, S3-04)
+
+**Problem.** The Chaos suspension constraint has a built-in anti-slide (`PBDSuspensionConstraints.cpp`). On slopes up to 45° (`p.Chaos.Suspension.SlopeThreshold` 0.707) it pushes the suspension straight up instead of along the ground normal below 1 mph, and blends back up to 10 mph. That cancels gravity along the slope, so:
+- a stopped jeep never slides, whatever the mud does (ADR-001 slopes need "barely sunk slides");
+- a slow climb gets free help against gravity. In the S3-02 baseline, medium mud climbed 20° at 50 % throttle.
+
+The CVar is global; there's no per-vehicle or per-surface switch.
+
+**Decision.** `p.Chaos.Suspension.SlopeThreshold=1.0` in `DefaultEngine.ini` `[ConsoleVariables]`, which turns the anti-slide off everywhere. On firm ground a stopped jeep is still held by engine braking (Chaos's brake model holds a near-stopped wheel) and tire grip. On muddy slopes the mud sim releases that brake when there's no input (ADR-001 amendment), and the slope hold decides.
+
+**Rationale.** The anti-slide is an arcade crutch that hides gravity on slopes; the project wants physics. With it off, the slope rules do what the ADR-001 amendment describes: firm 50 % climbs 20°, medium fails at 30/50/100 %, medium idle slides at ~0.5 m/s, deep and dug-in jeeps hold.
+
+**Consequences.**
+- Firm hills are harder at low throttle: firm 50 % no longer climbs 25° or 30°, so the winch gym slope is 20°.
+- `Lvl_Offroad` rigs still pass. `B1Gym_FullThrottle5s` 85.3 → 89.0 m. `B1Step_Push20/120` drift drops 7.6 → 0.7 m, and 20 vs 120 fps still agree (0.74 / 0.71).
+- Flat mud rigs are unchanged.
+
+**Alternatives.**
+- Keep it on and fake the slide with a mud force (fights the constraint every step; still no slide below 1 mph).
+- Per-material slope grip factor (ADR-001 fallback): can't overcome the anti-slide either.
+- Toggle the CVar at runtime when the player is on mud (global, so it would flip every vehicle).

@@ -41,6 +41,9 @@ public:
 	/** N, from the latest physics step */
 	float GetWheelRollingResistance(int32 WheelIndex) const;
 
+	/** N pulling the wheel down a muddy slope, from the latest physics step */
+	float GetWheelSlopePull(int32 WheelIndex) const;
+
 	/** cm the average sink depth is past BellyClearance */
 	float GetBellyDepth() const { return SimOutput.BellyDepth; }
 
@@ -59,6 +62,14 @@ public:
 	/** Belly drag starts once the average sink depth passes it. Axle height, below the jeep body's ~62 cm underside */
 	UPROPERTY(EditAnywhere, Category = "Mud|Config", meta = (Units = "cm", ClampMin = "0"))
 	float BellyClearance = 45.0f;
+
+	/** Mud steeper than this is a slope: the vehicle stays awake, with no input its wheels aren't braked, and SlopePull applies */
+	UPROPERTY(EditAnywhere, Category = "Mud|Config", meta = (Units = "deg", ClampMin = "0", ClampMax = "45"))
+	float KeepAwakeSlope = 3.0f;
+
+	/** Slippery mud: extra pull down the slope per mud wheel, as a fraction of gravity along the ground (ADR-001) */
+	UPROPERTY(EditAnywhere, Category = "Mud|Config", meta = (ClampMin = "0"))
+	float SlopePull = 0.5f;
 
 	/** Push at full throttle during the B1Unstuck window, along the flattened heading */
 	UPROPERTY(EditAnywhere, Category = "Mud|Unstuck", meta = (Units = "N", ClampMin = "0"))

@@ -87,13 +87,14 @@ namespace B1VehicleTelemetry
 		for (int32 WheelIndex = 0; WheelIndex < Mud.GetNumWheels(); ++WheelIndex)
 		{
 			const FWheelStatus& Status = Mud.GetWheelState(WheelIndex);
-			Line.Appendf(TEXT(" | w%d mat=%s sink=%.1f slip=%.2f mu=%.2f rr=%.0f spray=%.0f"),
+			Line.Appendf(TEXT(" | w%d mat=%s sink=%.1f slip=%.2f mu=%.2f rr=%.0f pull=%.0f spray=%.0f"),
 				WheelIndex,
 				*GetNameSafe(Status.PhysMaterial.Get()),
 				Mud.GetWheelSinkDepth(WheelIndex),
 				Status.SlipMagnitude,
 				Mud.GetWheelMudFrictionScale(WheelIndex),
 				Mud.GetWheelRollingResistance(WheelIndex),
+				Mud.GetWheelSlopePull(WheelIndex),
 				Spray ? Spray->GetWheelSpawnRate(WheelIndex) : 0.0f);
 		}
 

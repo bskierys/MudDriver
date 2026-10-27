@@ -20,6 +20,12 @@ struct FB1MudSimInput
 	/** cm; belly drag starts once the average sink depth passes it */
 	float BellyClearance = 0.0f;
 
+	/** Extra downhill pull on a mud wheel, as a fraction of gravity along the ground under it */
+	float SlopePull = 0.0f;
+
+	/** Ground normal Z below which mud counts as a slope */
+	float SlopeUpZ = 1.0f;
+
 	/** One-shot sink reset: the sim clears SinkDepth/SinkOffset once per new value. A counter, since input is latest-wins */
 	uint32 SinkResetSerial = 0;
 
@@ -39,11 +45,17 @@ struct FB1MudSimOutput
 	/** Per wheel, N */
 	TArray<float> RollingResistance;
 
+	/** Per wheel, N */
+	TArray<float> SlopePull;
+
 	/** cm the average sink depth is past belly clearance */
 	float BellyDepth = 0.0f;
 
 	/** N */
 	float BellyDrag = 0.0f;
+
+	/** Lowest ground normal Z under the wheels on mud; 1 off mud */
+	float MudGroundUpZ = 1.0f;
 
 	/** Last FB1MudSimInput::SinkResetSerial the sim applied */
 	uint32 SinkResetSerial = 0;

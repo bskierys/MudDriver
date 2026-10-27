@@ -52,8 +52,10 @@ void FB1MudSimulation::EndStep(UChaosWheeledVehicleSimulation& Vehicle, float De
 	LatestOutput.SinkDepth = SinkDepth;
 	LatestOutput.MudFrictionScale = MudFrictionScale;
 	LatestOutput.RollingResistance = RollingResistance;
+	LatestOutput.SlopePull = SlopePull;
 	LatestOutput.BellyDepth = BellyDepth;
 	LatestOutput.BellyDrag = BellyDrag;
+	LatestOutput.MudGroundUpZ = MudGroundUpZ;
 	LatestOutput.SinkResetSerial = AppliedSinkResetSerial;
 }
 
@@ -125,6 +127,11 @@ void FB1MudSimulation::PreFriction(UChaosWheeledVehicleSimulation& Vehicle)
 	UpdateRelativeLoads(Vehicle);
 	MudFrictionScale.Init(1.0f, NumWheels);
 
+	// Chaos brakes with EngineRPM × EngineBrakeEffect at zero throttle, and its brake locks a near-stopped wheel.
+	// On a muddy slope with no input the wheels roll instead, so the slope hold decides whether the jeep slides.
+	const FControlInputs& Inputs = Vehicle.VehicleInputs;
+	const bool bNoInput = Inputs.ThrottleInput < SMALL_NUMBER && Inputs.BrakeInput < SMALL_NUMBER && Inputs.HandbrakeInput < SMALL_NUMBER && !Inputs.ParkingEnabled;
+
 	// The base call sets SurfaceFriction from the material itself, so the depth curve goes on the multiplier.
 	SavedFrictionMultiplier.SetNumUninitialized(NumWheels);
 	for (int32 WheelIdx = 0; WheelIdx < NumWheels; ++WheelIdx)
@@ -136,6 +143,11 @@ void FB1MudSimulation::PreFriction(UChaosWheeledVehicleSimulation& Vehicle)
 		{
 			MudFrictionScale[WheelIdx] = B1MudWheelModel::GetFrictionScale(GetSinkDepth(WheelIdx), *Mud);
 			PWheel.FrictionMultiplier *= MudFrictionScale[WheelIdx];
+
+			if (bNoInput && Vehicle.WheelState.TraceResult[WheelIdx].Normal.Z < StepInput.SlopeUpZ)
+			{
+				PWheel.SetBrakeTorque(0.0f);
+			}
 		}
 	}
 }
@@ -155,6 +167,7 @@ void FB1MudSimulation::ApplyRollingResistance(UChaosWheeledVehicleSimulation& Ve
 {
 	const int32 NumWheels = Vehicle.PVehicle->Wheels.Num();
 	RollingResistance.Init(0.0f, NumWheels);
+	SlopePull.Init(0.0f, NumWheels);
 	if (NumWheelsInContact == 0 || DeltaTime <= 0.0f)
 	{
 		return;
@@ -175,20 +188,31 @@ void FB1MudSimulation::ApplyRollingResistance(UChaosWheeledVehicleSimulation& Ve
 		const float RoadSpeed = PWheel.GetRoadSpeed();
 		const float Coefficient = B1MudWheelModel::GetRollingResistanceCoefficient(GetSinkDepth(WheelIdx), *Mud, RoadSpeed / B1MudWheelModel::CmPerM);
 
-		// Opposes motion, or at standstill the tire's push, like static friction, so a spinning wheel can't creep.
-		const float TireForce = PWheel.GetForceFromFriction().X;
-		const float MotionSign = FMath::Abs(RoadSpeed) > B1MudWheelModel::StandstillSpeed ? FMath::Sign(RoadSpeed) : FMath::Sign(TireForce);
-		const float TirePush = FMath::Max(TireForce * MotionSign, 0.0f);
+		const FHitResult& Hit = Vehicle.WheelState.TraceResult[WheelIdx];
+		const FVector GroundForward = FVector::CrossProduct(Vehicle.VehicleState.VehicleRightAxis, Hit.Normal).GetSafeNormal();
+		const FVector WheelForward = GroundForward.RotateAngleAxis(PWheel.SteeringAngle, Hit.Normal);
+
+		// Net = tire force + gravity along the ground: on a slope the tire force is mostly holding the jeep, not pushing it.
+		float NetPush = PWheel.GetForceFromFriction().X - WeightShare * WheelForward.Z;
+
+		// Mud on a slope is slippery: an extra pull down the slope, always on, so climbing is hard and a stopped jeep slides.
+		if (Hit.Normal.Z < StepInput.SlopeUpZ)
+		{
+			const FVector Pull = B1MudWheelModel::GetSlopePull(Hit.Normal, WeightShare, StepInput.SlopePull);
+			Vehicle.AddForceAtPosition(Pull, Hit.ImpactPoint);
+			NetPush += FVector::DotProduct(Pull, WheelForward);
+			SlopePull[WheelIdx] = Pull.Size() / B1MudWheelModel::NewtonsToUnreal;
+		}
+
+		// Opposes motion, or at standstill the net push, like static friction, so a spinning wheel can't creep.
+		const float MotionSign = FMath::Abs(RoadSpeed) > B1MudWheelModel::StandstillSpeed ? FMath::Sign(RoadSpeed) : FMath::Sign(NetPush);
+		const float PushAlongMotion = FMath::Max(NetPush * MotionSign, 0.0f);
 		const float StopForce = B1MudWheelModel::GetStopForce(PWheel.MassPerWheel, FMath::Abs(RoadSpeed), DeltaTime);
-		const float Force = B1MudWheelModel::LimitResistance(Coefficient * WeightShare, TirePush, StopForce);
+		const float Force = B1MudWheelModel::LimitResistance(Coefficient * WeightShare, PushAlongMotion, StopForce);
 		if (Force <= 0.0f || MotionSign == 0.0f)
 		{
 			continue;
 		}
-
-		const FHitResult& Hit = Vehicle.WheelState.TraceResult[WheelIdx];
-		const FVector GroundForward = FVector::CrossProduct(Vehicle.VehicleState.VehicleRightAxis, Hit.Normal).GetSafeNormal();
-		const FVector WheelForward = GroundForward.RotateAngleAxis(PWheel.SteeringAngle, Hit.Normal);
 
 		Vehicle.AddForceAtPosition(WheelForward * -MotionSign * Force, Hit.ImpactPoint);
 		RollingResistance[WheelIdx] = Force / B1MudWheelModel::NewtonsToUnreal;
@@ -232,14 +256,22 @@ void FB1MudSimulation::ApplyBellyDrag(UChaosWheeledVehicleSimulation& Vehicle, f
 	const FVector GroundVelocity = FVector::VectorPlaneProject(State.VehicleWorldVelocity, State.VehicleUpAxis);
 	const float Speed = GroundVelocity.Size();
 
-	FVector TirePush = FVector::ZeroVector;
-	for (const Chaos::FSimpleWheelSim& PWheel : Vehicle.PVehicle->Wheels)
+	// Net push: tires plus gravity on the ground plane, as for rolling resistance.
+	FVector NetPush = FVector::ZeroVector;
+	FVector GroundUp = FVector::ZeroVector;
+	for (int32 WheelIdx = 0; WheelIdx < NumWheels; ++WheelIdx)
 	{
-		TirePush += State.VehicleForwardAxis * PWheel.GetForceFromFriction().X;
+		const Chaos::FSimpleWheelSim& PWheel = Vehicle.PVehicle->Wheels[WheelIdx];
+		NetPush += State.VehicleForwardAxis * PWheel.GetForceFromFriction().X;
+		if (PWheel.InContact())
+		{
+			GroundUp += Vehicle.WheelState.TraceResult[WheelIdx].Normal;
+		}
 	}
+	NetPush += FVector::VectorPlaneProject(FVector(0.0f, 0.0f, -Mass * B1MudWheelModel::GravityCmPerS2), GroundUp.GetSafeNormal());
 
-	const FVector Direction = Speed > B1MudWheelModel::StandstillSpeed ? GroundVelocity / Speed : TirePush.GetSafeNormal();
-	const float PushAlongMotion = FMath::Max(FVector::DotProduct(TirePush, Direction), 0.0f);
+	const FVector Direction = Speed > B1MudWheelModel::StandstillSpeed ? GroundVelocity / Speed : NetPush.GetSafeNormal();
+	const float PushAlongMotion = FMath::Max(FVector::DotProduct(NetPush, Direction), 0.0f);
 	const float Force = B1MudWheelModel::LimitResistance(DragLimit, PushAlongMotion, B1MudWheelModel::GetStopForce(Mass, Speed, DeltaTime));
 	if (Force <= 0.0f || Direction.IsNearlyZero())
 	{
@@ -278,6 +310,7 @@ void FB1MudSimulation::UpdateSinkDepth(const UChaosWheeledVehicleSimulation& Veh
 {
 	const int32 NumWheels = Vehicle.PVehicle->Wheels.Num();
 	SinkDepth.SetNumZeroed(NumWheels);
+	MudGroundUpZ = 1.0f;
 
 	for (int32 WheelIdx = 0; WheelIdx < NumWheels; ++WheelIdx)
 	{
@@ -295,6 +328,7 @@ void FB1MudSimulation::UpdateSinkDepth(const UChaosWheeledVehicleSimulation& Veh
 			SinkDepth[WheelIdx] = 0.0f;
 			continue;
 		}
+		MudGroundUpZ = FMath::Min(MudGroundUpZ, static_cast<float>(Vehicle.WheelState.TraceResult[WheelIdx].Normal.Z));
 
 		FB1MudSinkInput Input;
 		Input.SlipSpeed = FMath::Abs(PWheel.GetSlipMagnitude()) / B1MudWheelModel::CmPerM;

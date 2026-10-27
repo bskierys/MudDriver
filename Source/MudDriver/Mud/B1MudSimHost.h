@@ -38,4 +38,7 @@ public:
 
 	/** Raw player drive input, throttle minus brake, [-1, 1]; ignores cut-offs */
 	virtual float GetMudDriveInput() const = 0;
+
+	/** Called every physics step. While true the vehicle must not sleep and should wake if asleep: mud on a slope has to be able to slide it */
+	virtual void SetMudKeepAwake(bool bKeepAwake) = 0;
 };

@@ -47,6 +47,13 @@ SurfaceProfileName=B1MudSurface
 SpraySystem=/Game/B1/FX/NS_B1MudSpray.NS_B1MudSpray
 ```
 
+`DefaultEngine.ini`, for mud on slopes (ADR-016). Without it, Chaos's suspension anti-slide holds every stopped vehicle on slopes up to 45°, and muddy slopes never slide:
+
+```ini
+[ConsoleVariables]
+p.Chaos.Suspension.SlopeThreshold=1.0
+```
+
 Replace `MudDriver` in `/Script/MudDriver.` with the target module name. If you copy an existing `DA_B1JeepTuning`, it was saved as `UB1VehicleTuningData`; this project's `[CoreRedirects]` entry maps it to `UB1FuelConsumptionData`. A fresh data asset doesn't need it.
 
 ## 4. Content
@@ -66,7 +73,7 @@ Migrate with the editor's Asset Actions → Migrate so references come along:
 ## 5. Host vehicle
 
 **Movement component** implements two interfaces (see `UB1VehicleMovementComponent`):
-- `IB1MudSimHost`: `GetMudSimulation()` (null until the physics vehicle exists), wheel count / `FWheelStatus` / world location (wheel bone) / radius / width, effective throttle (after input rates and any cut-off), raw drive input (throttle − brake, ignores cut-offs; used by the unstuck assist).
+- `IB1MudSimHost`: `GetMudSimulation()` (null until the physics vehicle exists), wheel count / `FWheelStatus` / world location (wheel bone) / radius / width, effective throttle (after input rates and any cut-off), raw drive input (throttle − brake, ignores cut-offs; used by the unstuck assist), `SetMudKeepAwake(bool)` (called every physics step; while true the vehicle must not sleep and must wake if asleep. Chaos sleeps on slopes up to 30°, which would hold a jeep on a muddy slope. This project sets `SleepSlopeLimit` to 1 and calls `SetSleeping(false)`).
 - `IB1EngineLoadSource` (only with fuel): `GetNormalizedEnginePower()` in [0, 1]. Chaos doesn't expose engine torque on the game thread; this project rebuilds it as throttle² × torque(RPM) × RPM over the curve's peak power.
 
 It also creates its own Chaos simulation subclass (`CreatePhysicsVehicle` sets `VehicleSimulationPT` before calling `UChaosVehicleMovementComponent::CreatePhysicsVehicle`) and makes its wheel traces block the mud channel in `OnRegister`:

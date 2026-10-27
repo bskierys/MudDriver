@@ -49,6 +49,7 @@ public:
 	virtual float GetMudWheelWidth(int32 WheelIndex) const override;
 	virtual float GetMudEffectiveThrottle() const override { return EffectiveThrottle; }
 	virtual float GetMudDriveInput() const override;
+	virtual void SetMudKeepAwake(bool bKeepAwake) override;
 
 protected:
 
@@ -74,4 +75,8 @@ private:
 
 	/** Vehicle sleep stops the simulation step, so it's disabled while a test force is active */
 	float SavedSleepThreshold = 0.0f;
+
+	/** Mud keep-awake blocks sleep through SleepSlopeLimit, so it doesn't fight the test force over SleepThreshold */
+	bool bMudKeepAwake = false;
+	float SavedSleepSlopeLimit = 0.0f;
 };
