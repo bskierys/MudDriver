@@ -924,3 +924,26 @@ The template's `Lvl_Offroad` (World Partition landscape, ~55 MB of external acto
 
 ### Open follow-ups
 - The rest of `Variant_OffRoad/` (landscape materials, RVT, template BPs) may now be partly unused; not checked.
+
+## 2026-10-27 — Sprint 4 refined (on foot)
+
+### Context
+Sprint 3 closed with the mud + winch checkpoint. Sprint 4 had been outlined on 2026-10-26, before Sprint 3 shipped, so parts of it no longer matched the code (`Lvl_Offroad` deleted, `IA_B1WinchRelease` replaced by a toggle, keep-awake and the fuel components' unpossessed behaviour already in place). Refined with `/sprint`; no code changes.
+
+### What was built
+- SPRINTS.md: Sprint 4 rewritten as S4-01..S4-10. New S4-01 winch housekeeping; ability-input and teleport rig steps so enter/exit and hook carry get headless rigs; park rigs on the firm and medium slopes; carry state in the Winch window and `ShowDebug B1Winch`; log lane in S4-09. Sprint 3 marked closed; its snatch backlog item resolved.
+- DECISIONS.md: ADR-007's hook-carry reference S4-06 → S4-07.
+
+### Decisions made
+- `MaxCableLength` on `BP_B1Jeep` changes from 800 m (80000 cm) to 80 m (8000 cm), user's pick. The 80 m cable is the on-foot leash. Applied in S4-01.
+- Getting out parks the jeep with the handbrake: it holds on firm ground but must still slide on a muddy slope (user). Built in S4-05.
+- Winch snatch overrun accepted as drum slip; ADR-007 gets the line in S4-01.
+- In the car, `IA_B1WinchToggle` becomes release-only once the hook carry works (per the ADR-007 amendment); attach-nearest stays as a cheat and an ImGui button.
+
+### What we learned
+- Chaos `bRequiresControllerForInputs` clears inputs on an unpossessed vehicle, so the parked handbrake needs `SetParked` / `ParkingEnabled` or the sim (S4-05 research).
+- `FB1MudSimulation`'s no-input brake release already treats handbrake and parking as input, so a parked jeep keeps its brake torque; whether `SlopePull` still slides it on medium is untested.
+- The template adds mapping contexts in `AMudDriverPlayerController::SetupInputComponent`, and `OnPawnDestroyed` possesses a new jeep even when the player is on foot (S4-04).
+
+### Open follow-ups
+- Next: `/work` on S4-01.

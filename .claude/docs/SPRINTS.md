@@ -547,7 +547,7 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
 
 ## Sprint 3 — Mud + winch core (Phase 2, part 1)
 
-**Status:** next (Sprint 2 closed 2026-10-27); start with `/work`.
+**Status:** closed 2026-10-27 (S3-16 sign-off).
 
 **Goal.** Prove mud + winch before any on-foot work. Mud learns slopes (slide when barely sunk, hold when deep, never climb unwinched), the winch pulls the jeep out of deep mud and up the muddy slope, and the user feels it at a checkpoint with the hook attached by cheat.
 
@@ -722,7 +722,7 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
 
 ### Backlog (found during the sprint)
 
-- **Winch snatch overrun** (S3-15, decide at S3-16): tension is clamped to `MaxPullForce` (40 kN) in every case, so a jeep driving into a taut cable at ~7 m/s stretches it 4.4 m past rest (`B1Winch_CableSnatch`, 42.7 m vs the 40 m `MaxCableLength`). Options: cap only the drum's reel-in force and let a stretched cable hold with full stiffness (or a higher hold cap); or accept it (a slipping drum brake).
+- **Winch snatch overrun** (S3-15, decide at S3-16): tension is clamped to `MaxPullForce` (40 kN) in every case, so a jeep driving into a taut cable at ~7 m/s stretches it 4.4 m past rest (`B1Winch_CableSnatch`, 42.7 m vs the 40 m `MaxCableLength`). Options: cap only the drum's reel-in force and let a stretched cable hold with full stiffness (or a higher hold cap); or accept it (a slipping drum brake). → Accepted as drum slip (user, 2026-10-27); recorded in S4-01.
 
 ### Close
 
@@ -736,59 +736,76 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
 
 ## Sprint 4 — On foot (Phase 2, part 2)
 
-**Status:** outlined 2026-10-26; refine with `/sprint` after the Sprint 3 checkpoint.
+**Status:** refined 2026-10-27 after the Sprint 3 checkpoint; start with `/work`.
 
 **Goal.** Close Phase 2: the player gets out, carries the hook to a tree, gets back in and winches out; a log can be winched off a lane.
 
 **Sprint-wide notes**
-- ⚠️ Possession changes re-run both flat suites and the slope/winch suites headless.
+- ⚠️ Suites: `Lvl_Gym_Core` (8, replaces `Lvl_Offroad`), `Lvl_Gym_Mud` (22), `Lvl_Gym_Winch` (slope 8 + winch 8). Possession changes re-run all of them headless.
 - ⚠️ Rigs with `bPossessWithPlayer` run one per round in PIE (single player 0).
+- ⚠️ Agent checks for on-foot work go through rigs (S4-02 adds ability-input steps), not console cheats. Cheats are for you.
+- ⚠️ Already in place, don't rebuild: `AB1PlayerController::OnPossess` accepts any pawn and sets `State.Avatar.InVehicle` (S2-03); the fuel components only act while the pawn is controlled; `IB1MudSimHost::SetMudKeepAwake` keeps a jeep awake on mud slopes (S3-03).
+- User decisions (2026-10-27): `MaxCableLength` 80 m; the jeep is parked with the handbrake when you get out, but still slides on a muddy slope; snatch overrun accepted as drum slip.
 
-- [ ] **S4-01** Ability set + input config (ADR-014) (3.5 h)
-  `UB1AbilitySet` (abilities with input tags + effects), granted once on the PlayerState ASC (`AB1PlayerState` or `AB1GameMode` hook). `UB1InputConfig` (input action → `InputTag.*`). `AB1PlayerController` forwards pressed/released to `UB1AbilitySystemComponent`, which activates matching specs. A no-op test ability bound to a key logs activation.
+- [ ] **S4-01** Winch housekeeping (0.5 h)
+  `BP_B1Jeep` `MaxCableLength` 80000 → 8000 cm (user). `B1Winch_CableLimit` and `CableSnatch` were built for 40 m: move them ~78 m from `Tree_FirmPull` (floor allows it) or retire `CableLimit` if it stays trivial (rest = distance at attach). ADR-007: snatch overrun accepted as drum slip; close the open line.
+  **Done:** winch gym 16/16 PASS headless with 80 m; ADR-007 updated.
+  **User check:** —
+
+- [ ] **S4-02** Ability set + input config + rig steps (ADR-014) (4 h)
+  `UB1AbilitySet` (abilities with input tags + effects), granted once on the `AB1PlayerState` ASC. `UB1InputConfig` (input action → native `InputTag.*` in `B1GameplayTags`). `AB1PlayerController` forwards pressed/released to `UB1AbilitySystemComponent`, which activates matching specs. A no-op `GA_B1TestPing` bound to a key logs activation.
+  Rig: `FB1GymInputStep::AbilityInputTag` (pressed at step start, released at end, through the player controller; needs `bPossessWithPlayer`). Rig `B1Ability_TestPing` checks the activation count.
   🔍 Research first: Lyra's `ULyraAbilitySet`, `ULyraInputConfig` and `ULyraAbilitySystemComponent::AbilityInputTagPressed`; the minimum we need without `ULyraInputComponent`.
-  **Done:** builds; headless `-game` with a cheat that injects the input tag logs the test ability's activation; ADR-014 → accepted.
+  **Done:** builds; `B1Ability_TestPing` PASS headless; ADR-014 → accepted.
   **User check:** press the test key in PIE: the activation shows in the log.
 
-- [ ] **S4-02** `AB1Character` + on-foot input (3 h) _(requires S4-01)_
-  First-person `ACharacter`: capsule, camera, walk/look/jump with Enhanced Input, `IMC_B1OnFoot`. `BP_B1Character` in `/Game/B1/Player/`. Implements `IAbilitySystemInterface` through the PlayerState ASC.
-  **Done:** builds; a character placed in `Lvl_Gym_Winch` and possessed via a debug cheat walks in PIE (user check).
+- [ ] **S4-03** `AB1Character` + on-foot input (3 h) _(requires S4-02)_
+  First-person `ACharacter`: capsule, camera, walk/look/jump with Enhanced Input, `IMC_B1OnFoot`. `BP_B1Character` in `/Game/B1/Player/`. Implements `IAbilitySystemInterface` through the PlayerState ASC. Cheat `B1SpawnCharacter` (spawn in front of the jeep and possess) for testing before S4-06.
+  ⚠️ Note: the capsule must walk on a patch's hard bottom, not its mud surface; check its collision against the mud channel/profile from `UB1MudSettings`.
+  **Done:** builds; `BP_B1Character` placed in `Lvl_Gym_Winch` with auto-possess walks in PIE (capture).
   **User check:** walking and looking feel fine; walking through mud stands on the hard bottom.
 
-- [ ] **S4-03** Mapping-context swap on possession (1.5 h) _(requires S4-02)_
-  `AB1PlayerController::OnPossess` removes the previous pawn's mapping contexts and adds the new one's (vehicle vs on-foot); the vehicle UI already hides on foot.
-  ⚠️ Note: the template adds its contexts in `BeginPlay`; move vehicle contexts to possession without breaking respawn.
-  **Done:** builds; both flat suites PASS.
+- [ ] **S4-04** Mapping-context swap on possession (1.5 h) _(requires S4-03)_
+  `AB1PlayerController::OnPossess` removes the previous pawn's mapping contexts and adds the new one's (vehicle vs on-foot). The vehicle UI already hides on foot.
+  ⚠️ Note: the template adds its contexts in `AMudDriverPlayerController::SetupInputComponent` (`DefaultMappingContexts`, `MobileExcludedMappingContexts`); move the vehicle ones to possession. `OnPawnDestroyed` respawns and possesses a new jeep even if you're on foot: only do that when the destroyed pawn is the one possessed.
+  **Done:** builds; core 8 and gym 22 PASS.
   **User check:** —
 
-- [ ] **S4-04** Seat attach + engine off outside (2 h) _(requires S4-02)_
-  Seat socket on `BP_B1Jeep`. While driving the character is hidden, collision off, attached to the seat. Engine off on exit: throttle cut (same path as out-of-fuel), no fuel drain, `Vehicle.State.EngineOff`; restart on enter.
-  ⚠️ Note: an unpossessed jeep on a slope must still slide/hold per the slope rules; keep the sim running (don't let it sleep while on mud slope).
-  **Done:** builds; a headless run shows no fuel drain while the engine is off.
+- [ ] **S4-05** Seat, engine off, parked on exit (3 h) _(requires S4-03)_
+  - Seat socket on `BP_B1Jeep`. The character is spawned once (class on `AB1GameMode`), hidden, collision off and attached to the seat while driving.
+  - Engine off outside: `Vehicle.State.EngineOff`, throttle cut through the same path as out-of-fuel (`SetFuelCutOff` → a general engine-cut reason), restart on enter. Fuel doesn't drain unpossessed already; verify, don't rebuild.
+  - Parked on exit (user): handbrake on, released on enter. It must hold on firm ground and on the firm 20° slope, but still slide on a muddy slope.
+  🔍 Research first: Chaos `bRequiresControllerForInputs` zeroes raw inputs without a controller, so a handbrake input won't stick on an unpossessed jeep; look at `SetParked` / `ParkingEnabled`. `FB1MudSimulation` already counts handbrake and parking as input (no brake release).
+  ⚠️ Note: if the parked jeep holds on the medium slope (locked wheels out-grip `SlopePull`), fix it in the mud sim (portable), not in the host. Keep-awake must still work with no controller.
+  Rig: `FB1GymInputStep::bParked` calls the same jeep function. `B1Park_FirmSlope` (mid firm slope, 10 s): `lastDisp` ≤ 5 cm. `B1Park_MediumSlope` (mid medium slope, 10 s): slides ≥ 1 m.
+  **Done:** builds; park rigs PASS headless; a headless run logs no fuel drain while parked.
   **User check:** —
 
-- [ ] **S4-05** `GA_B1EnterExitVehicle` + cheats (3 h) _(requires S4-01, S4-03, S4-04)_
-  Exit: place the character at the driver door (fallback spots if blocked), unhide, possess it, ASC avatar → character, `State.Avatar.OnFoot`. Enter: within range of the jeep, possess it, avatar → jeep. Tag-gated per ADR-004. Cheats `B1ExitVehicle`, `B1EnterVehicle`.
-  **Done:** builds; headless `-game` script with 10 × exit/enter: no errors or ensures, fuel unchanged while outside, avatar tags correct after each (logged).
-  **User check:** get out and in on firm ground, in mud and on the slope; camera and controls switch cleanly.
+- [ ] **S4-06** `GA_B1EnterExitVehicle` + cheats (3 h) _(requires S4-02, S4-04, S4-05)_
+  Exit: place the character at the driver door (fallback spots if blocked), unhide, possess it, ASC avatar → character, `State.Avatar.OnFoot`; park the jeep and cut the engine. Enter: within range of the jeep, possess it, avatar → jeep, re-seat the character. Tag-gated per ADR-004. `State.Avatar.*` moves from `AB1PlayerController::OnPossess` to the ability (or stays there keyed on pawn type; pick one). Cheats `B1ExitVehicle`, `B1EnterVehicle`.
+  Rig `B1OnFoot_ExitEnter10`: 10 × exit/enter via `AbilityInputTag` steps; checks possessed pawn class and avatar tag after each step, fuel unchanged while outside, no errors or ensures.
+  **Done:** builds; rig PASS headless; all suites PASS.
+  **User check:** get out and in on firm ground, in mud and on the slope; camera and controls switch cleanly; the parked jeep stays put on firm ground and slides on the muddy slope.
 
-- [ ] **S4-06** `GA_B1CarryWinchHook` (3.5 h) _(requires S3-07, S4-05)_
-  On foot at the jeep's front: take the hook; the cable runs from the winch point to the character's hand; the character can't walk past `MaxCableLength` (leash). Interact near an anchor attaches (rest length = distance); interact at the jeep puts the hook back. Detach from the car via `IA_B1WinchRelease`.
-  **Done:** builds; a headless cheat sequence (take, teleport near the tree, attach) logs the attachment; S3-15 rigs still PASS.
+- [ ] **S4-07** `GA_B1CarryWinchHook` (3.5 h) _(requires S4-06)_
+  On foot at the jeep's front: take the hook; the cable runs from the winch point to the character's hand, no tension; the character can't walk past `MaxCableLength` (80 m leash). Interact near an anchor attaches (rest length = distance); interact at the jeep puts the hook back.
+  In the car, `IA_B1WinchToggle` becomes release-only (ADR-007: the carry replaces attaching from the seat). `B1WinchAttachNearest` and the Winch window's Attach button stay as debug.
+  Rig: step `TeleportPawnTo` (actor) stands in for walking. `B1OnFoot_HookCarry`: exit, take, teleport by the tree, attach, teleport back, enter, full pull: the jeep moves toward the tree.
+  **Done:** builds; `B1OnFoot_HookCarry` PASS headless; S3-15 rigs still PASS.
   **User check:** carry the hook up the slope to the tree, attach, walk back, get in, winch up.
 
-- [ ] **S4-07** Interaction prompt + cable from hand (1.5 h) _(requires S4-06)_
-  Minimal UMG/ShowDebug-style prompt: "Take hook", "Attach", "Return hook" when in range. Cable end follows a hand socket on the first-person camera.
+- [ ] **S4-08** Interaction prompt, cable from hand, carry debug (2 h) _(requires S4-07)_
+  Minimal UMG/ShowDebug-style prompt: "Take hook", "Attach", "Return hook", "Enter" when in range. Cable end follows a hand socket on the first-person camera. Winch window and `ShowDebug B1Winch` show the hook state (stowed / carried / attached) and the carry distance vs `MaxCableLength`.
   **Done:** builds.
-  **User check:** you always know what the interact key will do.
+  **User check:** you always know what the interact key will do; the debug views read the carry state.
 
-- [ ] **S4-08** Winchable log (3 h) _(requires S3-08, S3-14)_
-  `BP_B1WinchLog`: simulating trunk mesh with `UB1WinchAnchorComponent`. The opposite cable force is applied in the log's async physics tick (`bAsyncPhysicsTickEnabled`), reading the winch's published tension and direction. Log lane in `Lvl_Gym_Winch`. Rig `B1Winch_Log`: braked jeep, full pull, log moves ≥ 3 m toward the jeep.
+- [ ] **S4-09** Winchable log (3 h) _(requires S4-01)_
+  `BP_B1WinchLog`: simulating trunk mesh with `UB1WinchAnchorComponent`. The opposite cable force is applied in the log's async physics tick (`bAsyncPhysicsTickEnabled`), reading the winch's published tension and direction. Log lane in `Lvl_Gym_Winch` (not built in S3-14). Pick mass and friction so the 60 kN cap moves it but not trivially. Rig `B1Winch_Log`: braked jeep, full pull, log moves ≥ 3 m toward the jeep, `tensionMax` ≤ 63 kN.
   🔍 Research first: `AActor::AsyncPhysicsTickActor` in 5.8 and reading game-thread data safely from it. Fallback: game-thread `AddForce` on the log only.
   **Done:** rig PASS headless.
   **User check:** winch the log off the lane; it slides and rolls believably.
 
-- [ ] **S4-09** Phase 2 playtest (user + agent, 1–2 h) _(requires S4-05..S4-08)_
+- [ ] **S4-10** Phase 2 playtest (user + agent, 1–2 h) _(requires S4-06..S4-09)_
   Full loop on foot in `Lvl_Gym_Winch`: get stuck, get out, carry the hook, attach, get in, winch out; same on both slopes; log lane. All suites headless.
   **Done:** all suites PASS; ROADMAP Phase 2 ticked.
   **User check:** sign-off on Phase 2.
