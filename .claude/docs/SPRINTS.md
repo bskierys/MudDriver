@@ -756,7 +756,8 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   - Enter/exit abilities are instant and thin: the controller does the swap, and the cheats call the same functions.
   - The character follows possession: possessing a jeep seats it there.
   - A carried hook is visual only and never reaches the sim.
-- Out of scope: animations, hook-in-hand mesh, cable sag, winch free-spool, character slowed in mud, swimming. If the sprint runs long, S4-09 (log) is the task to slip.
+- Out of scope: animations, hook-in-hand mesh, unpowered winch free-spool (powered reel-out is S4-13), character slowed in mud, swimming. If the sprint runs long, S4-09 (log) is the task to slip.
+- User additions (2026-10-27): S4-13 (reel the cable in and out, detach on its own key, keyboard rebind) and S4-12 (cable lies on the ground and the mud). Both come before S4-07.
 
 - [x] **S4-01** Winch housekeeping (0.5 h) <!-- done: 2026-10-27 -->
   Result: `BP_B1Jeep` already had `MaxCableLength` 8000 cm. `B1Winch_CableLimit` and `CableSnatch` moved to X 95.5 m, Y −50 m (77.8 m from `Tree_FirmPull`, on firm floor, endH −0.98); `CableLimit` kept as a cheap regression check, limit 80.5 m. Headless winch gym 16/16 PASS (`s401_winchgym.log`): CableLimit anchorDistMax 77.81, CableSnatch 82.69 (rest 77.79, 4.9 m drum slip). ADR-007 records the drum slip.
@@ -860,7 +861,43 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** builds; rig PASS headless; all suites PASS.
   **User check:** get out and in on firm ground, in mud and on the slope; camera and controls switch cleanly; the parked jeep stays put on firm ground and slides on the muddy slope.
 
-- [ ] **S4-07** Winch hook carry (4.5 h) _(requires S4-06)_
+- [ ] **S4-13** Winch reel in/out + detach key + keyboard rebind (3 h) _(requires S4-06)_
+  Added mid-sprint (user, 2026-10-27): the winch can only shorten the cable, and S4-07 needs the final in-car controls before it removes attaching from the seat.
+  - **Reel-out.** The pull input becomes signed, −1..1: positive reels in as today; negative grows the rest length at `ReelOutSpeed` (new, `Winch|Config`, default = `ReelInSpeed`) up to `MaxCableLength`.
+    - Reel-out isn't limited by the drum stall, so a jeep held on a slope descends under control at reel speed.
+    - Rigs, the Winch window and telemetry show signed pull.
+    - `Vehicle.State.Winching` stays reel-in only.
+  - **Input (user's layout).**
+    - Pad: D-pad Up reels in, D-pad Down reels out, Y detaches.
+    - Keyboard: W/S/A/D drive, Arrow Up reels in, Arrow Down reels out, Q detaches, E interacts (moves from F, both pawns). Arrow Left/Right do nothing in the vehicle.
+    - `IA_B1WinchPull` gets both directions (Negate modifier on the "out" keys). `IA_B1WinchToggle` → `IA_B1WinchDetach` (detach only; attaching from the seat ends here, ADR-007). Pad X stays interact.
+    - Remove any template bindings on those keys in `IMC_Vehicle_Default` (arrow drive, Y/Q/E if used); list what was removed in the result.
+    - `B1WinchAttachNearest` and the Winch window's Attach button stay as debug until S4-07 gives an on-foot attach.
+  - ADR-007 amendment: reel-out, signed pull, detach key.
+  Rig: `WinchPull` accepts −1..1.
+  - `B1Winch_ReelOutSlope` (medium slope, hooked to `Tree_MediumSlope`, full reel-out 15 s): the jeep moves down the slope at ≤ `ReelOutSpeed` + 10 %, tension > 0 throughout (controlled descent, not free fall).
+  - `B1Winch_ReelOutLimit` (firm lane, slack cable, reel out 90 s): `rest` ≤ `MaxCableLength`.
+  **Done:** builds; both rigs PASS headless; winch gym and core suites PASS; IMC lists match the layout above.
+  **User check:** on the medium slope, hook a tree, back down on reel-out, then pull back up; detach on Y / Q; E gets you in and out; no leftover template action fires on the arrows, Q, E or Y.
+
+- [ ] **S4-12** Cable lies on the ground and the mud (3 h) _(requires S4-13)_
+  Added mid-sprint (user, 2026-10-27): the cable has no collision, so a slack cable sags through the floor and into the mud, and from the car you can't see whether you're hooked. It has to rest on whatever is under it: the ground, the mud surface (not the hard bottom), slopes and kerbs. It must never touch the jeep's or the character's physics.
+  🔍 Research first, in this order:
+  1. `UCableComponent` collision (`bEnableCollision`, `CollisionFriction`). Check:
+     - which channel/object type its particle sweeps use, and whether that hits `B1MudSurface` (blocks only WorldDynamic, S4-03);
+     - that it stays stable with the 16 solver iterations + stiffness from S3-07;
+     - how many segments an 80 m cable needs to lie flat (≈ 1 per m) and its game-thread cost.
+  2. Fallback: a drape built from traces. Sample the anchor–winch line, trace down on a channel that hits ground and mud surface, lift the slack part onto the hits, and keep the taut part straight. Draw it with the existing cable or with spline mesh segments.
+  ⚠️ Note: the cable may hit the jeep and the character only if they're on the trace channel; ignore both owners, so a cable over the bonnet doesn't snag.
+  ⚠️ Note: with reel-out (S4-13) the cable can be slack up to 80 m, so a long slack cable lying in a heap or line on the ground is the normal case, not an edge case.
+  Visual check through Simulate captures on `Lvl_Gym_Winch`, all hooked by `StartAnchor`:
+  - a slack cable across firm floor;
+  - a slack cable across `Mud_DeepStrip` (lies on the mud surface, not the 70 cm bottom);
+  - a taut cable up the medium slope (straight, no jitter).
+  **Done:** builds; the three captures show the cable on the surface; winch rigs still PASS (visual only, no sim change).
+  **User check:** from the driver's seat you can see the cable lying on the ground and the mud and tell at a glance that you're hooked; reel in and watch it lift and straighten.
+
+- [ ] **S4-07** Winch hook carry (4.5 h) _(requires S4-06, S4-12, S4-13)_
   - Hook states on `UB1WinchComponent`: stowed / carried / attached.
     - **Carried** is visual only: the cable runs to the character's hand, and no `FB1WinchSimInput` anchor is sent, so there is no tension.
     - **Attached** works as today (rest length = distance at attach).
@@ -869,7 +906,8 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
     - Jeep front: "Take hook" when stowed, "Return hook" when carried.
     - Anchor: "Attach" when carried, "Detach" when this anchor is hooked; the hook goes back to carried.
   - Getting in while carrying stows the hook (user).
-  - In the car, `IA_B1WinchToggle` becomes release-only (ADR-007: the carry replaces attaching from the seat). `B1WinchAttachNearest` and the Winch window's Attach button stay as debug.
+  - In-car controls are final after S4-13 (reel in/out, detach on Y / Q). `B1WinchAttachNearest` and the Winch window's Attach button stay as debug.
+  - The carried cable uses the S4-12 drape between the winch point and the hand.
   Rig: step `TeleportPawnTo` (actor) for long trips only. Metrics `hook=` (state) and `carryMax=` (peak hand-to-winch-point distance).
   - `B1OnFoot_HookCarry`: exit, take, teleport by the tree, attach, teleport back, enter, full pull: the jeep moves toward the tree.
   - `B1OnFoot_Leash`: take, walk away 30 s (`Move`): `carryMax` ≤ 80.5 m.
@@ -877,7 +915,7 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** builds; the three rigs PASS headless; S3-15 rigs still PASS.
   **User check:** carry the hook up the slope to the tree, attach, walk back, get in, winch up; on the medium slope, walk out to full length and feel the sliding jeep drag you.
 
-- [ ] **S4-08** Interaction prompt, cable from hand, debug panels (3 h) _(requires S4-07)_
+- [ ] **S4-08** Interaction prompt, cable from hand, debug panels (3 h) _(requires S4-07, S4-12)_
   - Minimal UMG prompt showing the scan's best option ("Enter", "Take hook", "Attach", "Return hook", "Detach") and its key, read from `UB1InteractionScanComponent`, so it can't disagree with what interact does.
   - Cable end follows a hand socket on the first-person camera.
   - Winch window and `ShowDebug B1Winch` show the hook state and carry distance vs `MaxCableLength`.
@@ -896,7 +934,7 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** rig PASS headless.
   **User check:** winch the log off the lane; it slides and rolls believably.
 
-- [ ] **S4-10** Phase 2 playtest (user + agent, 1–2 h) _(requires S4-06..S4-09, S4-11)_
-  Full loop on foot in `Lvl_Gym_Winch`: get stuck, get out, carry the hook, attach, get in, winch out; same on both slopes; log lane. All suites headless.
+- [ ] **S4-10** Phase 2 playtest (user + agent, 1–2 h) _(requires S4-06..S4-09, S4-11..S4-13)_
+  Full loop on foot in `Lvl_Gym_Winch`: get stuck, get out, carry the hook, attach, get in, winch out; same on both slopes; lower the jeep down a slope on reel-out; log lane. All suites headless.
   **Done:** all suites PASS; ROADMAP Phase 2 ticked.
   **User check:** sign-off on Phase 2.

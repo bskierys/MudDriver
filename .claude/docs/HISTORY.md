@@ -1048,3 +1048,37 @@ Same session, after the S4-03 commit and the pad pitch fix. Starting state: the 
 ### Open follow-ups
 - Next: S4-07 winch hook carry.
 - Exit spot search could use the jeep's bounds instead of fixed offsets if other vehicles come.
+
+## 2026-10-27 — Sprint 4 critique and winch additions
+
+### Context
+After the first Sprint 4 refinement, `/plan-analyse` reviewed the open tasks (S4-03..S4-10) against ARCHITECTURE.md and ADR-004/007/014. The critique went into PLAN.md (there was no active plan) and was applied with `/sprint`; the S4-03..S4-06 and S4-11 work since then built on it. After S4-06 the user asked for two winch additions.
+
+### What was built
+- PLAN.md: critique round 1 for Sprint 4 (verdict: needs revision). Applied in SPRINTS.md:
+  - new task S4-11 (interaction scan, ADR-017);
+  - S4-03 gained a rig move step and walk rigs;
+  - S4-05 seats the character in whichever jeep is possessed;
+  - S4-06 does the swap in the controller;
+  - S4-07 gained hook states, leash and enter-with-hook rigs;
+  - S4-08 gained the Abilities panel;
+  - S4-09 got a research order;
+  - the sprint got an out-of-scope list.
+- SPRINTS.md: new tasks before S4-07.
+  - S4-13: signed winch pull (reel-out up to `MaxCableLength`), detach on its own key, keyboard rebind, rigs `B1Winch_ReelOutSlope` and `B1Winch_ReelOutLimit`.
+  - S4-12: the cable lies on the ground and the mud surface. Research `UCableComponent` collision first, trace-based drape as the fallback, three Simulate captures.
+  - S4-07, S4-08 and S4-10 dependencies updated.
+
+### Decisions made
+- On-foot interact goes through a Lyra-style interaction scan (user; became ADR-017 in S4-11).
+- At full cable length, a sliding jeep drags the character; getting in while carrying the hook stows it (user).
+- `State.Avatar.*` stays in `AB1PlayerController::OnPossess`. Enter/exit abilities are thin and instant, with the swap in the controller. A carried hook is visual only and never reaches the sim.
+- Winch controls (user): pad D-pad Up reels in, D-pad Down reels out, Y detaches, X interacts. Keyboard: W/S/A/D drive, Arrow Up/Down reel in/out, Q detaches, E interacts; Arrow Left/Right are unbound in the jeep. The attach/detach toggle goes away; ADR-007 gets amended in S4-13.
+- Powered reel-out is in scope; unpowered free-spool stays out.
+
+### What we learned
+- Reel-out makes a long slack cable the normal case, so the cable has to rest on the surface rather than sag through it.
+
+### Open follow-ups
+- Next: S4-13, then S4-12, then S4-07.
+- Check `IMC_Vehicle_Default` for template bindings on the arrows, Q, E and Y before rebinding (S4-13).
