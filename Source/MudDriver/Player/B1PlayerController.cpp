@@ -10,12 +10,38 @@
 #include "B1GameplayTags.h"
 #include "B1VehicleAttributeSet.h"
 #include "B1InputConfig.h"
+#include "B1InteractionPromptWidget.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputMappingContext.h"
 #include "MudDriverUI.h"
 #include "B1Log.h"
 #include "WheeledVehiclePawn.h"
+
+void AB1PlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	InteractionPrompt = CreateWidget<UB1InteractionPromptWidget>(this, UB1InteractionPromptWidget::StaticClass());
+	if (!InteractionPrompt)
+	{
+		return;
+	}
+	if (InputConfig)
+	{
+		const FB1InputAction* Interact = InputConfig->AbilityInputActions.FindByPredicate([](const FB1InputAction& Action)
+		{
+			return Action.InputTag == B1GameplayTags::InputTag_Interact;
+		});
+		InteractionPrompt->SetInteractAction(Interact ? Interact->InputAction.Get() : nullptr);
+	}
+	InteractionPrompt->AddToPlayerScreen(1);
+}
 
 void AB1PlayerController::OnPossess(APawn* InPawn)
 {

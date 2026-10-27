@@ -120,13 +120,27 @@ namespace B1ImGui
 		}
 
 		const APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
-		const APawn* Vehicle = PC ? PC->GetPawn() : nullptr;
-		UB1WinchComponent* Winch = Vehicle ? Vehicle->FindComponentByClass<UB1WinchComponent>() : nullptr;
+		const APawn* PlayerPawn = PC ? PC->GetPawn() : nullptr;
+		UB1WinchComponent* Winch = PlayerPawn ? PlayerPawn->FindComponentByClass<UB1WinchComponent>() : nullptr;
 		if (!Winch)
 		{
-			ImGui::TextDisabled("No winch on the player's pawn");
+			Winch = UB1WinchComponent::FindCarriedBy(PlayerPawn);
+		}
+		const APawn* Vehicle = Winch ? Cast<APawn>(Winch->GetOwner()) : nullptr;
+		if (!Winch || !Vehicle)
+		{
+			ImGui::TextDisabled("No winch on the player's pawn or in their hand");
 			ImGui::End();
 			return;
+		}
+
+		const EB1WinchHook Hook = Winch->GetHookState();
+		ImGui::Text("Hook: %s", TCHAR_TO_UTF8(*StaticEnum<EB1WinchHook>()->GetNameStringByValue(static_cast<int64>(Hook))));
+		if (Hook == EB1WinchHook::Carried)
+		{
+			ImGui::SameLine();
+			ImGui::Text("by %s, winch on %s", TCHAR_TO_UTF8(*GetNameSafe(Winch->GetHookCarrier())), TCHAR_TO_UTF8(*GetNameSafe(Vehicle)));
+			DrawBar("Carry m", Winch->GetCurrentLength() / 100.0f, Winch->MaxCableLength / 100.0f);
 		}
 
 		if (const UB1WinchAnchorComponent* Anchor = Winch->GetAnchor())
@@ -157,7 +171,10 @@ namespace B1ImGui
 			ImGui::EndDisabled();
 		}
 
-		DrawBar("Length m", Winch->GetCurrentLength() / 100.0f, Winch->MaxCableLength / 100.0f);
+		if (Hook != EB1WinchHook::Carried)
+		{
+			DrawBar("Length m", Winch->GetCurrentLength() / 100.0f, Winch->MaxCableLength / 100.0f);
+		}
 		ImGui::Text("Rest %.2f m", Winch->GetRestLength() / 100.0f);
 		DrawBar("Tension kN", Winch->GetTension() / 1000.0f, Winch->MaxPullForce / 1000.0f);
 		ImGui::Text("Pull %+4.0f %% (%s)", Winch->Pull * 100.0f, Winch->Pull > 0.0f ? "in" : Winch->Pull < 0.0f ? "out" : "hold");

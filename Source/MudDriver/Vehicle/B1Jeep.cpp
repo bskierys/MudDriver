@@ -169,9 +169,10 @@ void AB1Jeep::DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo&
 
 	B1MudShowDebug::DrawVehicle(Canvas, DisplayInfo, *MudVehicle);
 
-	// Anchors only for the viewer's own vehicle, so rig jeeps don't draw them again.
-	const bool bViewerVehicle = HUD && HUD->PlayerOwner && HUD->PlayerOwner->GetPawn() == this;
-	B1WinchShowDebug::Draw(Canvas, DisplayInfo, *Winch, bViewerVehicle);
+	// Anchors only for the viewer's own winch (driving it or carrying its hook), so rig jeeps don't draw them again.
+	const APawn* Viewer = HUD && HUD->PlayerOwner ? HUD->PlayerOwner->GetPawn() : nullptr;
+	const bool bViewerWinch = Viewer && (Viewer == this || Winch->GetHookCarrier() == Viewer);
+	B1WinchShowDebug::Draw(Canvas, DisplayInfo, *Winch, bViewerWinch);
 }
 
 void AB1Jeep::UnPossessed()

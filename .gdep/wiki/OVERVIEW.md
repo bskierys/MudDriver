@@ -16,8 +16,8 @@ stale: false
 
 | Metric | Value |
 |--------|-------|
-| Files | **62** |
-| Classes | **65** |
+| Files | **63** |
+| Classes | **66** |
 | Circular deps | **0** |
 | Dead code candidates | **0** |
 
@@ -28,11 +28,11 @@ stale: false
 
 ### High-coupling classes (likely God Objects — modify with care)
 
+- `AB1Character` — 5 dependents
 - `UB1PhysicalMaterial_Mud` — 5 dependents
 - `AMudDriverPawn` — 4 dependents
 - `UB1GameplayAbility_WinchHook` — 4 dependents
 - `UB1MudVehicleComponent` — 4 dependents
-- `UB1VehicleMovementComponent` — 4 dependents
 
 ## GAS Summary
 

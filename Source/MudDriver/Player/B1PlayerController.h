@@ -8,6 +8,7 @@
 class UB1InputConfig;
 class AB1Character;
 class AB1Jeep;
+class UB1InteractionPromptWidget;
 
 // Moves the PlayerState ASC avatar to whatever pawn is possessed (ADR-004).
 UCLASS(abstract)
@@ -32,6 +33,8 @@ public:
 	bool EnterVehicle(AB1Jeep* Jeep);
 
 protected:
+	/** Adds the interaction prompt on local controllers */
+	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void SetupInputComponent() override;
 
@@ -57,4 +60,7 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AB1Character> OnFootCharacter;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UB1InteractionPromptWidget> InteractionPrompt;
 };

@@ -939,7 +939,13 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** builds; the three rigs PASS headless; S3-15 rigs still PASS.
   **User check:** carry the hook up the slope to the tree, attach, walk back, get in, winch up; on the medium slope, walk out to full length and feel the sliding jeep drag you.
 
-- [ ] **S4-08** Interaction prompt, cable from hand, debug panels (3 h) _(requires S4-07, S4-12)_
+- [x] **S4-08** Interaction prompt, cable from hand, debug panels (3 h) _(requires S4-07, S4-12)_ <!-- done: 2026-10-27 -->
+  Result:
+  - `UB1InteractionPromptWidget` (`Interaction/`): a code-only `UUserWidget` (canvas + text built in `Initialize`, no WBP). Its tick shows `[keys]  <best option text>` from the possessed character's `UB1InteractionScanComponent`, the same list `GA_B1Interact` uses. Keys come from `QueryKeysMappedToAction` on the interact action (`InputConfig` entry for `InputTag.Interact`): first keyboard key and first pad button; face buttons show as Xbox letters (A/B/X/Y, user). `AB1PlayerController::BeginPlay` adds it on local controllers (z-order 1). PIE capture: "[E / X]  Take hook" at the jeep front.
+  - Cable from hand: `AB1Character::HookHand` (S4-07, on the camera) unchanged.
+  - Winch window: uses the pawn's winch, or on foot the winch whose hook you carry; shows the hook state, the carrier and a "Carry m" bar vs `MaxCableLength`. `ShowDebug B1Winch`: "hook carried by X" + "carry a / max m", or "hook stowed". Anchors are drawn for the viewer's own winch, which now also means a hook you carry.
+  - NetImGui Debug → Abilities (`Debug/B1ImGuiAbilities`): pawn + class, ASC avatar, granted specs (class, input tag, active count in green, pressed), owned tags with counts, the scan's options (text, event, priority, distance, target; best in green). Read-only, no tunables.
+  - The panel can't be captured: NetImgui draws only in its remote server app, so that's the user check. Builds; headless `B1OnFoot*` core 3/3 and winch 6/6 with the widget on every player controller (`s408_*.log`).
   - Minimal UMG prompt showing the scan's best option ("Enter", "Take hook", "Attach", "Return hook", "Detach") and its key, read from `UB1InteractionScanComponent`, so it can't disagree with what interact does.
   - Cable end follows a hand socket on the first-person camera.
   - Winch window and `ShowDebug B1Winch` show the hook state and carry distance vs `MaxCableLength`.

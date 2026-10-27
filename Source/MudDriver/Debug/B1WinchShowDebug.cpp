@@ -82,9 +82,14 @@ namespace B1WinchShowDebug
 			Lines.Add(FString::Printf(TEXT("length %5.2f / %.0f m  rest %.2f m"), Winch.GetCurrentLength() / 100.0f,
 				Winch.MaxCableLength / 100.0f, Winch.GetRestLength() / 100.0f));
 		}
+		else if (const AActor* Carrier = Winch.GetHookCarrier())
+		{
+			Lines.Add(FString::Printf(TEXT("winch  hook carried by %s"), *Carrier->GetActorNameOrLabel()));
+			Lines.Add(FString::Printf(TEXT("carry %5.2f / %.0f m"), Winch.GetCurrentLength() / 100.0f, Winch.MaxCableLength / 100.0f));
+		}
 		else
 		{
-			Lines.Add(FString::Printf(TEXT("winch  not attached  max %.0f m"), Winch.MaxCableLength / 100.0f));
+			Lines.Add(FString::Printf(TEXT("winch  hook stowed  max %.0f m"), Winch.MaxCableLength / 100.0f));
 		}
 		Lines.Add(FString::Printf(TEXT("pull %+4.0f %%"), Winch.Pull * 100.0f));
 		DrawLines(Canvas, Winch.GetComponentLocation() + FVector(0.0f, 0.0f, WinchTextHeight), Lines, FColor(255, 120, 120));

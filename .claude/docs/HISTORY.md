@@ -1155,3 +1155,26 @@ After S4-12/13 the winch could only be hooked from the seat (debug cheat / Winch
 ### Open follow-ups
 - `HookHand` placement and the on-screen prompt are S4-08.
 - Mud gym not rerun (untouched); full suite after S4-08.
+
+## 2026-10-27 — S4-08 interaction prompt and debug panels
+
+### Context
+After S4-07 the hook carry worked, but nothing on screen said what the interact key would do (Enter vs Take hook depends on which point is nearer), and the debug views didn't know about the carried hook.
+
+### What was built
+- `UB1InteractionPromptWidget`: "[E / X]  Take hook" from the scan's best option, keys queried from the interact action; added by `AB1PlayerController::BeginPlay`.
+- Winch window and `ShowDebug B1Winch` show hook state and carry distance; on foot the window follows the carried hook.
+- NetImGui Debug → Abilities: specs, input tags, active state, owned tags, interaction options.
+
+### Decisions made
+- Prompt widget built in C++ (no WBP) to skip UMG asset work over MCP; restyle later if needed.
+- Pad face buttons shown as Xbox letters (user).
+
+### What we learned
+- NetImgui renders only in its remote server app, so PIE captures can't verify ImGui windows; the user checks those.
+- Collapsed `UUserWidget`s don't tick: keep the root visible and collapse only the child text.
+- A throwaway auto-run rig (created, run in PIE, removed, never saved) is a cheap way to stage the player for a screenshot.
+
+### Open follow-ups
+- S4-08 not committed yet; full suite (core, mud, winch) after the user check.
+- Next: S4-09 winchable log.
