@@ -23,6 +23,15 @@ enum class EB1GymExpectAvatar : uint8
 	OnFoot,
 };
 
+UENUM()
+enum class EB1GymExpectHook : uint8
+{
+	Any,
+	Stowed,
+	Carried,
+	Attached,
+};
+
 USTRUCT(BlueprintType)
 struct FB1GymInputStep
 {
@@ -59,9 +68,21 @@ struct FB1GymInputStep
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Categories = "InputTag"))
 	FGameplayTag AbilityInputTag;
 
-	/** On-foot movement input, X forward and Y right relative to the character; needs StartOnFootClass */
+	/** On-foot movement input, X forward and Y right relative to player 0's character; needs StartOnFootClass or bPossessWithPlayer */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	FVector2D Move = FVector2D::ZeroVector;
+
+	/** At step start, teleports player 0's pawn to this actor + TeleportOffset, facing it. For long trips only */
+	UPROPERTY(EditInstanceOnly, Category = "B1Test")
+	TObjectPtr<AActor> TeleportPawnTo;
+
+	/** Teleport target is the rig's vehicle instead */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	bool bTeleportToVehicle = false;
+
+	/** In the target's yaw frame, cm */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	FVector TeleportOffset = FVector::ZeroVector;
 
 	/** Checked when the step ends: player 0's pawn and State.Avatar tag; needs bPossessWithPlayer */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
@@ -169,6 +190,14 @@ struct FB1GymThresholds
 	/** Peak winch point to anchor distance */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
 	float MaxAnchorDistance = -1.0f;
+
+	/** Peak winch point to hand distance while the hook is carried */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
+	float MaxCarryDistance = -1.0f;
+
+	/** Hook state at script end; Any skips the check */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	EB1GymExpectHook ExpectHook = EB1GymExpectHook::Any;
 
 	/** Abilities activated on the PlayerState ASC during the script; needs bPossessWithPlayer */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
@@ -283,6 +312,9 @@ private:
 	void SetAbilityInput(const FGameplayTag& InputTag);
 	void OnAbilityActivated(UGameplayAbility* Ability);
 	void CheckExpectAvatar(int32 StepIndex);
+	void TeleportPlayerPawn(const FB1GymInputStep& Step);
+	/** The rig's on-foot character, or the one player 0 got out as */
+	AB1Character* GetWalker() const;
 
 	/** The rig's vehicle or on-foot character; what the metrics sample */
 	UPROPERTY(Transient)
@@ -306,9 +338,14 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UB1MudVehicleComponent> MudVehicle;
 
-	/** Set only while the rig's WinchAnchor is hooked */
+	/** The vehicle's winch; steps set its pull */
 	UPROPERTY(Transient)
 	TObjectPtr<UB1WinchComponent> Winch;
+
+	/** Hook left the drum during the script; winch metrics print when this or WinchAnchor is set */
+	bool bHookUsed = false;
+	/** cm */
+	float MaxCarryDistance = 0.0f;
 
 	/** Player 0's pawn before bPossessWithPlayer took over; possessed again when the test finishes */
 	UPROPERTY(Transient)

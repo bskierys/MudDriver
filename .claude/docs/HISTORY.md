@@ -1130,3 +1130,28 @@ After S4-13 a slack winch cable had no collision, so it sagged through the floor
 ### Open follow-ups
 - Cable sweep cost not measured (~4000 sweeps/s per 80 m cable).
 - Next: S4-07 winch hook carry.
+
+## 2026-10-27 — S4-07 winch hook carry
+
+### Context
+After S4-12/13 the winch could only be hooked from the seat (debug cheat / Winch window). S4-07 adds the Uncharted-style on-foot loop: take the hook at the jeep, carry it to a tree, attach, get back in and winch.
+
+### What was built
+- `EB1WinchHook` (stowed / carried / attached) on `UB1WinchComponent`: `TakeHook`, `DetachToCarrier`, `AttachTo` from any state, `Detach` stows; carried cable pays out with walk-out distance; leash swept back onto `MaxCableLength`.
+- Interaction options: jeep front "Take hook" / "Return hook", anchors "Attach" / "Detach"; abilities `GA_B1TakeHook`, `GA_B1ReturnHook`, `GA_B1AttachHook`, `GA_B1DetachHook` (one C++ base + four subclasses) in `AbilitySet_B1Player`.
+- `AB1Character::HookHand`; getting into a jeep stows a carried hook (`UpdateOnFootCharacter`).
+- Rig: teleport step, Move steps for the player's exited character, `hook=` / `carryMax=` metrics, `ExpectHook` / `MaxCarryDistance`. Rigs `B1OnFoot_HookCarry`, `B1OnFoot_Leash`, `B1OnFoot_EnterWithHook` in `Lvl_Gym_Winch`.
+- Headless: winch gym 26/26 (old rigs match S4-12 within 1 kN), core `B1OnFoot*` 3/3. User check passed.
+
+### Decisions made
+- Hook carry recorded as an ADR-007 amendment: carried hook is visual only, leash lives in the winch tick, one instant ability per hook action.
+- Hook state has one owner (the winch); anchors and the jeep look it up with `FindCarriedBy` / `FindAttachedTo` instead of storing back-pointers.
+
+### What we learned
+- `UCharacterMovementComponent::SlideAlongSurface` is protected, but the `UMovementComponent` override is public; call it through the base pointer.
+- `TWeakObjectPtr::IsExplicitlyNull` tells "was hooked, anchor now destroyed" apart from "never hooked", which keeps the detach log at world teardown.
+- `StartEditor.ps1` after a failed build opens the editor on the old binaries without warning; build first.
+
+### Open follow-ups
+- `HookHand` placement and the on-screen prompt are S4-08.
+- Mud gym not rerun (untouched); full suite after S4-08.

@@ -911,7 +911,17 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** builds; the three captures show the cable on the surface; winch rigs still PASS (visual only, no sim change).
   **User check:** from the driver's seat you can see the cable lying on the ground and the mud and tell at a glance that you're hooked; reel in and watch it lift and straighten.
 
-- [ ] **S4-07** Winch hook carry (4.5 h) _(requires S4-06, S4-12, S4-13)_
+- [x] **S4-07** Winch hook carry (4.5 h) _(requires S4-06, S4-12, S4-13)_ <!-- done: 2026-10-27 -->
+  Result:
+  - `EB1WinchHook` stowed / carried / attached on `UB1WinchComponent`, derived from `Anchor` / `HookCarrier`. `TakeHook(Hand)`, `DetachToCarrier(Hand)`, `AttachTo` from any state (a carried hook keeps its cable and retargets the end), `Detach` stows from any state. Carried sends no sim input. The cable length grows with the walk-out distance and never shrinks, so walking back leaves slack. `GetCurrentLength` measures to the anchor or the hand. `FindCarriedBy(actor)` / `FindAttachedTo(anchor)` iterate winches, so the hook state has one owner.
+  - Leash in `TickCarriedHook`: past `MaxCableLength`, the carrying `ACharacter` is swept back onto the radius (slide on a blocking hit) and loses its outward velocity.
+  - `AB1Character::HookHand` (on the camera, (40, 25, −35)); S4-08 can tune it.
+  - Options: the jeep adds "Take hook" / "Return hook" at the winch point (priority 10 like Enter; door and winch are ~3.4 m apart, so the nearer one wins). `UB1WinchAnchorComponent` is an `IB1Interactable`: "Attach" when the character carries a hook in reach, "Detach" when a winch is hooked there and the hands are free.
+  - Abilities: `UB1GameplayAbility_WinchHook` base + TakeHook / ReturnHook / AttachHook / DetachHook (one file pair), triggered by `Event.Interact.TakeHook|ReturnHook|AttachHook|DetachHook`, gated by OnFoot. BPs `GA_B1TakeHook`, `GA_B1ReturnHook`, `GA_B1AttachHook`, `GA_B1DetachHook` in `AbilitySet_B1Player`.
+  - `AB1PlayerController::UpdateOnFootCharacter` stows a carried hook before seating, so every path into a jeep stows it.
+  - Rig: step `TeleportPawnTo` / `bTeleportToVehicle` + `TeleportOffset` (target's yaw frame, faces the target). Move steps now drive the character the player got out as (`bPossessWithPlayer`). The rig always takes the vehicle's winch for pull. Winch metrics print with `WinchAnchor` or once the hook left the drum, plus `hook=` and `carryMax=`. Thresholds `MaxCarryDistance`, `ExpectHook`.
+  - Rigs in `Lvl_Gym_Winch` (`B1Tests/OnFoot`, firm floor, `Tree_FirmPull`): `B1OnFoot_HookCarry` (5, −45 m): exit, walk to the front, take, teleport by the tree, attach (rest 13.66 m), teleport to the door, enter, full pull 5 s: the jeep moves 14.8 m to rest 1.50, abilities 7, hook=Attached. `B1OnFoot_Leash` (−30, −45 m): take, walk 30 s: carryMax 80.04 ≤ 80.5. `B1OnFoot_EnterWithHook` (−15, −45 m): take, enter: hook=Stowed, abilities 5.
+  - Headless: winch gym 26/26 (`s407_winch.log`, S3-15 and reel rigs match S4-12 within 1 kN), core `B1OnFoot*` 3/3 (`s407_core.log`). Mud not run (untouched).
   - Hook states on `UB1WinchComponent`: stowed / carried / attached.
     - **Carried** is visual only: the cable runs to the character's hand, and no `FB1WinchSimInput` anchor is sent, so there is no tension.
     - **Attached** works as today (rest length = distance at attach).

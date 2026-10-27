@@ -14,4 +14,8 @@ namespace B1GameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_Interact, "InputTag.Interact", "Activates GA_B1Interact");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Interact_TestPing, "Event.Interact.TestPing", "Test interactable's option; triggers GA_B1TestPing");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Interact_EnterVehicle, "Event.Interact.EnterVehicle", "Jeep door's option; triggers GA_B1EnterVehicle");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Interact_TakeHook, "Event.Interact.TakeHook", "Jeep front's option; triggers GA_B1TakeHook");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Interact_ReturnHook, "Event.Interact.ReturnHook", "Jeep front's option; triggers GA_B1ReturnHook");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Interact_AttachHook, "Event.Interact.AttachHook", "Anchor's option; triggers GA_B1AttachHook");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Interact_DetachHook, "Event.Interact.DetachHook", "Anchor's option; triggers GA_B1DetachHook");
 }

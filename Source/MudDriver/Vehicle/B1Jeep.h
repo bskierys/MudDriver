@@ -41,7 +41,7 @@ public:
 	USceneComponent* GetDriverSeat() const { return DriverSeat; }
 	USceneComponent* GetDriverDoor() const { return DriverDoor; }
 
-	/** "Enter" at the driver door while nobody drives (ADR-017) */
+	/** While nobody drives: "Enter" at the driver door, "Take hook" / "Return hook" at the winch (ADR-017) */
 	virtual void GatherInteractionOptions(const AB1Character& Character, TArray<FB1InteractionOption>& Options) const override;
 
 	/** Parking brake on every wheel and engine off (Vehicle.State.EngineOff); possessing the jeep releases it */

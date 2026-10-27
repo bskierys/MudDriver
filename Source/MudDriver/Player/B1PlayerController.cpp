@@ -3,6 +3,7 @@
 #include "B1Character.h"
 #include "B1GameMode.h"
 #include "B1Jeep.h"
+#include "B1WinchComponent.h"
 #include "Engine/World.h"
 #include "Components/CapsuleComponent.h"
 #include "B1AbilitySystemComponent.h"
@@ -78,6 +79,10 @@ void AB1PlayerController::UpdateOnFootCharacter(APawn* InPawn)
 		}
 	}
 
+	if (UB1WinchComponent* CarriedWinch = UB1WinchComponent::FindCarriedBy(OnFootCharacter))
+	{
+		CarriedWinch->Detach();
+	}
 	OnFootCharacter->SitIn(Jeep->GetDriverSeat());
 	UE_LOG(LogB1Vehicle, Log, TEXT("%s seated in %s"), *OnFootCharacter->GetName(), *Jeep->GetName());
 }

@@ -6,7 +6,9 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "CableComponent.h"
-#include "GameFramework/Pawn.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "UObject/UObjectIterator.h"
 
 UB1WinchComponent::UB1WinchComponent()
 {
@@ -41,11 +43,12 @@ void UB1WinchComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (!Anchor.IsValid() && Cable)
+	if (Cable && !Anchor.IsValid() && !HookCarrier.IsValid())
 	{
 		Detach();
 	}
 
+	TickCarriedHook();
 	ReadSimOutput();
 	SendSimInput();
 	SetWinchingTag(IsWinching());
@@ -126,14 +129,15 @@ bool UB1WinchComponent::AttachTo(UB1WinchAnchorComponent* NewAnchor)
 	}
 
 	const float Distance = FVector::Dist(GetComponentLocation(), NewAnchor->GetComponentLocation());
-	if (Distance > MaxCableLength)
+	if (!IsInReach(NewAnchor))
 	{
 		UE_LOG(LogB1Physics, Warning, TEXT("%s winch: %s is %.1f m away, max %.1f m"), *GetNameSafe(GetOwner()),
 			*GetNameSafe(NewAnchor->GetOwner()), Distance / 100.0f, MaxCableLength / 100.0f);
 		return false;
 	}
 
-	Detach();
+	ReleaseAnchor();
+	HookCarrier.Reset();
 
 	Anchor = NewAnchor;
 	++AttachSerial;
@@ -142,13 +146,33 @@ bool UB1WinchComponent::AttachTo(UB1WinchAnchorComponent* NewAnchor)
 	Tension = 0.0f;
 	PeakTension = 0.0f;
 
+	// A carried hook keeps the cable lying where it is.
+	if (Cable)
+	{
+		Cable->SetAttachEndToComponent(NewAnchor);
+		Cable->CableLength = RestLength;
+	}
+	else
+	{
+		CreateCable(*NewAnchor, RestLength);
+	}
+
+	SendSimInput();
+
+	UE_LOG(LogB1Physics, Log, TEXT("%s winch attached to %s, rest %.2f m"), *GetNameSafe(GetOwner()),
+		*GetNameSafe(NewAnchor->GetOwner()), RestLength / 100.0f);
+	return true;
+}
+
+void UB1WinchComponent::CreateCable(USceneComponent& End, float Length)
+{
 	// A fresh cable starts its particles on the straight line between the ends.
 	Cable = NewObject<UCableComponent>(GetOwner(), TEXT("WinchCable"));
 	Cable->SetupAttachment(this);
 	SetupCableCollision(*Cable);
-	Cable->SetAttachEndToComponent(NewAnchor);
+	Cable->SetAttachEndToComponent(&End);
 	Cable->EndLocation = FVector::ZeroVector;
-	Cable->CableLength = RestLength;
+	Cable->CableLength = Length;
 	Cable->NumSegments = FMath::Clamp(FMath::CeilToInt(MaxCableLength / CableSegmentLength), 4, 400);
 	Cable->CableWidth = CableWidth;
 	// Default single iteration sags a 10+ m steel cable like a rope.
@@ -159,12 +183,83 @@ bool UB1WinchComponent::AttachTo(UB1WinchAnchorComponent* NewAnchor)
 		Cable->SetMaterial(0, CableMaterial);
 	}
 	Cable->RegisterComponent();
+}
 
-	SendSimInput();
+bool UB1WinchComponent::TakeHook(USceneComponent* Hand)
+{
+	if (!Hand || GetHookState() != EB1WinchHook::Stowed)
+	{
+		return false;
+	}
 
-	UE_LOG(LogB1Physics, Log, TEXT("%s winch attached to %s, rest %.2f m"), *GetNameSafe(GetOwner()),
-		*GetNameSafe(NewAnchor->GetOwner()), RestLength / 100.0f);
+	CarryTo(*Hand, 0.0f);
 	return true;
+}
+
+bool UB1WinchComponent::DetachToCarrier(USceneComponent* Hand)
+{
+	if (!Hand || !IsAttached())
+	{
+		return false;
+	}
+
+	const float Length = RestLength;
+	ReleaseAnchor();
+	CarryTo(*Hand, Length);
+	return true;
+}
+
+void UB1WinchComponent::CarryTo(USceneComponent& Hand, float Length)
+{
+	HookCarrier = &Hand;
+	CarryLength = FMath::Min(FMath::Max(Length, GetCurrentLength()), MaxCableLength);
+	if (Cable)
+	{
+		Cable->SetAttachEndToComponent(&Hand);
+		Cable->CableLength = CarryLength;
+	}
+	else
+	{
+		CreateCable(Hand, CarryLength);
+	}
+
+	UE_LOG(LogB1Physics, Log, TEXT("%s winch hook carried by %s, %.2f m out"), *GetNameSafe(GetOwner()),
+		*GetNameSafe(Hand.GetOwner()), CarryLength / 100.0f);
+}
+
+void UB1WinchComponent::TickCarriedHook()
+{
+	const USceneComponent* Hand = HookCarrier.Get();
+	if (!Hand)
+	{
+		return;
+	}
+
+	FVector Offset = Hand->GetComponentLocation() - GetComponentLocation();
+	float Distance = Offset.Size();
+	ACharacter* Carrier = Cast<ACharacter>(Hand->GetOwner());
+	if (Carrier && Distance > MaxCableLength)
+	{
+		const FVector Outward = Offset / Distance;
+		const FVector Leash = -Outward * (Distance - MaxCableLength);
+		UCharacterMovementComponent* CharacterMovement = Carrier->GetCharacterMovement();
+		FHitResult Hit;
+		CharacterMovement->SafeMoveUpdatedComponent(Leash, Carrier->GetActorQuat(), true, Hit);
+		if (Hit.IsValidBlockingHit())
+		{
+			// Public on the base class, protected on the character's.
+			static_cast<UMovementComponent*>(CharacterMovement)->SlideAlongSurface(Leash, 1.0f - Hit.Time, Hit.Normal, Hit, true);
+		}
+		CharacterMovement->Velocity -= FMath::Max(0.0, CharacterMovement->Velocity | Outward) * Outward;
+		Distance = FVector::Dist(Hand->GetComponentLocation(), GetComponentLocation());
+	}
+
+	// Paid out as the carrier walks away; walking back leaves the slack on the ground.
+	CarryLength = FMath::Min(FMath::Max(CarryLength, Distance), MaxCableLength);
+	if (Cable)
+	{
+		Cable->CableLength = CarryLength;
+	}
 }
 
 void UB1WinchComponent::SetupCableCollision(UCableComponent& CableComponent) const
@@ -181,14 +276,11 @@ void UB1WinchComponent::SetupCableCollision(UCableComponent& CableComponent) con
 	CableComponent.SetCollisionResponseToChannel(GetDefault<UB1MudSettings>()->MudObjectChannel, ECR_Block);
 }
 
-void UB1WinchComponent::Detach()
+void UB1WinchComponent::ReleaseAnchor()
 {
-	// The cable lives exactly while attached; the anchor can already be gone at world teardown.
-	if (Cable)
+	// Not explicitly null = it was hooked; the anchor itself can already be gone at world teardown.
+	if (!Anchor.IsExplicitlyNull())
 	{
-		Cable->DestroyComponent();
-		Cable = nullptr;
-
 		UE_LOG(LogB1Physics, Log, TEXT("%s winch detached from %s: rest %.2f -> %.2f m, peak tension %.0f N (cap %.0f)"),
 			*GetNameSafe(GetOwner()), *GetNameSafe(Anchor.IsValid() ? Anchor->GetOwner() : nullptr), InitialRestLength / 100.0f,
 			RestLength / 100.0f, PeakTension, MaxPullForce);
@@ -198,6 +290,59 @@ void UB1WinchComponent::Detach()
 	Tension = 0.0f;
 	SetWinchingTag(false);
 	SendSimInput();
+}
+
+void UB1WinchComponent::Detach()
+{
+	ReleaseAnchor();
+	if (!HookCarrier.IsExplicitlyNull())
+	{
+		UE_LOG(LogB1Physics, Log, TEXT("%s winch hook stowed"), *GetNameSafe(GetOwner()));
+		HookCarrier.Reset();
+	}
+	if (Cable)
+	{
+		Cable->DestroyComponent();
+		Cable = nullptr;
+	}
+}
+
+EB1WinchHook UB1WinchComponent::GetHookState() const
+{
+	if (Anchor.IsValid())
+	{
+		return EB1WinchHook::Attached;
+	}
+	return HookCarrier.IsValid() ? EB1WinchHook::Carried : EB1WinchHook::Stowed;
+}
+
+bool UB1WinchComponent::IsInReach(const UB1WinchAnchorComponent* Target) const
+{
+	return Target && FVector::Dist(GetComponentLocation(), Target->GetComponentLocation()) <= MaxCableLength;
+}
+
+UB1WinchComponent* UB1WinchComponent::FindCarriedBy(const AActor* Carrier)
+{
+	for (UB1WinchComponent* Winch : TObjectRange<UB1WinchComponent>())
+	{
+		if (Carrier && Winch->GetWorld() == Carrier->GetWorld() && Winch->GetHookCarrier() == Carrier)
+		{
+			return Winch;
+		}
+	}
+	return nullptr;
+}
+
+UB1WinchComponent* UB1WinchComponent::FindAttachedTo(const UB1WinchAnchorComponent* Target)
+{
+	for (UB1WinchComponent* Winch : TObjectRange<UB1WinchComponent>())
+	{
+		if (Target && Winch->GetWorld() == Target->GetWorld() && Winch->GetAnchor() == Target)
+		{
+			return Winch;
+		}
+	}
+	return nullptr;
 }
 
 void UB1WinchComponent::ToggleAttachNearest()
@@ -225,6 +370,6 @@ UB1WinchAnchorComponent* UB1WinchComponent::FindNearestAnchor() const
 
 float UB1WinchComponent::GetCurrentLength() const
 {
-	const UB1WinchAnchorComponent* AnchorComponent = Anchor.Get();
-	return AnchorComponent ? FVector::Dist(GetComponentLocation(), AnchorComponent->GetComponentLocation()) : 0.0f;
+	const USceneComponent* HookEnd = Anchor.IsValid() ? static_cast<const USceneComponent*>(Anchor.Get()) : HookCarrier.Get();
+	return HookEnd ? FVector::Dist(GetComponentLocation(), HookEnd->GetComponentLocation()) : 0.0f;
 }

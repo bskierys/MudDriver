@@ -1,4 +1,5 @@
 #include "B1Jeep.h"
+#include "B1Character.h"
 #include "B1VehicleMovementComponent.h"
 #include "B1VehicleAttributeSet.h"
 #include "B1GameplayTags.h"
@@ -114,6 +115,18 @@ void AB1Jeep::GatherInteractionOptions(const AB1Character& Character, TArray<FB1
 	Option.TriggerEventTag = B1GameplayTags::Event_Interact_EnterVehicle;
 	Option.Priority = 10;
 	Option.InteractionPoint = DriverDoor->GetComponentLocation();
+
+	// Same priority as Enter: the door and the winch are far apart, so the nearer one wins.
+	const EB1WinchHook Hook = Winch->GetHookState();
+	const bool bCarriedByCharacter = Hook == EB1WinchHook::Carried && Winch->GetHookCarrier() == &Character;
+	if ((Hook == EB1WinchHook::Stowed && !UB1WinchComponent::FindCarriedBy(&Character)) || bCarriedByCharacter)
+	{
+		FB1InteractionOption& HookOption = Options.AddDefaulted_GetRef();
+		HookOption.Text = bCarriedByCharacter ? NSLOCTEXT("B1Jeep", "ReturnHook", "Return hook") : NSLOCTEXT("B1Jeep", "TakeHook", "Take hook");
+		HookOption.TriggerEventTag = bCarriedByCharacter ? B1GameplayTags::Event_Interact_ReturnHook : B1GameplayTags::Event_Interact_TakeHook;
+		HookOption.Priority = 10;
+		HookOption.InteractionPoint = Winch->GetComponentLocation();
+	}
 }
 
 bool AB1Jeep::IsParked() const

@@ -209,22 +209,27 @@ void AB1GymTestRig::StartTest()
 		B1Movement->SetTestForce(TestForce);
 	}
 
-	Winch = nullptr;
+	Winch = Vehicle ? Vehicle->FindComponentByClass<UB1WinchComponent>() : nullptr;
+	bHookUsed = false;
+	MaxCarryDistance = 0.0f;
 	if (WinchAnchor)
 	{
-		UB1WinchComponent* VehicleWinch = Vehicle->FindComponentByClass<UB1WinchComponent>();
 		UB1WinchAnchorComponent* Anchor = WinchAnchor->FindComponentByClass<UB1WinchAnchorComponent>();
-		if (!VehicleWinch || !Anchor)
+		if (!Winch || !Anchor)
 		{
 			FinishTest(EFunctionalTestResult::Error, TEXT("WinchAnchor needs a UB1WinchComponent on the vehicle and a UB1WinchAnchorComponent on the anchor"));
 			return;
 		}
-		if (!VehicleWinch->AttachTo(Anchor))
+		if (!Winch->AttachTo(Anchor))
 		{
 			FinishTest(EFunctionalTestResult::Error, TEXT("WinchAnchor is out of the cable's reach"));
 			return;
 		}
-		Winch = VehicleWinch;
+	}
+	if (!Winch && Thresholds.ExpectHook != EB1GymExpectHook::Any)
+	{
+		FinishTest(EFunctionalTestResult::Error, TEXT("ExpectHook needs a UB1WinchComponent on the vehicle"));
+		return;
 	}
 
 	TimeInMud = 0.0f;
@@ -257,9 +262,10 @@ void AB1GymTestRig::StartTest()
 		FinishTest(EFunctionalTestResult::Error, TEXT("bParked steps need an AB1Jeep"));
 		return;
 	}
-	if (!Character && InputScript.ContainsByPredicate([](const FB1GymInputStep& Step) { return !Step.Move.IsZero(); }))
+	if (!Character && !bPossessWithPlayer && InputScript.ContainsByPredicate([](const FB1GymInputStep& Step)
+		{ return !Step.Move.IsZero() || Step.TeleportPawnTo || Step.bTeleportToVehicle; }))
 	{
-		FinishTest(EFunctionalTestResult::Error, TEXT("Move steps need StartOnFootClass"));
+		FinishTest(EFunctionalTestResult::Error, TEXT("Move and teleport steps need StartOnFootClass or bPossessWithPlayer"));
 		return;
 	}
 
@@ -284,11 +290,48 @@ void AB1GymTestRig::EnterStep(int32 StepIndex)
 		CheckExpectAvatar(CurrentStep);
 	}
 	CurrentStep = StepIndex;
-	if (InputScript[StepIndex].bUnstuck && MudVehicle)
+	const FB1GymInputStep& Step = InputScript[StepIndex];
+	if (Step.bUnstuck && MudVehicle)
 	{
 		MudVehicle->Unstuck();
 	}
-	SetAbilityInput(InputScript[StepIndex].AbilityInputTag);
+	if (Step.TeleportPawnTo || Step.bTeleportToVehicle)
+	{
+		TeleportPlayerPawn(Step);
+	}
+	SetAbilityInput(Step.AbilityInputTag);
+}
+
+void AB1GymTestRig::TeleportPlayerPawn(const FB1GymInputStep& Step)
+{
+	const AActor* Target = Step.bTeleportToVehicle ? static_cast<const AActor*>(Vehicle) : Step.TeleportPawnTo.Get();
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	APawn* Pawn = PC ? PC->GetPawn() : nullptr;
+	if (!Target || !Pawn)
+	{
+		UE_LOG(LogB1Test, Warning, TEXT("%s step %d: nothing to teleport or no target"), *GetName(), CurrentStep);
+		return;
+	}
+
+	const FRotator TargetYaw(0.0f, Target->GetActorRotation().Yaw, 0.0f);
+	const FVector Location = Target->GetActorLocation() + TargetYaw.RotateVector(Step.TeleportOffset);
+	const FRotator Facing(0.0f, (Target->GetActorLocation() - Location).Rotation().Yaw, 0.0f);
+	if (!Pawn->TeleportTo(Location, Facing))
+	{
+		UE_LOG(LogB1Test, Warning, TEXT("%s step %d: no room for %s at %s"), *GetName(), CurrentStep, *Pawn->GetName(), *Location.ToCompactString());
+		return;
+	}
+	PC->SetControlRotation(Facing);
+}
+
+AB1Character* AB1GymTestRig::GetWalker() const
+{
+	if (Character || !bPossessWithPlayer)
+	{
+		return Character;
+	}
+	const APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	return PC ? Cast<AB1Character>(PC->GetPawn()) : nullptr;
 }
 
 void AB1GymTestRig::SetAbilityInput(const FGameplayTag& InputTag)
@@ -420,10 +463,13 @@ void AB1GymTestRig::Tick(float DeltaSeconds)
 
 void AB1GymTestRig::ApplyInput(const FB1GymInputStep& Step)
 {
+	if (AB1Character* Walker = GetWalker())
+	{
+		Walker->AddMovementInput(Walker->GetActorForwardVector(), Step.Move.X);
+		Walker->AddMovementInput(Walker->GetActorRightVector(), Step.Move.Y);
+	}
 	if (Character)
 	{
-		Character->AddMovementInput(Character->GetActorForwardVector(), Step.Move.X);
-		Character->AddMovementInput(Character->GetActorRightVector(), Step.Move.Y);
 		return;
 	}
 
@@ -498,9 +544,19 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 
 	if (Winch)
 	{
+		const EB1WinchHook Hook = Winch->GetHookState();
+		bHookUsed |= Hook != EB1WinchHook::Stowed;
+		if (Hook == EB1WinchHook::Carried)
+		{
+			MaxCarryDistance = FMath::Max(MaxCarryDistance, Winch->GetCurrentLength());
+		}
+		else if (Hook == EB1WinchHook::Attached)
+		{
+			MaxAnchorDistance = FMath::Max(MaxAnchorDistance, Winch->GetCurrentLength());
+		}
+
 		const float Tension = Winch->GetTension();
 		MaxTension = FMath::Max(MaxTension, Tension);
-		MaxAnchorDistance = FMath::Max(MaxAnchorDistance, Winch->GetCurrentLength());
 		if (bInLastStep)
 		{
 			LastStepTension.Include(Tension);
@@ -636,8 +692,20 @@ void AB1GymTestRig::FinishScript()
 	}
 
 	FString WinchMetrics;
-	if (Winch)
+	if (Winch && (WinchAnchor || bHookUsed || Thresholds.ExpectHook != EB1GymExpectHook::Any))
 	{
+		const FString HookName = StaticEnum<EB1WinchHook>()->GetNameStringByValue(static_cast<int64>(Winch->GetHookState()));
+		const float CarryDistance = MaxCarryDistance / CmPerM;
+		if (Thresholds.ExpectHook != EB1GymExpectHook::Any && StaticEnum<EB1GymExpectHook>()->GetNameStringByValue(static_cast<int64>(Thresholds.ExpectHook)) != HookName)
+		{
+			Failures.Add(FString::Printf(TEXT("hook!=%s"), *UEnum::GetValueAsString(Thresholds.ExpectHook)));
+		}
+		if (Thresholds.MaxCarryDistance >= 0.0f && CarryDistance > Thresholds.MaxCarryDistance)
+		{
+			Failures.Add(FString::Printf(TEXT("carryMax>%.2f"), Thresholds.MaxCarryDistance));
+		}
+		WinchMetrics = FString::Printf(TEXT(" hook=%s carryMax=%.2f"), *HookName, CarryDistance);
+
 		const float TensionOscillation = LastStepTension.IsValid() ? LastStepTension.Size() : 0.0f;
 		const float TensionMinLast = LastStepTension.IsValid() ? LastStepTension.Min : 0.0f;
 		const float AnchorDistance = MaxAnchorDistance / CmPerM;
@@ -664,7 +732,7 @@ void AB1GymTestRig::FinishScript()
 			Failures.Add(FString::Printf(TEXT("rest>%.2f"), Thresholds.MaxRestLength));
 		}
 
-		WinchMetrics = FString::Printf(TEXT(" tensionMax=%.0f tensionOsc=%.0f tensionMinLast=%.0f anchorDistMax=%.2f rest=%.2f vmaxLast=%.2f"),
+		WinchMetrics += FString::Printf(TEXT(" tensionMax=%.0f tensionOsc=%.0f tensionMinLast=%.0f anchorDistMax=%.2f rest=%.2f vmaxLast=%.2f"),
 			MaxTension, TensionOscillation, TensionMinLast, AnchorDistance, RestLength, LastStepMaxSpeed);
 		Winch->Detach();
 		Winch = nullptr;

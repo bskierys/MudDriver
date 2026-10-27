@@ -30,6 +30,7 @@ public:
 
 	UCameraComponent* GetFirstPersonCamera() const { return FirstPersonCamera; }
 	UB1InteractionScanComponent* GetInteractionScan() const { return InteractionScan; }
+	USceneComponent* GetHookHand() const { return HookHand; }
 
 	/** Hidden, no collision, no movement and attached to the seat while its player drives */
 	void SitIn(USceneComponent* Seat);
@@ -44,6 +45,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction")
 	TObjectPtr<UB1InteractionScanComponent> InteractionScan;
+
+	/** A carried winch cable ends here */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction")
+	TObjectPtr<USceneComponent> HookHand;
 
 	// Mapping contexts are swapped by AB1PlayerController on possession.
 	UPROPERTY(EditDefaultsOnly, Category = "Input")

@@ -10,6 +10,16 @@ class UB1VehicleMovementComponent;
 class UCableComponent;
 class UMaterialInterface;
 
+UENUM()
+enum class EB1WinchHook : uint8
+{
+	/** On the drum, no cable */
+	Stowed,
+	/** In someone's hand: visual cable only, no tension */
+	Carried,
+	Attached,
+};
+
 /**
  * Winch on the vehicle; the component's location is the winch point. Cable is a capped one-sided spring (ADR-007),
  * applied in FB1VehicleSimulation; this side sends the cable state and reads tension back.
@@ -83,12 +93,26 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Winch|Debug", meta = (ClampMin = "-1", ClampMax = "1"))
 	float Pull = 0.0f;
 
-	/** Rest length = current distance. False when the anchor is out of MaxCableLength */
+	/** Rest length = current distance, from any hook state. False when the anchor is out of MaxCableLength */
 	UFUNCTION(BlueprintCallable, Category = "Winch")
 	bool AttachTo(UB1WinchAnchorComponent* Anchor);
 
+	/** Hook back on the drum from any state */
 	UFUNCTION(BlueprintCallable, Category = "Winch")
 	void Detach();
+
+	/** Stowed hook to Hand. A carrying ACharacter is leashed: pulled back onto MaxCableLength from the winch point */
+	bool TakeHook(USceneComponent* Hand);
+
+	/** Attached hook off its anchor and into Hand */
+	bool DetachToCarrier(USceneComponent* Hand);
+
+	EB1WinchHook GetHookState() const;
+	AActor* GetHookCarrier() const { return HookCarrier.IsValid() ? HookCarrier->GetOwner() : nullptr; }
+	bool IsInReach(const UB1WinchAnchorComponent* Target) const;
+
+	static UB1WinchComponent* FindCarriedBy(const AActor* Carrier);
+	static UB1WinchComponent* FindAttachedTo(const UB1WinchAnchorComponent* Target);
 
 	/** Detaches when attached, else hooks the nearest anchor in range */
 	void ToggleAttachNearest();
@@ -107,6 +131,7 @@ public:
 	float GetTension() const { return Tension; }
 	/** cm */
 	float GetRestLength() const { return RestLength; }
+	/** Winch point to the anchor or the carrier's hand, cm */
 	float GetCurrentLength() const;
 
 protected:
@@ -120,8 +145,17 @@ private:
 	void ReadSimOutput();
 	void SetWinchingTag(bool bWinching);
 	void SetupCableCollision(UCableComponent& CableComponent) const;
+	void CreateCable(USceneComponent& End, float Length);
+	/** Ends the anchor's sim cable; keeps the visual cable */
+	void ReleaseAnchor();
+	void CarryTo(USceneComponent& Hand, float Length);
+	void TickCarriedHook();
 
 	TWeakObjectPtr<UB1WinchAnchorComponent> Anchor;
+	TWeakObjectPtr<USceneComponent> HookCarrier;
+
+	/** Visual cable paid out while carried, cm */
+	float CarryLength = 0.0f;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UB1VehicleMovementComponent> Movement;

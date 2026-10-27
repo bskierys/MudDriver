@@ -23,6 +23,10 @@ AB1Character::AB1Character(const FObjectInitializer& ObjectInitializer)
 
 	InteractionScan = CreateDefaultSubobject<UB1InteractionScanComponent>(TEXT("InteractionScan"));
 
+	HookHand = CreateDefaultSubobject<USceneComponent>(TEXT("HookHand"));
+	HookHand->SetupAttachment(FirstPersonCamera);
+	HookHand->SetRelativeLocation(FVector(40.0f, 25.0f, -35.0f));
+
 	bUseControllerRotationYaw = true;
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationRoll = false;
