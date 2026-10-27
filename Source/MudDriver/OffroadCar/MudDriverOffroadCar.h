@@ -10,7 +10,7 @@
  *  Offroad car wheeled vehicle implementation
  */
 UCLASS(abstract)
-class AMudDriverOffroadCar : public AMudDriverPawn
+class MUDDRIVER_API AMudDriverOffroadCar : public AMudDriverPawn
 {
 	GENERATED_BODY()
 	

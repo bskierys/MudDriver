@@ -1,5 +1,6 @@
 #include "B1Character.h"
 #include "B1GameplayTags.h"
+#include "B1InteractionScanComponent.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "Camera/CameraComponent.h"
@@ -20,6 +21,8 @@ AB1Character::AB1Character(const FObjectInitializer& ObjectInitializer)
 	FirstPersonCamera->SetRelativeLocation(FVector(0.0f, 0.0f, 70.0f));
 	FirstPersonCamera->bUsePawnControlRotation = true;
 
+	InteractionScan = CreateDefaultSubobject<UB1InteractionScanComponent>(TEXT("InteractionScan"));
+
 	bUseControllerRotationYaw = true;
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationRoll = false;
@@ -34,6 +37,26 @@ UAbilitySystemComponent* AB1Character::GetAbilitySystemComponent() const
 float AB1Character::GetCapsuleBottomZ() const
 {
 	return GetCapsuleComponent()->GetComponentLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+}
+
+void AB1Character::SitIn(USceneComponent* Seat)
+{
+	bSeated = true;
+	GetCharacterMovement()->StopMovementImmediately();
+	GetCharacterMovement()->DisableMovement();
+	SetActorEnableCollision(false);
+	SetActorHiddenInGame(true);
+	AttachToComponent(Seat, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+}
+
+void AB1Character::LeaveSeat()
+{
+	bSeated = false;
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	SetActorRotation(FRotator(0.0f, GetActorRotation().Yaw, 0.0f));
+	SetActorHiddenInGame(false);
+	SetActorEnableCollision(true);
+	GetCharacterMovement()->SetMovementMode(MOVE_Falling);
 }
 
 void AB1Character::UnPossessed()

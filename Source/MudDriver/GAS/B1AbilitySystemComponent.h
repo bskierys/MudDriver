@@ -20,6 +20,7 @@ public:
 	bool AddVehicleFuel(float Litres);
 
 	// Activates, or forwards input to, every spec whose dynamic tags hold InputTag (ADR-014).
+	// Only specs that could activate before the press changed anything are activated.
 	void AbilityInputTagPressed(const FGameplayTag& InputTag);
 	void AbilityInputTagReleased(const FGameplayTag& InputTag);
 };

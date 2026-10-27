@@ -44,6 +44,14 @@ public:
 	UFUNCTION(Exec)
 	void B1SpawnCharacter();
 
+	/** Same path as the interact key in the jeep */
+	UFUNCTION(Exec)
+	void B1ExitVehicle();
+
+	/** Enters the nearest free jeep, at any distance */
+	UFUNCTION(Exec)
+	void B1EnterVehicle();
+
 private:
 
 	class UB1WinchComponent* GetPlayerWinch(const TCHAR* CheatName) const;

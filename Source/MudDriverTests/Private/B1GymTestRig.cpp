@@ -2,6 +2,7 @@
 #include "B1Log.h"
 #include "B1AbilitySystemComponent.h"
 #include "B1Character.h"
+#include "B1Jeep.h"
 #include "Components/CapsuleComponent.h"
 #include "B1GameplayTags.h"
 #include "B1PlayerController.h"
@@ -238,6 +239,9 @@ void AB1GymTestRig::StartTest()
 		const float TargetFuel = StartFuel < 0.0f ? MaxFuel : FMath::Min(StartFuel, MaxFuel);
 		AbilitySystem->AddVehicleFuel(TargetFuel - AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute()));
 		FuelAtStart = AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute());
+		LastFuel = FuelAtStart;
+		FuelOutside = 0.0f;
+		AvatarFailures.Reset();
 
 		AbilityActivations = 0;
 		AbilityActivatedHandle = AbilitySystem->AbilityActivatedCallbacks.AddUObject(this, &AB1GymTestRig::OnAbilityActivated);
@@ -247,6 +251,11 @@ void AB1GymTestRig::StartTest()
 		FinishTest(EFunctionalTestResult::Error, TEXT("AbilityInputTag steps need bPossessWithPlayer"));
 		return;
 	}
+	if (!Cast<AB1Jeep>(Vehicle) && InputScript.ContainsByPredicate([](const FB1GymInputStep& Step) { return Step.bParked; }))
+	{
+		FinishTest(EFunctionalTestResult::Error, TEXT("bParked steps need an AB1Jeep"));
+		return;
+	}
 	if (!Character && InputScript.ContainsByPredicate([](const FB1GymInputStep& Step) { return !Step.Move.IsZero(); }))
 	{
 		FinishTest(EFunctionalTestResult::Error, TEXT("Move steps need StartOnFootClass"));
@@ -254,6 +263,7 @@ void AB1GymTestRig::StartTest()
 	}
 
 	CurrentStep = INDEX_NONE;
+	bRigParked = false;
 	if (InputScript.Num() > 0)
 	{
 		EnterStep(0);
@@ -268,6 +278,10 @@ void AB1GymTestRig::EnterStep(int32 StepIndex)
 		return;
 	}
 
+	if (CurrentStep != INDEX_NONE)
+	{
+		CheckExpectAvatar(CurrentStep);
+	}
 	CurrentStep = StepIndex;
 	if (InputScript[StepIndex].bUnstuck && MudVehicle)
 	{
@@ -298,6 +312,27 @@ void AB1GymTestRig::SetAbilityInput(const FGameplayTag& InputTag)
 	if (HeldAbilityInputTag.IsValid())
 	{
 		PC->AbilityInputTagPressed(HeldAbilityInputTag);
+	}
+}
+
+void AB1GymTestRig::CheckExpectAvatar(int32 StepIndex)
+{
+	const EB1GymExpectAvatar Expect = InputScript[StepIndex].ExpectAvatar;
+	if (Expect == EB1GymExpectAvatar::Any)
+	{
+		return;
+	}
+
+	const APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
+	const bool bInVehicle = Expect == EB1GymExpectAvatar::InVehicle;
+	const FGameplayTag& Tag = bInVehicle ? B1GameplayTags::State_Avatar_InVehicle : B1GameplayTags::State_Avatar_OnFoot;
+	const bool bPawnOk = bInVehicle ? (Pawn && Pawn == Vehicle) : (Pawn && Pawn->IsA<AB1Character>());
+	if (!bPawnOk || !AbilitySystem || !AbilitySystem->HasMatchingGameplayTag(Tag))
+	{
+		AvatarFailures.Add(StepIndex);
+		UE_LOG(LogB1Test, Warning, TEXT("%s step %d: expected %s, pawn %s"), *GetName(), StepIndex,
+			*UEnum::GetValueAsString(Expect), *GetNameSafe(Pawn));
 	}
 }
 
@@ -395,6 +430,13 @@ void AB1GymTestRig::ApplyInput(const FB1GymInputStep& Step)
 	Movement->SetSteeringInput(Step.Steer);
 	Movement->SetBrakeInput(Step.Brake);
 	Movement->SetHandbrakeInput(Step.bHandbrake);
+	// Only on a change, so the rig doesn't unpark a jeep the player has just left.
+	AB1Jeep* Jeep = Cast<AB1Jeep>(Vehicle);
+	if (Jeep && Step.bParked != bRigParked)
+	{
+		Jeep->SetParked(Step.bParked);
+		bRigParked = Step.bParked;
+	}
 	if (Winch)
 	{
 		Winch->SetPull(Step.WinchPull);
@@ -438,6 +480,16 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 	{
 		TimeInMud += DeltaSeconds;
 	}
+	if (AbilitySystem && Vehicle)
+	{
+		const float Fuel = AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute());
+		const APlayerController* PC = GetWorld()->GetFirstPlayerController();
+		if (!PC || PC->GetPawn() != Vehicle)
+		{
+			FuelOutside += FMath::Max(0.0f, LastFuel - Fuel);
+		}
+		LastFuel = Fuel;
+	}
 
 	if (Winch)
 	{
@@ -479,6 +531,10 @@ void AB1GymTestRig::SampleSpring()
 void AB1GymTestRig::FinishScript()
 {
 	bScriptRunning = false;
+	if (CurrentStep != INDEX_NONE)
+	{
+		CheckExpectAvatar(CurrentStep);
+	}
 	ApplyInput(FB1GymInputStep());
 	SetAbilityInput(FGameplayTag());
 	if (TestForce != EB1TestForce::Off)
@@ -610,6 +666,18 @@ void AB1GymTestRig::FinishScript()
 			Failures.Add(FString::Printf(TEXT("fuelPer100m>%.3f"), Thresholds.MaxFuelPer100m));
 		}
 
+		if (Thresholds.MaxFuelUsed >= 0.0f && FuelUsed > Thresholds.MaxFuelUsed)
+		{
+			Failures.Add(FString::Printf(TEXT("fuelUsed>%.4f"), Thresholds.MaxFuelUsed));
+		}
+		if (Thresholds.MaxFuelOutside >= 0.0f && FuelOutside > Thresholds.MaxFuelOutside)
+		{
+			Failures.Add(FString::Printf(TEXT("fuelOutside>%.4f"), Thresholds.MaxFuelOutside));
+		}
+		if (!AvatarFailures.IsEmpty())
+		{
+			Failures.Add(FString::Printf(TEXT("avatar@%s"), *FString::JoinBy(AvatarFailures, TEXT("/"), [](int32 Step) { return FString::FromInt(Step); })));
+		}
 		if (Thresholds.MinFuelPerHour >= 0.0f && FuelPerHour < Thresholds.MinFuelPerHour)
 		{
 			Failures.Add(FString::Printf(TEXT("fuelPerHour<%.1f"), Thresholds.MinFuelPerHour));
@@ -631,6 +699,10 @@ void AB1GymTestRig::FinishScript()
 
 		FuelMetrics = FString::Printf(TEXT(" fuelUsed=%.3f fuelPer100m=%.3f fuelPerHour=%.1f cond=%.1f inMud=%.2f abilities=%d"), FuelUsed, FuelPer100m, FuelPerHour,
 			AbilitySystem->GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute()), TimeInMud, AbilityActivations);
+		if (Vehicle)
+		{
+			FuelMetrics += FString::Printf(TEXT(" fuelOutside=%.4f"), FuelOutside);
+		}
 	}
 
 	FString PlayerMetrics;
@@ -648,6 +720,13 @@ void AB1GymTestRig::FinishScript()
 			Avatar = TEXT("OnFoot");
 		}
 		PlayerMetrics = FString::Printf(TEXT(" pawn=%s avatar=%s"), PossessedPawn ? *PossessedPawn->GetClass()->GetName() : TEXT("none"), Avatar);
+	}
+	if (bPossessWithPlayer && Vehicle)
+	{
+		TArray<AActor*> Attached;
+		Vehicle->GetAttachedActors(Attached);
+		const bool bSeated = Attached.ContainsByPredicate([](const AActor* Actor) { return Actor->IsA<AB1Character>(); });
+		PlayerMetrics += FString::Printf(TEXT(" seated=%d"), bSeated ? 1 : 0);
 	}
 	if (Character)
 	{

@@ -6,6 +6,7 @@
 #include "B1Character.generated.h"
 
 class UCameraComponent;
+class UB1InteractionScanComponent;
 class UInputAction;
 struct FInputActionValue;
 
@@ -28,11 +29,21 @@ public:
 	float GetCapsuleBottomZ() const;
 
 	UCameraComponent* GetFirstPersonCamera() const { return FirstPersonCamera; }
+	UB1InteractionScanComponent* GetInteractionScan() const { return InteractionScan; }
+
+	/** Hidden, no collision, no movement and attached to the seat while its player drives */
+	void SitIn(USceneComponent* Seat);
+	/** Back to walking where it stands; the caller places it first */
+	void LeaveSeat();
+	bool IsSeated() const { return bSeated; }
 
 protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	TObjectPtr<UCameraComponent> FirstPersonCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction")
+	TObjectPtr<UB1InteractionScanComponent> InteractionScan;
 
 	// Mapping contexts are swapped by AB1PlayerController on possession.
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
@@ -62,4 +73,6 @@ private:
 	void Move(const FInputActionValue& Value);
 	void LookMouse(const FInputActionValue& Value);
 	void LookStick(const FInputActionValue& Value);
+
+	bool bSeated = false;
 };

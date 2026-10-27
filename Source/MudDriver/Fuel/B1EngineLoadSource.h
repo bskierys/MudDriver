@@ -19,4 +19,7 @@ public:
 
 	/** Engine power over its peak, [0, 1] */
 	virtual float GetNormalizedEnginePower() const = 0;
+
+	/** A stopped engine burns no fuel, not even idle */
+	virtual bool IsEngineRunning() const { return true; }
 };

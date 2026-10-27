@@ -1,10 +1,16 @@
 #include "B1GameplayAbility_TestPing.h"
 #include "B1Log.h"
+#include "B1GameplayTags.h"
 
 UB1GameplayAbility_TestPing::UB1GameplayAbility_TestPing()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+
+	FAbilityTriggerData Trigger;
+	Trigger.TriggerTag = B1GameplayTags::Event_Interact_TestPing;
+	Trigger.TriggerSource = EGameplayAbilityTriggerSource::GameplayEvent;
+	AbilityTriggers.Add(Trigger);
 }
 
 void UB1GameplayAbility_TestPing::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,

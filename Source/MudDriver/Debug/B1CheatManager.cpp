@@ -8,6 +8,8 @@
 #include "B1PlayerState.h"
 #include "B1Character.h"
 #include "B1GameMode.h"
+#include "B1PlayerController.h"
+#include "EngineUtils.h"
 #include "B1AbilitySystemComponent.h"
 #include "B1VehicleAttributeSet.h"
 #include "GameFramework/PlayerController.h"
@@ -164,6 +166,37 @@ void UB1CheatManager::B1SpawnCharacter()
 	PC->Possess(Character);
 	PC->SetControlRotation(Yaw);
 	UE_LOG(LogB1Vehicle, Display, TEXT("B1SpawnCharacter: %s at %s"), *Character->GetName(), *Location.ToCompactString());
+}
+
+void UB1CheatManager::B1ExitVehicle()
+{
+	if (AB1PlayerController* PC = Cast<AB1PlayerController>(GetOuterAPlayerController()))
+	{
+		PC->ExitVehicle();
+	}
+}
+
+void UB1CheatManager::B1EnterVehicle()
+{
+	AB1PlayerController* PC = Cast<AB1PlayerController>(GetOuterAPlayerController());
+	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
+	if (!Pawn)
+	{
+		return;
+	}
+
+	AB1Jeep* Nearest = nullptr;
+	double NearestDistSq = TNumericLimits<double>::Max();
+	for (TActorIterator<AB1Jeep> It(GetWorld()); It; ++It)
+	{
+		const double DistSq = FVector::DistSquared(It->GetActorLocation(), Pawn->GetActorLocation());
+		if (!It->GetController() && DistSq < NearestDistSq)
+		{
+			Nearest = *It;
+			NearestDistSq = DistSq;
+		}
+	}
+	PC->EnterVehicle(Nearest);
 }
 
 UB1AbilitySystemComponent* UB1CheatManager::GetPlayerASC(const TCHAR* CheatName) const

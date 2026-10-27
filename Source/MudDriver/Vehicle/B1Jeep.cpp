@@ -32,6 +32,14 @@ AB1Jeep::AB1Jeep(const FObjectInitializer& ObjectInitializer)
 	Winch->SetRelativeLocation(FVector(230.0f, 0.0f, 60.0f));
 	Winch->WinchingTag = B1GameplayTags::Vehicle_State_Winching;
 
+	DriverSeat = CreateDefaultSubobject<USceneComponent>(TEXT("DriverSeat"));
+	DriverSeat->SetupAttachment(GetMesh());
+	DriverSeat->SetRelativeLocation(FVector(-20.0f, -40.0f, 100.0f));
+
+	DriverDoor = CreateDefaultSubobject<USceneComponent>(TEXT("DriverDoor"));
+	DriverDoor->SetupAttachment(GetMesh());
+	DriverDoor->SetRelativeLocation(FVector(-20.0f, -230.0f, 100.0f));
+
 	// Data and DrainEffect are assets, set on BP_B1Jeep.
 	FuelConsumption = CreateDefaultSubobject<UB1FuelConsumptionComponent>(TEXT("FuelConsumption"));
 	FuelConsumption->FuelAttribute = UB1VehicleAttributeSet::GetFuelAttribute();
@@ -67,6 +75,50 @@ void AB1Jeep::PossessedBy(AController* NewController)
 
 	UE_LOG(LogB1Vehicle, Log, TEXT("%s ASC link: %s"), *GetName(),
 		*GetNameSafe(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(this)));
+
+	SetParked(false);
+}
+
+void AB1Jeep::SetParked(bool bParked)
+{
+	UB1VehicleMovementComponent* Movement = GetB1VehicleMovement();
+	if (UAbilitySystemComponent* ASC = AbilitySystem.Get())
+	{
+		ASC->SetLooseGameplayTagCount(B1GameplayTags::Vehicle_State_EngineOff, bParked ? 1 : 0);
+	}
+	if (bParked == IsParked())
+	{
+		return;
+	}
+
+	// Chaos parking applies the full handbrake torque to every wheel and needs no controller.
+	if (bParked)
+	{
+		Movement->ClearDriverInput();
+	}
+	Movement->SetParked(bParked);
+	Movement->SetEngineCut(EB1EngineCut::EngineOff, bParked);
+	Movement->SetParkSleep(bParked);
+	UE_LOG(LogB1Vehicle, Log, TEXT("%s %s"), *GetName(), bParked ? TEXT("parked, engine off") : TEXT("unparked, engine on"));
+}
+
+void AB1Jeep::GatherInteractionOptions(const AB1Character& Character, TArray<FB1InteractionOption>& Options) const
+{
+	if (GetController())
+	{
+		return;
+	}
+
+	FB1InteractionOption& Option = Options.AddDefaulted_GetRef();
+	Option.Text = NSLOCTEXT("B1Jeep", "Enter", "Enter");
+	Option.TriggerEventTag = B1GameplayTags::Event_Interact_EnterVehicle;
+	Option.Priority = 10;
+	Option.InteractionPoint = DriverDoor->GetComponentLocation();
+}
+
+bool AB1Jeep::IsParked() const
+{
+	return GetB1VehicleMovement()->IsParked();
 }
 
 void AB1Jeep::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -94,7 +146,7 @@ void AB1Jeep::WinchToggle(const FInputActionValue& Value)
 
 void AB1Jeep::OnOutOfFuelChanged(bool bOutOfFuel)
 {
-	GetB1VehicleMovement()->SetFuelCutOff(bOutOfFuel);
+	GetB1VehicleMovement()->SetEngineCut(EB1EngineCut::OutOfFuel, bOutOfFuel);
 	UE_LOG(LogB1Vehicle, Log, TEXT("%s %s"), *GetName(), bOutOfFuel ? TEXT("throttle cut") : TEXT("throttle back"));
 }
 

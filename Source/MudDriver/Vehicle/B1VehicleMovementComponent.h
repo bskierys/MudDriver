@@ -9,6 +9,15 @@
 
 class FB1VehicleSimulation;
 
+/** Why the engine gives no torque; any reason cuts the throttle */
+enum class EB1EngineCut : uint8
+{
+	None = 0,
+	OutOfFuel = 1 << 0,
+	EngineOff = 1 << 1,
+};
+ENUM_CLASS_FLAGS(EB1EngineCut);
+
 /** Wheeled movement that runs FB1VehicleSimulation on the physics thread */
 UCLASS(ClassGroup = (B1), meta = (BlueprintSpawnableComponent))
 class MUDDRIVER_API UB1VehicleMovementComponent : public UChaosWheeledVehicleMovementComponent, public IB1MudSimHost, public IB1EngineLoadSource
@@ -37,12 +46,23 @@ public:
 	/** IB1EngineLoadSource: engine throttle² × torque(RPM) × RPM over the curve's peak power, [0, 1]; updated each game frame */
 	virtual float GetNormalizedEnginePower() const override { return NormalizedEnginePower; }
 
-	/** Throttle as the engine sees it this frame, after rise/fall rates and the fuel cut-off */
+	virtual bool IsEngineRunning() const override { return !EnumHasAnyFlags(EngineCut, EB1EngineCut::EngineOff); }
+
+	/** Throttle as the engine sees it this frame, after rise/fall rates and the engine cut */
 	float GetEffectiveThrottle() const { return EffectiveThrottle; }
 
-	/** Out of fuel: throttle is forced to 0, brake/steering/handbrake still work */
-	void SetFuelCutOff(bool bCutOff) { bFuelCutOff = bCutOff; }
-	bool IsFuelCutOff() const { return bFuelCutOff; }
+	/** While any reason is set the throttle is forced to 0; brake, steering and handbrake still work */
+	void SetEngineCut(EB1EngineCut Reason, bool bCut);
+	bool IsEngineCut() const { return EngineCut != EB1EngineCut::None; }
+
+	/** Unpossessed, Chaos replays the last replicated inputs, so the driver's last throttle would stay on */
+	void ClearDriverInput();
+
+	/** Locked wheels still creep on a firm slope, so a parked vehicle sleeps below ParkedSleepThreshold; mud slopes never sleep */
+	void SetParkSleep(bool bParked);
+
+	UPROPERTY(EditAnywhere, Category = "Vehicle|Config", meta = (Units = "cm/s", ClampMin = "0"))
+	float ParkedSleepThreshold = 50.0f;
 
 	// IB1MudSimHost
 	virtual FB1MudSimulation* GetMudSimulation() const override;
@@ -66,8 +86,8 @@ private:
 
 	void UpdateEnginePower();
 
-	/** Test force and winch need every step simulated */
-	void RefreshForceKeepAwake();
+	/** Test force and winch need every step simulated; parking sleeps sooner */
+	void RefreshSleepThreshold();
 
 	float NormalizedEnginePower = 0.0f;
 	float EffectiveThrottle = 0.0f;
@@ -75,7 +95,7 @@ private:
 	/** torque × RPM at the torque curve's best point; the curve doesn't change at runtime */
 	float PeakEnginePower = 0.0f;
 
-	bool bFuelCutOff = false;
+	EB1EngineCut EngineCut = EB1EngineCut::None;
 
 	EB1TestForce TestForce = EB1TestForce::Off;
 	FVector TestForceAnchor = FVector::ZeroVector;
@@ -84,7 +104,10 @@ private:
 
 	/** Vehicle sleep stops the simulation step, so it's disabled while a test force or the winch is active */
 	bool bForceKeepAwake = false;
-	float SavedSleepThreshold = 0.0f;
+	bool bParkSleep = false;
+	bool bAppliedParkSleep = false;
+	/** SleepThreshold before an override, restored when none is left */
+	TOptional<float> DefaultSleepThreshold;
 
 	/** Mud keep-awake blocks sleep through SleepSlopeLimit, so it doesn't fight the test force over SleepThreshold */
 	bool bMudKeepAwake = false;

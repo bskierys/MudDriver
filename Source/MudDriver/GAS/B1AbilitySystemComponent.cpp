@@ -68,7 +68,11 @@ void UB1AbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& Input
 		else
 		{
 			Spec.InputPressed = true;
-			ToActivate.Add(Spec.Handle);
+			// Judged before any activation: exiting the jeep must not let the same press interact on foot.
+			if (Spec.Ability->CanActivateAbility(Spec.Handle, AbilityActorInfo.Get()))
+			{
+				ToActivate.Add(Spec.Handle);
+			}
 		}
 	}
 

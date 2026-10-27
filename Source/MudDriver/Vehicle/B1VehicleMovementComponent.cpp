@@ -27,26 +27,60 @@ TUniquePtr<Chaos::FSimpleWheeledVehicle> UB1VehicleMovementComponent::CreatePhys
 	return UChaosVehicleMovementComponent::CreatePhysicsVehicle();
 }
 
-void UB1VehicleMovementComponent::RefreshForceKeepAwake()
+void UB1VehicleMovementComponent::RefreshSleepThreshold()
 {
-	const bool bNeeded = TestForce != EB1TestForce::Off || WinchInput.bAttached;
-	if (bNeeded && !bForceKeepAwake)
+	const bool bKeepAwake = TestForce != EB1TestForce::Off || WinchInput.bAttached;
+	const bool bOverride = bKeepAwake || bParkSleep;
+	// Written only on a change, so direct edits of SleepThreshold (rigs, details panel) survive the per-tick winch input.
+	if (bKeepAwake == bForceKeepAwake && bParkSleep == bAppliedParkSleep)
 	{
-		SavedSleepThreshold = SleepThreshold;
-		SleepThreshold = 0.0f;
+		return;
+	}
+
+	if (bOverride && !DefaultSleepThreshold.IsSet())
+	{
+		DefaultSleepThreshold = SleepThreshold;
+	}
+	if (bKeepAwake && !bForceKeepAwake)
+	{
 		SetSleeping(false);
 	}
-	else if (!bNeeded && bForceKeepAwake)
+	bForceKeepAwake = bKeepAwake;
+	bAppliedParkSleep = bParkSleep;
+
+	if (bKeepAwake)
 	{
-		SleepThreshold = SavedSleepThreshold;
+		SleepThreshold = 0.0f;
 	}
-	bForceKeepAwake = bNeeded;
+	else if (bParkSleep)
+	{
+		SleepThreshold = FMath::Max(DefaultSleepThreshold.GetValue(), ParkedSleepThreshold);
+	}
+	else if (DefaultSleepThreshold.IsSet())
+	{
+		SleepThreshold = DefaultSleepThreshold.GetValue();
+		DefaultSleepThreshold.Reset();
+	}
+}
+
+void UB1VehicleMovementComponent::ClearDriverInput()
+{
+	ClearRawInput();
+	const int32 Gear = ReplicatedState.TargetGear;
+	ReplicatedState = FVehicleReplicatedState();
+	ReplicatedState.TargetGear = Gear;
+}
+
+void UB1VehicleMovementComponent::SetParkSleep(bool bParked)
+{
+	bParkSleep = bParked;
+	RefreshSleepThreshold();
 }
 
 void UB1VehicleMovementComponent::SetWinchInput(const FB1WinchSimInput& Input)
 {
 	WinchInput = Input;
-	RefreshForceKeepAwake();
+	RefreshSleepThreshold();
 }
 
 FB1WinchSimOutput UB1VehicleMovementComponent::GetWinchOutput() const
@@ -59,10 +93,22 @@ void UB1VehicleMovementComponent::SetTestForce(EB1TestForce Mode)
 {
 	TestForce = Mode;
 	TestForceAnchor = GetOwner()->GetActorLocation();
-	RefreshForceKeepAwake();
+	RefreshSleepThreshold();
 
 	UE_LOG(LogB1Physics, Log, TEXT("TestForce %s on %s, anchor %s"),
 		*UEnum::GetValueAsString(Mode), *GetNameSafe(GetOwner()), *TestForceAnchor.ToCompactString());
+}
+
+void UB1VehicleMovementComponent::SetEngineCut(EB1EngineCut Reason, bool bCut)
+{
+	if (bCut)
+	{
+		EnumAddFlags(EngineCut, Reason);
+	}
+	else
+	{
+		EnumRemoveFlags(EngineCut, Reason);
+	}
 }
 
 void UB1VehicleMovementComponent::UpdateEnginePower()
@@ -87,7 +133,7 @@ void UB1VehicleMovementComponent::UpdateEnginePower()
 void UB1VehicleMovementComponent::Update(float DeltaTime)
 {
 	// Chaos engine torque is throttle × curve(RPM), so a zero throttle also removes idle torque.
-	if (bFuelCutOff)
+	if (IsEngineCut())
 	{
 		ThrottleInput = 0.0f;
 	}

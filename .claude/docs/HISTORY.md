@@ -1019,3 +1019,32 @@ Same session, after the S4-03 commit and the pad pitch fix. Starting state: the 
 ### Open follow-ups
 - Touch controls no longer exclude the vehicle mouse-look context (desktop only for now).
 - Next: S4-05 seat, engine off, parked on exit.
+
+## 2026-10-27 — S4-05 park, S4-11 interaction, S4-06 enter/exit
+
+### Context
+`/work` run to the S4-06 user check. Starting state: the character could only be spawned by a cheat; nothing parked the jeep, cut its engine or put the player back in it.
+
+### What was built
+- S4-05: `AB1Jeep::DriverSeat`; `AB1PlayerController::OnFootCharacter` follows possession (seated in any possessed jeep, spawned once from `CharacterClass`). `AB1Character::SitIn` / `LeaveSeat`. `AB1Jeep::SetParked`: Chaos parking + `EB1EngineCut::EngineOff` + `Vehicle.State.EngineOff` + park sleep (`ParkedSleepThreshold` 50 cm/s). `IB1EngineLoadSource::IsEngineRunning` stops fuel use. Rigs `B1Park_FirmSlope` / `B1Park_MediumSlope`, step `bParked`, metric `seated=`, threshold `MaxFuelUsed`.
+- S4-11: `Interaction/` (`IB1Interactable`, `FB1InteractionOption`, `UB1InteractionScanComponent`), `GA_B1Interact`, `IA_B1Interact`, `AB1TestInteractable`, rig `B1OnFoot_Interact`. ADR-017.
+- S4-06: `ExitVehicle` / `EnterVehicle` on the controller, `GA_B1ExitVehicle` / `GA_B1EnterVehicle`, jeep "Enter" option at `DriverDoor`, cheats `B1ExitVehicle` / `B1EnterVehicle`. Rig step `ExpectAvatar`, metric `fuelOutside=`. Rigs `B1OnFoot_ExitEnter10` (core), `B1OnFoot_ExitDeepSlope` / `ExitDeepStrip` (winch).
+- Input after the user check: pad X = interact (removed from vehicle throttle; RT stays), F on keyboard.
+- Headless: core 12/12, mud 22/22, winch 21/21 (`s406b_*.log`). User check passed.
+
+### Decisions made
+- ADR-017: interaction options + one interact ability (Lyra-style scan).
+- Parked jeep held by Chaos sleep off mud, not a hold force (S4-05 note; creep measured 1.31 m / 10 s).
+- One ability input press activates only specs that could activate before the press (ADR-014 amendment).
+- Exit never fails: lifts, `FindTeleportSpot`, then a drop above the door (user: walking is the most prototype feature).
+
+### What we learned
+- Locked wheels on a firm 20° slope creep at ~14 cm/s, just above Chaos's 10 cm/s sleep speed.
+- Unpossessed Chaos vehicles replay `ReplicatedState` (last driver input); parking must clear it.
+- The jeep's physics body blocks a capsule 1.7 m from its centre sideways; door spots sit at 2.3 m.
+- On a sunk or sloped jeep, a ground trace starting 1.5 m above the spot can start inside a 1 m hard-bottom slab and miss it.
+- MCP `set_properties` array resize needs element 0 resent bit-identical (0.3 round-trips as 0.30000001192092896); long scripts go through the HTTP endpoint from PowerShell.
+
+### Open follow-ups
+- Next: S4-07 winch hook carry.
+- Exit spot search could use the jeep's bounds instead of fixed offsets if other vehicles come.

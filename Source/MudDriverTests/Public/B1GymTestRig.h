@@ -15,6 +15,14 @@ class UB1WinchComponent;
 class UGameplayAbility;
 class AB1Character;
 
+UENUM()
+enum class EB1GymExpectAvatar : uint8
+{
+	Any,
+	InVehicle,
+	OnFoot,
+};
+
 USTRUCT(BlueprintType)
 struct FB1GymInputStep
 {
@@ -39,6 +47,10 @@ struct FB1GymInputStep
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	bool bUnstuck = false;
 
+	/** AB1Jeep::SetParked for this step: parking brake and engine off */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	bool bParked = false;
+
 	/** Winch reel-in fraction for this step; needs the rig's WinchAnchor */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (ClampMin = "0", ClampMax = "1"))
 	float WinchPull = 0.0f;
@@ -50,6 +62,10 @@ struct FB1GymInputStep
 	/** On-foot movement input, X forward and Y right relative to the character; needs StartOnFootClass */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	FVector2D Move = FVector2D::ZeroVector;
+
+	/** Checked when the step ends: player 0's pawn and State.Avatar tag; needs bPossessWithPlayer */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	EB1GymExpectAvatar ExpectAvatar = EB1GymExpectAvatar::Any;
 };
 
 /** Pass criteria. Negative values disable a check */
@@ -99,6 +115,14 @@ struct FB1GymThresholds
 
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	float MaxFuelPer100m = -1.0f;
+
+	/** Litres used over the script; needs bPossessWithPlayer */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MaxFuelUsed = -1.0f;
+
+	/** Litres used while player 0 isn't driving the rig's vehicle; needs bPossessWithPlayer */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MaxFuelOutside = -1.0f;
 
 	/** L/h averaged over the script; needs bPossessWithPlayer */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
@@ -246,6 +270,7 @@ private:
 	void FinishScript();
 	void SetAbilityInput(const FGameplayTag& InputTag);
 	void OnAbilityActivated(UGameplayAbility* Ability);
+	void CheckExpectAvatar(int32 StepIndex);
 
 	/** The rig's vehicle or on-foot character; what the metrics sample */
 	UPROPERTY(Transient)
@@ -281,6 +306,12 @@ private:
 	TObjectPtr<UB1AbilitySystemComponent> AbilitySystem;
 
 	float FuelAtStart = 0.0f;
+	float LastFuel = 0.0f;
+	bool bRigParked = false;
+	float FuelOutside = 0.0f;
+
+	/** Steps whose ExpectAvatar didn't hold, as step indices */
+	TArray<int32> AvatarFailures;
 
 	/** Ability input tag currently held through the player controller */
 	FGameplayTag HeldAbilityInputTag;

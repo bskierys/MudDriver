@@ -16,8 +16,8 @@ stale: false
 
 | Metric | Value |
 |--------|-------|
-| Files | **55** |
-| Classes | **55** |
+| Files | **61** |
+| Classes | **60** |
 | Circular deps | **0** |
 | Dead code candidates | **0** |
 
@@ -31,18 +31,18 @@ stale: false
 - `UB1PhysicalMaterial_Mud` — 5 dependents
 - `AMudDriverPawn` — 4 dependents
 - `UB1MudVehicleComponent` — 4 dependents
+- `AB1Character` — 4 dependents
 - `IB1FuelLoadSource` — 3 dependents
-- `UB1VehicleMovementComponent` — 3 dependents
 
 ## GAS Summary
 
-- Abilities (C++): 1
+- Abilities (C++): 4
 - Effects (C++): 0
 - AttributeSets: 1
-- GameplayTags (in assets): 0 high-confidence / 21 low
-- GAS .uassets — IS-A: GA 1 / GE 3 / AS 0 / ABP 1  |  Referencers: 8
+- GameplayTags (in assets): 0 high-confidence / 22 low
+- GAS .uassets — IS-A: GA 4 / GE 3 / AS 0 / ABP 1  |  Referencers: 8
 - Analysis confidence: **HIGH** (cpp_source_regex + binary_pattern_match)
-- Coverage: 140/140 assets (100.0%)
+- Coverage: 144/144 assets (100.0%)
 
 ---
 See [[index]] for the full wiki page catalog.

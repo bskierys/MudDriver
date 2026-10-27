@@ -33,6 +33,7 @@ public class MudDriver : ModuleRules
 			"MudDriver/Debug",
 			"MudDriver/Fuel",
 			"MudDriver/GAS",
+			"MudDriver/Interaction",
 			"MudDriver/Mud",
 			"MudDriver/Mud/Sim",
 			"MudDriver/Mud/Debug",

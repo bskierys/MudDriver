@@ -298,6 +298,8 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 - **Where input binds.** `UB1InputConfig` sits on the controller (`BP_B1PlayerController`), not per pawn, so ability keys work on both pawns. Its contexts (`IMC_B1Abilities`) stay in `DefaultMappingContexts`; only the vehicle and on-foot contexts swap (S4-04).
 - **Immediate activation.** Pressed/released go straight to the ASC. Lyra's per-frame `ProcessAbilityInput` queue and activation policies (on spawn, while held) are left out until an ability needs them.
 
+**Amended 2026-10-27 (S4-06).** One press activates only the specs whose `CanActivateAbility` passes before any of them activates. Exit and interact share `InputTag.Interact`: without this, the exit press swapped the avatar to on foot, and the same press then let interact pick the jeep door's "Enter". Lyra's frame queue would avoid it the same way.
+
 ---
 
 ## ADR-015 — Mud surface contract
@@ -346,3 +348,23 @@ The CVar is global; there's no per-vehicle or per-surface switch.
 - Keep it on and fake the slide with a mud force (fights the constraint every step; still no slide below 1 mph).
 - Per-material slope grip factor (ADR-001 fallback): can't overcome the anti-slide either.
 - Toggle the CVar at runtime when the player is on mud (global, so it would flip every vehicle).
+
+---
+
+## ADR-017 — Interaction options + one interact ability
+
+**Status:** accepted (2026-10-27, S4-11)
+
+**Problem.** On foot, one key has to do different things: enter the jeep at the door, take or return the hook at the jeep front, attach or detach at an anchor. S4-06/07/08 would each need the same "what's in range, which one wins" logic, and the prompt (S4-08) must never disagree with what the key does.
+
+**Decision.**
+- `IB1Interactable::GatherInteractionOptions(Character, Options)`, on an actor or any of its components. `FB1InteractionOption`: text, trigger event tag, priority, interaction point (Lyra's `IInteractableTarget` / `FInteractionOption`, minus the per-option granted ability).
+- `UB1InteractionScanComponent` on `AB1Character`: sphere overlap (`Range` 250 cm, all object types) every `ScanInterval` (0.1 s) while player-controlled and not seated. Options whose point is past the range are dropped; the rest sort by priority, then distance to the point.
+- `GA_B1Interact` (`UB1GameplayAbility_Interact`, `InputTag.Interact`, requires `State.Avatar.OnFoot`): `CanActivateAbility` runs a fresh scan and fails with nothing in range; activation sends the best option's event to the player ASC (target = the option's actor, instigator = the character). The option's ability triggers from it (`AbilityTriggers`, GameplayEvent).
+- Input `IA_B1Interact` in `IMC_B1Abilities`: F and pad X (user, S4-06 check: pad X was removed from vehicle throttle, RT throttles). The same key exits the jeep (`GA_B1ExitVehicle`, S4-06).
+
+**Rationale.** Lyra's pattern; one ability owns "which option", and each action stays a small ability triggered by its event. Abilities are granted once on the PlayerState ASC (ADR-014), so Lyra's per-option ability grant isn't needed. The prompt reads the same scan.
+
+**Alternatives.** Each interactable grants its own ability on overlap (Lyra's full version; grant churn on a single ASC). Per-feature input checks in each ability (duplicated range logic, prompt can drift). Line trace from the camera (fiddly for a big jeep and a thin tree; can be added as a tie-breaker later).
+
+**Verified.** `B1OnFoot_Interact` (`Lvl_Gym_Core`): walk up to `AB1TestInteractable`, press: interact + `GA_B1TestPing` (abilities = 2); walk 8 m away, press: nothing activates.

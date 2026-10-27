@@ -809,7 +809,12 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** builds; core 9 and gym 22 PASS; `B1OnFoot_WalkFirm` still PASS (on-foot context added on possession).
   **User check:** —
 
-- [ ] **S4-05** Seat, engine off, parked on exit (3.5 h) _(requires S4-03)_
+- [x] **S4-05** Seat, engine off, parked on exit (3.5 h) _(requires S4-03)_ <!-- done: 2026-10-27 -->
+  Result:
+  - `AB1Jeep::DriverSeat` (scene component on the mesh, (−20, −40, 100)). `AB1PlayerController::OnFootCharacter` follows possession (`UpdateOnFootCharacter`): possessing an `AB1Jeep` seats it (spawned once from `AB1GameMode::CharacterClass`); possessing another character (cheat, rig) adopts that one and destroys the seated leftover. `AB1Character::SitIn` / `LeaveSeat` (hidden, no collision, `MOVE_None`, attached).
+  - `AB1Jeep::SetParked`: Chaos `SetParked` (full handbrake torque on every wheel, no controller needed) + `EB1EngineCut::EngineOff` (movement's engine-cut flags; out of fuel is the other reason) + `Vehicle.State.EngineOff` + `SetParkSleep`. `PossessedBy` unparks. `IB1EngineLoadSource::IsEngineRunning` (default true) stops all fuel use, idle too (MIGRATION.md).
+  - Measured creep: locked wheels slid 1.31 m in 10 s at 14 cm/s on the firm 20° slope, just above the sleep speed. Fix per the note: parked raises `SleepThreshold` to `ParkedSleepThreshold` (50 cm/s), so Chaos sleep holds it; mud slopes never sleep (keep-awake). `RefreshSleepThreshold` merges this with the winch/test-force keep-awake and only writes on a change.
+  - `AB1Jeep`, `AMudDriverOffroadCar`, `AMudDriverPawn` exported (`MUDDRIVER_API`) for the rig. Rig: step `bParked`, metric `seated=`, threshold `MaxFuelUsed`. `B1Park_FirmSlope` (2 + 10 s parked, lastDisp 0.000 ≤ 0.05, asleep after 0.68 s) and `B1Park_MediumSlope` (10 s, slides 17.6 m ≥ 1), both `seated=1 fuelUsed=0.000`, folder `B1Tests/Park` in `Lvl_Gym_Winch`. Headless core 10/10, mud 22/22, winch 19/19 (`s405_*.log`).
   - Seat socket on `BP_B1Jeep`. The character is spawned once (class on `AB1GameMode`). While driving it is hidden, collision off, `MOVE_None` and attached to the seat.
   - The character follows possession: whenever the controller possesses a jeep, the character is seated in that jeep. Rig-spawned jeeps (`bPossessWithPlayer`) and respawned jeeps get it too, so exits always leave the possessed jeep.
   - Engine off outside: `Vehicle.State.EngineOff`, throttle cut through the same path as out-of-fuel (`SetFuelCutOff` → a general engine-cut reason), restart on enter. Fuel doesn't drain unpossessed already; verify, don't rebuild.
@@ -823,7 +828,12 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** builds; park rigs PASS headless with `seated=1`; a headless run logs no fuel drain while parked.
   **User check:** —
 
-- [ ] **S4-11** Interaction scan + `GA_B1Interact` (ADR-017) (2.5 h) _(requires S4-03)_
+- [x] **S4-11** Interaction scan + `GA_B1Interact` (ADR-017) (2.5 h) _(requires S4-03)_ <!-- done: 2026-10-27 -->
+  Result:
+  - `Interaction/` (new include path): `IB1Interactable` (actor or component), `FB1InteractionOption` (text, event tag, priority, point; the scan fills `TargetActor`), `UB1InteractionScanComponent` on `AB1Character` (sphere overlap, all object types, `Range` 250 cm, `ScanInterval` 0.1 s, only while player-controlled and not seated; priority then distance).
+  - `UB1GameplayAbility_Interact` → `GA_B1Interact`: requires `State.Avatar.OnFoot`; `CanActivateAbility` runs a fresh scan and fails with nothing in range, so an empty press activates nothing; sends the best option's event (`HandleGameplayEvent`, target = option actor). `UB1GameplayAbility_TestPing` triggers on `Event.Interact.TestPing`.
+  - Tags `InputTag.Interact`, `Event.Interact.TestPing`. Assets: `IA_B1Interact` (F, pad Y; pad X is vehicle throttle) in `IMC_B1Abilities`, `InputConfig_B1Player` + `AbilitySet_B1Player` entries.
+  - Rig: `AB1TestInteractable` (`MudDriverTests`, query-only sphere, option "Ping") at (3, −1.5, 0.9) m; `B1OnFoot_Interact` (`Lvl_Gym_Core`, origin): walk up, press → abilities 2; walk back 8 m, press → still 2. Core 11/11 headless (`s411_core.log`). ADR-017 accepted.
   Added after the round 1 critique: the jeep door, the jeep front and the anchors all share one interact key, and S4-06/07/08 each needed the same "what's in range, which wins" logic. Needed before S4-06, not backlog.
   - `IB1Interactable::GatherInteractionOptions(Character, Options)`. `FB1InteractionOption`: text, trigger event tag, priority, interaction point. Lyra's `IInteractableTarget` / `FInteractionOption`, minus the per-option granted ability.
   - `UB1InteractionScanComponent` on `AB1Character`: overlap query at ~10 Hz within a range, keeps the best option (priority, then distance to the point).
@@ -833,7 +843,15 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** builds; `B1OnFoot_Interact` PASS headless; ADR-017 added.
   **User check:** —
 
-- [ ] **S4-06** Enter/exit vehicle + cheats (3.5 h) _(requires S4-04, S4-05, S4-11)_
+- [x] **S4-06** Enter/exit vehicle + cheats (3.5 h) _(requires S4-04, S4-05, S4-11)_ <!-- done: 2026-10-27 -->
+  Result:
+  - `AB1PlayerController::ExitVehicle()`: `FindExitSpot` tries `AB1Jeep::DriverDoor` (mesh (−20, −230, 100)), the passenger side (+230), behind (−350) and in front (+380). Each spot: a Pawn-channel ground trace (ignores mud, lands on the hard bottom), then a capsule room test. The vehicle body blocked spots at ±170. Then park, `LeaveSeat`, teleport, possess, control yaw = jeep yaw. Logs the ASC tags on foot: `Vehicle.State.EngineOff` only (InMud/Winching drop on the controller change). `EnterVehicle(AB1Jeep*)` possesses the free jeep (seats + unparks).
+  - `UB1GameplayAbility_ExitVehicle` → `GA_B1ExitVehicle` (`InputTag.Interact`, requires InVehicle); `UB1GameplayAbility_EnterVehicle` → `GA_B1EnterVehicle` (triggered by `Event.Interact.EnterVehicle`, target = jeep, requires OnFoot). Both in `AbilitySet_B1Player`. `AB1Jeep` is an `IB1Interactable`: "Enter" (priority 10) at the door while nobody drives.
+  - `UB1AbilitySystemComponent::AbilityInputTagPressed` now checks `CanActivateAbility` for every spec before activating any, so the press that exits can't also interact on foot and re-enter.
+  - Parking also clears the driver input (`UB1VehicleMovementComponent::ClearDriverInput`): unpossessed, Chaos replays `ReplicatedState`, so the last throttle would stay on.
+  - Cheats `B1ExitVehicle`, `B1EnterVehicle` (nearest free jeep).
+  - User check round 1 (2026-10-27): pad X throttle removed from `IMC_Vehicle_Default` (RT stays) and interact moved to pad X (was Y). Exit failed dug in on the deep slope: every spot was "blocked by HardBottom", because the ground trace started inside the 1 m slab. Exit now never fails: trace from +4 m, try each spot at lifts of 2 / 30 / 60 cm, then `FindTeleportSpot`, last resort 1.5 m above the door (warning). Rigs `B1OnFoot_ExitDeepSlope` (mid deep slope) and `B1OnFoot_ExitDeepStrip` (X 20 m, Y −30 m) in `Lvl_Gym_Winch`: 4 s full throttle (sink 70 on all wheels), exit, enter, both PASS.
+  - Rig: step `ExpectAvatar` (pawn + tag checked at step end, `avatar@<steps>` on fail), metric `fuelOutside=` / `MaxFuelOutside`; the rig's `bParked` is edge-triggered so it doesn't unpark a jeep the player left. `B1OnFoot_ExitEnter10` (`Lvl_Gym_Core`, X −15 m, Y −30 m): 10 × exit/enter, abilities 30, `fuelOutside=0.0000`, ends seated; no errors or ensures. Core 12/12, mud 22/22, winch 19/19 headless (`s406_*.log`).
   - Controller does the swap: `AB1PlayerController::ExitVehicle()` puts the character at the driver door (fallback spots if blocked), unhides it, parks the jeep, cuts the engine and possesses the character. `EnterVehicle(AB1Jeep*)` possesses the jeep, which re-seats the character (S4-05).
   - `State.Avatar.*` stays in `OnPossess`, keyed on pawn type (ADR-004).
   - `GA_B1ExitVehicle` (`InputTag.Interact`, gated by `State.Avatar.InVehicle`) and `GA_B1EnterVehicle` (triggered by the jeep door's "Enter" option, S4-11) are instant: validate, call the controller, end in the same frame. Cheats `B1ExitVehicle` / `B1EnterVehicle` call the same functions.

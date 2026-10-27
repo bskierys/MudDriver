@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "MudDriverOffroadCar.h"
 #include "AbilitySystemInterface.h"
+#include "B1Interactable.h"
 #include "B1Jeep.generated.h"
 
 class UB1VehicleMovementComponent;
@@ -17,7 +18,7 @@ struct FInputActionValue;
 
 /** The player's jeep: the template offroad car running on UB1VehicleMovementComponent */
 UCLASS(abstract)
-class AB1Jeep : public AMudDriverOffroadCar, public IAbilitySystemInterface
+class MUDDRIVER_API AB1Jeep : public AMudDriverOffroadCar, public IAbilitySystemInterface, public IB1Interactable
 {
 	GENERATED_BODY()
 
@@ -37,6 +38,15 @@ public:
 	UB1MudVehicleComponent* GetMudVehicle() const { return MudVehicle; }
 	UB1FuelConsumptionComponent* GetFuelConsumption() const { return FuelConsumption; }
 	UB1WinchComponent* GetWinch() const { return Winch; }
+	USceneComponent* GetDriverSeat() const { return DriverSeat; }
+	USceneComponent* GetDriverDoor() const { return DriverDoor; }
+
+	/** "Enter" at the driver door while nobody drives (ADR-017) */
+	virtual void GatherInteractionOptions(const AB1Character& Character, TArray<FB1InteractionOption>& Options) const override;
+
+	/** Parking brake on every wheel and engine off (Vehicle.State.EngineOff); possessing the jeep releases it */
+	void SetParked(bool bParked);
+	bool IsParked() const;
 
 protected:
 
@@ -57,6 +67,14 @@ protected:
 	/** Sits at the winch point on the front bumper */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Winch|Components")
 	TObjectPtr<UB1WinchComponent> Winch;
+
+	/** The on-foot character is attached here, hidden, while driving */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Seat")
+	TObjectPtr<USceneComponent> DriverSeat;
+
+	/** Outside the driver door: the "Enter" interaction point and the first exit spot */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Seat")
+	TObjectPtr<USceneComponent> DriverDoor;
 
 	/** Axis1D, reel-in speed fraction */
 	UPROPERTY(EditAnywhere, Category = "Input")

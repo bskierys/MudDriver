@@ -71,7 +71,7 @@ void UB1FuelConsumptionComponent::TickComponent(float DeltaTime, ELevelTick Tick
 void UB1FuelConsumptionComponent::ConsumeFuel(float DeltaTime, UAbilitySystemComponent& ASC)
 {
 	Loads.Reset();
-	if (!Data || !DrainEffect || bOutOfFuel)
+	if (!Data || !DrainEffect || bOutOfFuel || (EngineSource && !EngineSource->IsEngineRunning()))
 	{
 		FuelRate = 0.0f;
 		EnginePower = 0.0f;

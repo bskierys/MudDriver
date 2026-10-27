@@ -23,7 +23,7 @@ struct FInputActionValue;
  *  Specific vehicle configurations are handled in subclasses.
  */
 UCLASS(abstract)
-class AMudDriverPawn : public AWheeledVehiclePawn
+class MUDDRIVER_API AMudDriverPawn : public AWheeledVehiclePawn
 {
 	GENERATED_BODY()
 
