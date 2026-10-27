@@ -46,6 +46,7 @@ All living docs are in [.claude/docs/](.claude/docs/). **`ARCHITECTURE.md` is th
 | [.claude/docs/ROADMAP.md](.claude/docs/ROADMAP.md) | Phases (outcome / scope / done when) + backlog |
 | [.claude/docs/SPRINTS.md](.claude/docs/SPRINTS.md) | Sprint tasks with done criteria and user checks |
 | [.claude/docs/HISTORY.md](.claude/docs/HISTORY.md) | Session snapshots — grown by `/save` |
+| [.claude/docs/MIGRATION.md](.claude/docs/MIGRATION.md) | Copying mud and fuel into another project — kept current per the portability rule |
 
 Domain rules in [.claude/rules/](.claude/rules/) (loaded per-file by `applyTo` glob):
 
@@ -53,7 +54,8 @@ Domain rules in [.claude/rules/](.claude/rules/) (loaded per-file by `applyTo` g
 |---|---|
 | [.claude/rules/mcp-tools.md](.claude/rules/mcp-tools.md) | always (Unreal MCP usage) |
 | [.claude/rules/editor-lifecycle.md](.claude/rules/editor-lifecycle.md) | always (closing, opening and rebuilding the editor) |
-| [.claude/rules/imgui.md](.claude/rules/imgui.md) | `Source/MudDriver/Debug/B1ImGui*` (typed fields for tunables, save to asset) |
+| [.claude/rules/imgui.md](.claude/rules/imgui.md) | `Source/MudDriver/Debug/B1ImGui*`, `Source/MudDriver/Mud/Debug/B1ImGui*` (typed fields for tunables, save to asset) |
+| [.claude/rules/portability.md](.claude/rules/portability.md) | `Source/MudDriver/Mud/**`, `Source/MudDriver/Fuel/**` (no project includes; host via interfaces; keep MIGRATION.md current) |
 
 ---
 

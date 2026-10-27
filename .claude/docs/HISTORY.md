@@ -696,3 +696,36 @@ After the flat first pass of S2-14, the user asked for ruts that look dug in, st
 
 ### Open follow-ups
 - S2-15 fuel tuning, S2-16 Phase 1 close playtest.
+
+---
+
+## 2026-10-27 — Mud and fuel portability refactor (S2-18..S2-25)
+
+### Context
+After /validate, mud and fuel had to become copyable into another project (different movement component, fuel attribute, mud from PCG) before Sprint 3 edits the same sim code. Pure refactor: behaviour must not change. Baseline: gym 22/22, `Lvl_Offroad` 8/8 run on the pre-refactor binaries; every task re-ran both and compared all metrics (outputs in `Saved/B1Refactor/`).
+
+### What was built
+- ADR-015 mud surface contract (S2-18).
+- `Mud/Sim/`: Chaos-free `B1MudWheelModel` and `FB1MudSimulation` composed into `FB1VehicleSimulation` via 6 hook calls (S2-19).
+- `UB1MudVehicleComponent` + `IB1MudSimHost` on the movement component; all mud consumers (spray, trail, ShowDebug, Mud window, cheat, telemetry, rigs) read the component (S2-20). InMud tag and mud strain moved onto it (S2-21).
+- `Fuel/UB1FuelConsumptionComponent`, `UB1FuelConsumptionData` (CoreRedirect from `UB1VehicleTuningData`), `IB1EngineLoadSource`, `IB1FuelLoadSource`; `AB1Jeep` keeps only the throttle cut-off binding. `BP_B1Jeep` got `Data` + `DrainEffect` via MCP (S2-22).
+- `UB1MudTrailSurfaceComponent`; the trail subsystem no longer knows patches and prefilters by world box (S2-23).
+- `UB1MudSettings` (channel, profile, spray asset), `LogB1Mud` / `LogB1Fuel`, `Mud/Debug/`, collision macros deleted (S2-24).
+- `MIGRATION.md` and `.claude/rules/portability.md` (S2-25).
+
+### Decisions made
+- ADR-015 added. ADR-001 (mud config and future `SlopeHoldVsSinkDepth` on the mud component) and ADR-010 (fuel component, loads by name, `LoadRates["Mud"]`) amended.
+- `Mud/` includes the interface-only `Fuel/B1FuelLoadSource.h` (one-way); the alternative put fuel code on the jeep.
+- Project tags/attribute are set in `AB1Jeep`'s constructor; asset refs on the BP.
+
+### What we learned
+- The Chaos vehicle manager refreshes `WheelStatus` and calls `Update` inside `OnPhysScenePreTick`. A PrePhysics tick or another PreTick binding (multicast broadcasts in reverse) runs before that refresh; mud learned new materials a frame late and the rigs moved up to 5 % (`DeepRunUp` 57.0 → 54.5 m). `OnPhysSceneStep` fires right after on the game thread and reproduces the old timing exactly.
+- Run-to-run noise on the rigs is ~0.4 % (firm `FullThrottle5s`), and much larger relative noise on near-zero values of stuck rigs.
+- Comparing rig lines in PowerShell: capture the test name before nested `-match` (it overwrites `$Matches`), and parse numbers with `InvariantCulture` (the machine uses a decimal comma).
+- `AActor::GetVelocity` on the jeep isn't the physics velocity check the old code used; the clearance log measured at spawn until it used the body's forward physics speed.
+- Toggling a WP rig property for a capture dirties its external actor package; `StopEditor` then blocks on the save dialog and `-Force` needs the user. Next time: avoid property edits for captures or save the actor package via `AssetTools.save_assets` with its `__ExternalActors__` path before stopping.
+
+### Open follow-ups
+- User validation of S2-18..S2-25 (drive the gym, Vehicle Status rates/save, Project Settings → B1 Mud, read MIGRATION.md).
+- `B1Mud_CrossMedium`'s external actor package was re-saved by the dialog (no intended change); revert if it bothers.
+- S2-15 fuel tuning, S2-16 Phase 1 close playtest.

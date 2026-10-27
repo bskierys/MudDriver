@@ -1,9 +1,10 @@
 #include "B1VehicleTelemetry.h"
 #include "B1Log.h"
-#include "B1PhysicalMaterial_Mud.h"
+#include "B1MudVehicleComponent.h"
+#include "B1MudLog.h"
 #include "B1VehicleMovementComponent.h"
 #include "B1VehicleAttributeSet.h"
-#include "B1Jeep.h"
+#include "B1FuelConsumptionComponent.h"
 #include "B1MudSprayComponent.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
@@ -21,7 +22,7 @@ namespace B1VehicleTelemetry
 	static TAutoConsoleVariable<bool> CVarMudTelemetry(
 		TEXT("b1.Mud.Telemetry"),
 		true,
-		TEXT("Write a 2 Hz per-wheel mud line to LogB1Physics while the vehicle touches mud."));
+		TEXT("Write a 2 Hz per-wheel mud line to LogB1Mud while the vehicle touches mud."));
 
 	static TAutoConsoleVariable<bool> CVarStatusTelemetry(
 		TEXT("b1.Vehicle.StatusTelemetry"),
@@ -65,37 +66,38 @@ namespace B1VehicleTelemetry
 		UE_LOG(LogB1Vehicle, Log, TEXT("%s"), *Line);
 	}
 
-	void LogMud(const UB1VehicleMovementComponent& Movement)
+	void LogMud(const UB1MudVehicleComponent& Mud)
 	{
-		bool bAnyMud = Movement.GetBellyDepth() > 0.0f;
-		for (int32 WheelIndex = 0; WheelIndex < Movement.GetNumWheels() && !bAnyMud; ++WheelIndex)
+		bool bAnyMud = Mud.GetBellyDepth() > 0.0f;
+		for (int32 WheelIndex = 0; WheelIndex < Mud.GetNumWheels() && !bAnyMud; ++WheelIndex)
 		{
-			bAnyMud = Movement.GetWheelSinkDepth(WheelIndex) > 0.0f || Cast<UB1PhysicalMaterial_Mud>(Movement.GetWheelState(WheelIndex).PhysMaterial.Get());
+			bAnyMud = Mud.GetWheelSinkDepth(WheelIndex) > 0.0f || Mud.GetWheelMud(WheelIndex);
 		}
 		if (!bAnyMud)
 		{
 			return;
 		}
 
+		const AActor* Owner = Mud.GetOwner();
 		TStringBuilder<512> Line;
-		Line.Appendf(TEXT("B1Mud %s v=%.1fkmh belly=%.1fcm/%.0fN"), *GetNameSafe(Movement.GetOwner()), Movement.GetForwardSpeed() * 0.036f,
-			Movement.GetBellyDepth(), Movement.GetBellyDrag());
+		Line.Appendf(TEXT("B1Mud %s v=%.1fkmh belly=%.1fcm/%.0fN"), *GetNameSafe(Owner),
+			FVector::DotProduct(Owner->GetVelocity(), Owner->GetActorForwardVector()) * 0.036f, Mud.GetBellyDepth(), Mud.GetBellyDrag());
 
-		const UB1MudSprayComponent* Spray = Movement.GetOwner()->FindComponentByClass<UB1MudSprayComponent>();
-		for (int32 WheelIndex = 0; WheelIndex < Movement.GetNumWheels(); ++WheelIndex)
+		const UB1MudSprayComponent* Spray = Owner->FindComponentByClass<UB1MudSprayComponent>();
+		for (int32 WheelIndex = 0; WheelIndex < Mud.GetNumWheels(); ++WheelIndex)
 		{
-			const FWheelStatus& Status = Movement.GetWheelState(WheelIndex);
+			const FWheelStatus& Status = Mud.GetWheelState(WheelIndex);
 			Line.Appendf(TEXT(" | w%d mat=%s sink=%.1f slip=%.2f mu=%.2f rr=%.0f spray=%.0f"),
 				WheelIndex,
 				*GetNameSafe(Status.PhysMaterial.Get()),
-				Movement.GetWheelSinkDepth(WheelIndex),
+				Mud.GetWheelSinkDepth(WheelIndex),
 				Status.SlipMagnitude,
-				Movement.GetWheelMudFrictionScale(WheelIndex),
-				Movement.GetWheelRollingResistance(WheelIndex),
+				Mud.GetWheelMudFrictionScale(WheelIndex),
+				Mud.GetWheelRollingResistance(WheelIndex),
 				Spray ? Spray->GetWheelSpawnRate(WheelIndex) : 0.0f);
 		}
 
-		UE_LOG(LogB1Physics, Log, TEXT("%s"), *Line);
+		UE_LOG(LogB1Mud, Log, TEXT("%s"), *Line);
 	}
 
 	void LogStatus(const AActor& Vehicle)
@@ -109,17 +111,17 @@ namespace B1VehicleTelemetry
 		FGameplayTagContainer Tags;
 		ASC->GetOwnedGameplayTags(Tags);
 
-		const AB1Jeep* Jeep = Cast<AB1Jeep>(&Vehicle);
+		const UB1FuelConsumptionComponent* Fuel = Vehicle.FindComponentByClass<UB1FuelConsumptionComponent>();
 		UE_LOG(LogB1Vehicle, Log, TEXT("B1Status %s cond=%.1f/%.0f fuel=%.2f/%.0f lph=%.1f l100=%.2f pow=%.2f strain=%.2f tags=%s"),
 			*Vehicle.GetName(),
 			ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetConditionAttribute()),
 			ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetMaxConditionAttribute()),
 			ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute()),
 			ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetMaxFuelAttribute()),
-			Jeep ? Jeep->GetFuelRate() : 0.0f,
-			Jeep ? Jeep->GetFuelPer100m() : -1.0f,
-			Jeep ? Jeep->GetB1VehicleMovement()->GetNormalizedEnginePower() : 0.0f,
-			Jeep ? Jeep->GetMudStrain() : 0.0f,
+			Fuel ? Fuel->GetFuelRate() : 0.0f,
+			Fuel ? Fuel->GetFuelPer100m() : -1.0f,
+			Fuel ? Fuel->GetEnginePower() : 0.0f,
+			Fuel ? Fuel->GetLoad(TEXT("Mud")) : 0.0f,
 			*Tags.ToStringSimple());
 	}
 }

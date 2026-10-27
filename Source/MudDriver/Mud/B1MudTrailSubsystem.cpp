@@ -1,5 +1,5 @@
 #include "B1MudTrailSubsystem.h"
-#include "B1MudPatch.h"
+#include "B1MudTrailSurfaceComponent.h"
 #include "Engine/Canvas.h"
 #include "Engine/Texture2D.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -60,15 +60,15 @@ void UB1MudTrailSubsystem::CreateBrushTexture()
 	BrushTexture->UpdateResource();
 }
 
-void UB1MudTrailSubsystem::RegisterPatch(AB1MudPatch* Patch)
+void UB1MudTrailSubsystem::RegisterSurface(UB1MudTrailSurfaceComponent* Surface)
 {
-	Patches.AddUnique(Patch);
+	Surfaces.AddUnique(Surface);
 }
 
-void UB1MudTrailSubsystem::UnregisterPatch(AB1MudPatch* Patch)
+void UB1MudTrailSubsystem::UnregisterSurface(UB1MudTrailSurfaceComponent* Surface)
 {
-	Patches.Remove(Patch);
-	PendingStamps.Remove(Patch);
+	Surfaces.Remove(Surface);
+	PendingStamps.Remove(Surface);
 }
 
 void UB1MudTrailSubsystem::AddSegment(const FVector& From, const FVector& To, float WidthCm, float DepthCm)
@@ -87,12 +87,12 @@ void UB1MudTrailSubsystem::AddSegment(const FVector& From, const FVector& To, fl
 
 void UB1MudTrailSubsystem::AddStamp(const FVector& WorldLocation, float WidthCm, float DepthCm)
 {
-	for (AB1MudPatch* Patch : Patches)
+	for (UB1MudTrailSurfaceComponent* Surface : Surfaces)
 	{
 		FVector2D UV;
-		if (Patch && Patch->WorldToTrailUV(WorldLocation, UV))
+		if (Surface && Surface->GetWorldBounds().IsInsideOrOn(WorldLocation) && Surface->WorldToTrailUV(WorldLocation, UV))
 		{
-			PendingStamps.FindOrAdd(Patch).Add({ UV, WidthCm, DepthCm });
+			PendingStamps.FindOrAdd(Surface).Add({ UV, WidthCm, DepthCm });
 		}
 	}
 }
@@ -101,10 +101,10 @@ void UB1MudTrailSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	for (TPair<TWeakObjectPtr<AB1MudPatch>, TArray<FStamp>>& Pending : PendingStamps)
+	for (TPair<TWeakObjectPtr<UB1MudTrailSurfaceComponent>, TArray<FStamp>>& Pending : PendingStamps)
 	{
-		const AB1MudPatch* Patch = Pending.Key.Get();
-		UTextureRenderTarget2D* Target = Patch ? Patch->GetTrailTarget() : nullptr;
+		const UB1MudTrailSurfaceComponent* Surface = Pending.Key.Get();
+		UTextureRenderTarget2D* Target = Surface ? Surface->GetTrailTarget() : nullptr;
 		if (!Target || !BrushTexture || Pending.Value.IsEmpty())
 		{
 			continue;
@@ -116,7 +116,7 @@ void UB1MudTrailSubsystem::Tick(float DeltaTime)
 		UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(this, Target, Canvas, CanvasSize, Context);
 		if (Canvas)
 		{
-			const FVector2D PixelsPerCm = CanvasSize / Patch->GetSize();
+			const FVector2D PixelsPerCm = CanvasSize / Surface->GetSize();
 			for (const FStamp& Stamp : Pending.Value)
 			{
 				const FVector2D BrushSize = PixelsPerCm * Stamp.WidthCm;

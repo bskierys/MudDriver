@@ -4,12 +4,12 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "B1MudTrailSubsystem.generated.h"
 
-class AB1MudPatch;
+class UB1MudTrailSurfaceComponent;
 class UTexture2D;
 
 /**
  * Visual mud ruts (ADR-008): wheels add segments, the subsystem splits them into soft brush stamps of rut depth
- * and draws them into each patch's trail render target once per frame. No effect on physics.
+ * and draws them into each trail surface's render target once per frame. No effect on physics.
  */
 UCLASS()
 class MUDDRIVER_API UB1MudTrailSubsystem : public UTickableWorldSubsystem
@@ -23,10 +23,10 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
 
-	void RegisterPatch(AB1MudPatch* Patch);
-	void UnregisterPatch(AB1MudPatch* Patch);
+	void RegisterSurface(UB1MudTrailSurfaceComponent* Surface);
+	void UnregisterSurface(UB1MudTrailSurfaceComponent* Surface);
 
-	/** Stamps every StampSpacing along the segment, on every patch it crosses; the rut there blends toward DepthCm */
+	/** Stamps every StampSpacing along the segment, on every trail surface it crosses; the rut there blends toward DepthCm */
 	void AddSegment(const FVector& From, const FVector& To, float WidthCm, float DepthCm);
 
 	/** cm between stamps along a wheel's path */
@@ -48,10 +48,10 @@ private:
 	void CreateBrushTexture();
 
 	UPROPERTY(Transient)
-	TArray<TObjectPtr<AB1MudPatch>> Patches;
+	TArray<TObjectPtr<UB1MudTrailSurfaceComponent>> Surfaces;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTexture2D> BrushTexture;
 
-	TMap<TWeakObjectPtr<AB1MudPatch>, TArray<FStamp>> PendingStamps;
+	TMap<TWeakObjectPtr<UB1MudTrailSurfaceComponent>, TArray<FStamp>> PendingStamps;
 };

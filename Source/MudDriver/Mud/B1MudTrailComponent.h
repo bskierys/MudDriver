@@ -4,6 +4,8 @@
 #include "Components/ActorComponent.h"
 #include "B1MudTrailComponent.generated.h"
 
+class UB1MudVehicleComponent;
+
 /** Feeds each mud wheel's contact path and sink depth to UB1MudTrailSubsystem (ADR-008, visual only) */
 UCLASS(ClassGroup = (B1), meta = (BlueprintSpawnableComponent))
 class MUDDRIVER_API UB1MudTrailComponent : public UActorComponent
@@ -28,7 +30,14 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Mud|Trails", meta = (Units = "cm", ClampMin = "0"))
 	float MinRutDepth = 2.0f;
 
+protected:
+
+	virtual void BeginPlay() override;
+
 private:
+
+	UPROPERTY(Transient)
+	TObjectPtr<UB1MudVehicleComponent> MudVehicle;
 
 	/** Per wheel; unset while the wheel is off mud */
 	TArray<TOptional<FVector>> LastStamp;

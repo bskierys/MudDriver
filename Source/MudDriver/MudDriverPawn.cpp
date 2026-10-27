@@ -13,7 +13,7 @@
 #include "MudDriver.h"
 #include "B1Log.h"
 #include "B1VehicleTelemetry.h"
-#include "B1VehicleMovementComponent.h"
+#include "B1MudVehicleComponent.h"
 #include "B1VehicleShowDebug.h"
 #include "GameFramework/HUD.h"
 #include "TimerManager.h"
@@ -327,10 +327,10 @@ void AMudDriverPawn::LogTelemetry()
 		B1VehicleTelemetry::LogWheels(*ChaosVehicleMovement);
 	}
 
-	const UB1VehicleMovementComponent* B1Movement = Cast<UB1VehicleMovementComponent>(ChaosVehicleMovement);
-	if (B1Movement && B1VehicleTelemetry::IsMudEnabled())
+	const UB1MudVehicleComponent* Mud = B1VehicleTelemetry::IsMudEnabled() ? FindComponentByClass<UB1MudVehicleComponent>() : nullptr;
+	if (Mud)
 	{
-		B1VehicleTelemetry::LogMud(*B1Movement);
+		B1VehicleTelemetry::LogMud(*Mud);
 	}
 
 	if (B1VehicleTelemetry::IsStatusEnabled())

@@ -1,6 +1,6 @@
 # NetImGui rules
 
-Applies to every NetImGui window in `Source/MudDriver/Debug/B1ImGui*`.
+Applies to every NetImGui window: `Source/MudDriver/Debug/B1ImGui*` and `Source/MudDriver/Mud/Debug/B1ImGui*`.
 
 ## Tunable values
 

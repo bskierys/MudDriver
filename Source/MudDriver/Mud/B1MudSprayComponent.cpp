@@ -1,12 +1,12 @@
 #include "B1MudSprayComponent.h"
-#include "B1VehicleMovementComponent.h"
+#include "B1MudVehicleComponent.h"
 #include "B1PhysicalMaterial_Mud.h"
-#include "B1Log.h"
-#include "ChaosVehicleWheel.h"
+#include "B1MudLog.h"
+#include "ChaosWheeledVehicleMovementComponent.h"
 #include "HAL/IConsoleManager.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
-#include "UObject/ConstructorHelpers.h"
+#include "B1MudSettings.h"
 
 namespace
 {
@@ -24,22 +24,25 @@ UB1MudSprayComponent::UB1MudSprayComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.TickGroup = TG_PostPhysics;
-
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> DefaultSpray(TEXT("/Game/B1/FX/NS_B1MudSpray.NS_B1MudSpray"));
-	SpraySystem = DefaultSpray.Object;
 }
 
 void UB1MudSprayComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	MudVehicle = GetOwner()->FindComponentByClass<UB1MudVehicleComponent>();
 	if (!SpraySystem)
 	{
-		UE_LOG(LogB1Physics, Warning, TEXT("%s: no SpraySystem, mud spray off"), *GetNameSafe(GetOwner()));
+		SpraySystem = GetDefault<UB1MudSettings>()->SpraySystem.LoadSynchronous();
+	}
+
+	if (!SpraySystem)
+	{
+		UE_LOG(LogB1Mud, Warning, TEXT("%s: no SpraySystem, mud spray off"), *GetNameSafe(GetOwner()));
 	}
 }
 
-void UB1MudSprayComponent::CreateWheelEmitters(const UB1VehicleMovementComponent& Movement)
+void UB1MudSprayComponent::CreateWheelEmitters()
 {
 	USceneComponent* Root = GetOwner()->GetRootComponent();
 	if (!SpraySystem || !Root)
@@ -47,7 +50,7 @@ void UB1MudSprayComponent::CreateWheelEmitters(const UB1VehicleMovementComponent
 		return;
 	}
 
-	for (int32 WheelIndex = WheelEmitters.Num(); WheelIndex < Movement.GetNumWheels(); ++WheelIndex)
+	for (int32 WheelIndex = WheelEmitters.Num(); WheelIndex < MudVehicle->GetNumWheels(); ++WheelIndex)
 	{
 		UNiagaraComponent* Emitter = NewObject<UNiagaraComponent>(GetOwner(), *FString::Printf(TEXT("MudSpray%d"), WheelIndex));
 		Emitter->SetAsset(SpraySystem);
@@ -64,30 +67,29 @@ void UB1MudSprayComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	const UB1VehicleMovementComponent* Movement = GetOwner()->FindComponentByClass<UB1VehicleMovementComponent>();
-	if (!Movement)
+	if (!MudVehicle)
 	{
 		return;
 	}
 
 	// Wheels are created with the physics state, which may come after BeginPlay.
-	if (WheelEmitters.Num() < Movement->GetNumWheels())
+	if (WheelEmitters.Num() < MudVehicle->GetNumWheels())
 	{
-		CreateWheelEmitters(*Movement);
+		CreateWheelEmitters();
 	}
 
 	const FVector Forward = GetOwner()->GetActorForwardVector().GetSafeNormal2D();
 	const bool bEnabled = CVarMudSpray.GetValueOnGameThread();
 
-	for (int32 WheelIndex = 0; WheelIndex < WheelEmitters.Num() && WheelIndex < Movement->GetNumWheels(); ++WheelIndex)
+	for (int32 WheelIndex = 0; WheelIndex < WheelEmitters.Num() && WheelIndex < MudVehicle->GetNumWheels(); ++WheelIndex)
 	{
 		UNiagaraComponent* Emitter = WheelEmitters[WheelIndex];
-		const FWheelStatus& Status = Movement->GetWheelState(WheelIndex);
-		const UB1PhysicalMaterial_Mud* Mud = Cast<UB1PhysicalMaterial_Mud>(Status.PhysMaterial.Get());
+		const FWheelStatus& Status = MudVehicle->GetWheelState(WheelIndex);
+		const UB1PhysicalMaterial_Mud* Mud = MudVehicle->GetWheelMud(WheelIndex);
 		// Same slip the sink model uses (cm/s). Forward drive torque spins the tread forward, so mud flies backward.
 		const float SlipSpeed = FMath::Abs(Status.SlipMagnitude) * (Status.DriveTorque >= 0.0f ? 1.0f : -1.0f);
 		const float ExcessSlip = FMath::Abs(SlipSpeed) / 100.0f - MinSlipSpeed;
-		const bool bSpray = bEnabled && Mud && Status.bInContact && Movement->GetWheelSinkDepth(WheelIndex) > 0.0f && ExcessSlip > 0.0f;
+		const bool bSpray = bEnabled && Mud && MudVehicle->GetWheelSinkDepth(WheelIndex) > 0.0f && ExcessSlip > 0.0f;
 
 		SpawnRates[WheelIndex] = bSpray ? FMath::Min(ExcessSlip * SpawnRatePerSlip, MaxSpawnRate) : 0.0f;
 		Emitter->SetVariableFloat(SpawnRateParam, SpawnRates[WheelIndex]);
@@ -103,9 +105,8 @@ void UB1MudSprayComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 
 		// The hit is pushed down by the sink (ADR-012). Spawn above the visible mud surface and behind the tread,
 		// where the depth buffer shows neither tire nor ground, or depth-buffer collision pins the particles.
-		const UChaosVehicleWheel* Wheel = Movement->Wheels.IsValidIndex(WheelIndex) ? Movement->Wheels[WheelIndex].Get() : nullptr;
-		const float Radius = Wheel ? Wheel->GetWheelRadius() : 0.0f;
-		const FVector Surface = Status.HitLocation + FVector::UpVector * Movement->GetWheelSinkDepth(WheelIndex);
+		const float Radius = MudVehicle->GetWheelRadius(WheelIndex);
+		const FVector Surface = Status.HitLocation + FVector::UpVector * MudVehicle->GetWheelSinkDepth(WheelIndex);
 		Emitter->SetWorldLocation(Surface + FVector::UpVector * SurfaceLift + Back * (Radius + SurfaceLift));
 
 		// The emitter's cone axis is in system space, which follows the attached component's rotation.

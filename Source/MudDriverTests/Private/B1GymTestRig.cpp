@@ -4,6 +4,7 @@
 #include "B1GameplayTags.h"
 #include "B1VehicleAttributeSet.h"
 #include "B1VehicleMovementComponent.h"
+#include "B1MudVehicleComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -63,6 +64,7 @@ void AB1GymTestRig::PrepareTest()
 	Vehicle = ResolveVehicle();
 	Movement = Vehicle ? Cast<UChaosWheeledVehicleMovementComponent>(Vehicle->GetVehicleMovementComponent()) : nullptr;
 	B1Movement = Cast<UB1VehicleMovementComponent>(Movement);
+	MudVehicle = Vehicle ? Vehicle->FindComponentByClass<UB1MudVehicleComponent>() : nullptr;
 	if (!Movement)
 	{
 		FinishTest(EFunctionalTestResult::Error, TEXT("no wheeled vehicle to drive"));
@@ -132,7 +134,7 @@ void AB1GymTestRig::StartTest()
 	TimeToStuck = -1.0f;
 	SettleTimeMeasured = 0.0f;
 	PeakOscillation = 0.0f;
-	MaxSinkDepth.Init(0.0f, B1Movement ? B1Movement->GetNumWheels() : 0);
+	MaxSinkDepth.Init(0.0f, MudVehicle ? MudVehicle->GetNumWheels() : 0);
 	MaxBellyDrag = 0.0f;
 	EndSpeed = 0.0f;
 	bInLastStep = false;
@@ -177,9 +179,9 @@ void AB1GymTestRig::EnterStep(int32 StepIndex)
 	}
 
 	CurrentStep = StepIndex;
-	if (InputScript[StepIndex].bUnstuck && B1Movement)
+	if (InputScript[StepIndex].bUnstuck && MudVehicle)
 	{
-		B1Movement->Unstuck();
+		MudVehicle->Unstuck();
 	}
 }
 
@@ -273,11 +275,11 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 
 	for (int32 WheelIndex = 0; WheelIndex < MaxSinkDepth.Num(); ++WheelIndex)
 	{
-		MaxSinkDepth[WheelIndex] = FMath::Max(MaxSinkDepth[WheelIndex], B1Movement->GetWheelSinkDepth(WheelIndex));
+		MaxSinkDepth[WheelIndex] = FMath::Max(MaxSinkDepth[WheelIndex], MudVehicle->GetWheelSinkDepth(WheelIndex));
 	}
-	if (B1Movement)
+	if (MudVehicle)
 	{
-		MaxBellyDrag = FMath::Max(MaxBellyDrag, B1Movement->GetBellyDrag());
+		MaxBellyDrag = FMath::Max(MaxBellyDrag, MudVehicle->GetBellyDrag());
 	}
 	if (AbilitySystem && AbilitySystem->HasMatchingGameplayTag(B1GameplayTags::Vehicle_State_InMud))
 	{

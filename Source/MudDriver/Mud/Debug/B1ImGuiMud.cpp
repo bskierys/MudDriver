@@ -1,9 +1,10 @@
 #include "B1ImGuiMud.h"
-#include "B1Log.h"
+#include "B1MudLog.h"
 #include "B1PhysicalMaterial_Mud.h"
-#include "B1VehicleMovementComponent.h"
+#include "B1MudVehicleComponent.h"
 #include "NetImguiModule.h"
-#include "WheeledVehiclePawn.h"
+#include "ChaosWheeledVehicleMovementComponent.h"
+#include "GameFramework/Pawn.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "UObject/UObjectIterator.h"
@@ -13,7 +14,7 @@
 namespace B1ImGui
 {
 #if NETIMGUI_ENABLED
-	static void DrawWheelTable(const UB1VehicleMovementComponent& Movement)
+	static void DrawWheelTable(const UB1MudVehicleComponent& Mud)
 	{
 		constexpr ImGuiTableFlags Flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
 		if (!ImGui::BeginTable("MudWheels", 6, Flags))
@@ -29,12 +30,12 @@ namespace B1ImGui
 		ImGui::TableSetupColumn("Resist N");
 		ImGui::TableHeadersRow();
 
-		for (int32 WheelIndex = 0; WheelIndex < Movement.GetNumWheels(); ++WheelIndex)
+		for (int32 WheelIndex = 0; WheelIndex < Mud.GetNumWheels(); ++WheelIndex)
 		{
-			const FWheelStatus& Status = Movement.GetWheelState(WheelIndex);
-			const UB1PhysicalMaterial_Mud* Mud = Cast<UB1PhysicalMaterial_Mud>(Status.PhysMaterial.Get());
-			const float Depth = Movement.GetWheelSinkDepth(WheelIndex);
-			const float MaxDepth = Mud && Mud->MaxSinkDepth > 0.0f ? Mud->MaxSinkDepth : 1.0f;
+			const FWheelStatus& Status = Mud.GetWheelState(WheelIndex);
+			const UB1PhysicalMaterial_Mud* WheelMud = Mud.GetWheelMud(WheelIndex);
+			const float Depth = Mud.GetWheelSinkDepth(WheelIndex);
+			const float MaxDepth = WheelMud && WheelMud->MaxSinkDepth > 0.0f ? WheelMud->MaxSinkDepth : 1.0f;
 
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn(); ImGui::Text("%d", WheelIndex);
@@ -43,11 +44,11 @@ namespace B1ImGui
 			{
 				char Overlay[32];
 				FCStringAnsi::Snprintf(Overlay, sizeof(Overlay), "%.1f", Depth);
-				ImGui::ProgressBar(Mud ? Depth / MaxDepth : 0.0f, ImVec2(-1.0f, 0.0f), Overlay);
+				ImGui::ProgressBar(WheelMud ? Depth / MaxDepth : 0.0f, ImVec2(-1.0f, 0.0f), Overlay);
 			}
 			ImGui::TableNextColumn(); ImGui::Text("%.2f", Status.SlipMagnitude);
-			ImGui::TableNextColumn(); ImGui::Text("%.2f", Movement.GetWheelMudFrictionScale(WheelIndex));
-			ImGui::TableNextColumn(); ImGui::Text("%.0f", Movement.GetWheelRollingResistance(WheelIndex));
+			ImGui::TableNextColumn(); ImGui::Text("%.2f", Mud.GetWheelMudFrictionScale(WheelIndex));
+			ImGui::TableNextColumn(); ImGui::Text("%.0f", Mud.GetWheelRollingResistance(WheelIndex));
 		}
 
 		ImGui::EndTable();
@@ -97,7 +98,7 @@ namespace B1ImGui
 	static void SavePreset(UB1PhysicalMaterial_Mud& Mud)
 	{
 		const bool bSaved = SaveAssetPackage(Mud);
-		UE_LOG(LogB1Physics, Log, TEXT("Mud preset %s %s"), *Mud.GetPathName(), bSaved ? TEXT("saved") : TEXT("FAILED to save"));
+		UE_LOG(LogB1Mud, Log, TEXT("Mud preset %s %s"), *Mud.GetPathName(), bSaved ? TEXT("saved") : TEXT("FAILED to save"));
 	}
 
 	/** Returns true when any value changed */
@@ -164,15 +165,15 @@ namespace B1ImGui
 		}
 
 		const APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
-		const AWheeledVehiclePawn* Vehicle = PC ? Cast<AWheeledVehiclePawn>(PC->GetPawn()) : nullptr;
-		UB1VehicleMovementComponent* Movement = Vehicle ? Cast<UB1VehicleMovementComponent>(Vehicle->GetVehicleMovementComponent()) : nullptr;
+		const APawn* Vehicle = PC ? PC->GetPawn() : nullptr;
+		UB1MudVehicleComponent* Mud = Vehicle ? Vehicle->FindComponentByClass<UB1MudVehicleComponent>() : nullptr;
 
-		if (Movement)
+		if (Mud)
 		{
-			ImGui::Text("Speed: %.1f km/h", Movement->GetForwardSpeed() * 0.036f);
-			ImGui::Text("Belly: %.1f cm past clearance, drag %.0f N", Movement->GetBellyDepth(), Movement->GetBellyDrag());
-			DragFloatTyped("Belly clearance cm", &Movement->BellyClearance, 0.5f, 0.0f, 200.0f);
-			DrawWheelTable(*Movement);
+			ImGui::Text("Speed: %.1f km/h", FVector::DotProduct(Vehicle->GetVelocity(), Vehicle->GetActorForwardVector()) * 0.036f);
+			ImGui::Text("Belly: %.1f cm past clearance, drag %.0f N", Mud->GetBellyDepth(), Mud->GetBellyDrag());
+			DragFloatTyped("Belly clearance cm", &Mud->BellyClearance, 0.5f, 0.0f, 200.0f);
+			DrawWheelTable(*Mud);
 		}
 		else
 		{

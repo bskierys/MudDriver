@@ -6,7 +6,7 @@
 
 class UNiagaraSystem;
 class UNiagaraComponent;
-class UB1VehicleMovementComponent;
+class UB1MudVehicleComponent;
 
 /** Mud thrown from spinning wheels: one Niagara component per wheel, fed slip, direction and mud colour each tick */
 UCLASS(ClassGroup = (B1), meta = (BlueprintSpawnableComponent))
@@ -20,6 +20,7 @@ public:
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+	/** Unset uses UB1MudSettings::SpraySystem */
 	UPROPERTY(EditAnywhere, Category = "Mud|Spray")
 	TObjectPtr<UNiagaraSystem> SpraySystem;
 
@@ -57,7 +58,10 @@ protected:
 
 private:
 
-	void CreateWheelEmitters(const UB1VehicleMovementComponent& Movement);
+	void CreateWheelEmitters();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UB1MudVehicleComponent> MudVehicle;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UNiagaraComponent>> WheelEmitters;

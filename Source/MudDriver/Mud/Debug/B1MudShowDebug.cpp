@@ -1,9 +1,10 @@
 #include "B1MudShowDebug.h"
-#include "B1VehicleMovementComponent.h"
+#include "B1MudVehicleComponent.h"
 #include "B1PhysicalMaterial_Mud.h"
+#include "ChaosWheeledVehicleMovementComponent.h"
 #include "B1MudPatch.h"
-#include "B1GameplayTags.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystemGlobals.h"
 #include "DisplayDebugHelpers.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
@@ -38,30 +39,31 @@ namespace B1MudShowDebug
 		}
 	}
 
-	void DrawVehicle(UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, const UB1VehicleMovementComponent& Movement, const UAbilitySystemComponent* AbilitySystem)
+	void DrawVehicle(UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, const UB1MudVehicleComponent& Mud)
 	{
-		const AActor* Owner = Movement.GetOwner();
+		const AActor* Owner = Mud.GetOwner();
 		if (!Canvas || !Owner || !DisplayInfo.IsDisplayOn(Category))
 		{
 			return;
 		}
 
 		TArray<FString> Lines;
+		const UAbilitySystemComponent* AbilitySystem = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Owner);
 		const TCHAR* InMud = !AbilitySystem ? TEXT("n/a (no ASC)")
-			: AbilitySystem->HasMatchingGameplayTag(B1GameplayTags::Vehicle_State_InMud) ? TEXT("yes") : TEXT("no");
-		Lines.Add(FString::Printf(TEXT("mud  InMud %s  belly %.1f cm / %.0f N"), InMud, Movement.GetBellyDepth(), Movement.GetBellyDrag()));
+			: AbilitySystem->HasMatchingGameplayTag(Mud.InMudTag) ? TEXT("yes") : TEXT("no");
+		Lines.Add(FString::Printf(TEXT("mud  InMud %s  belly %.1f cm / %.0f N"), InMud, Mud.GetBellyDepth(), Mud.GetBellyDrag()));
 
-		for (int32 WheelIndex = 0; WheelIndex < Movement.GetNumWheels(); ++WheelIndex)
+		for (int32 WheelIndex = 0; WheelIndex < Mud.GetNumWheels(); ++WheelIndex)
 		{
-			const FWheelStatus& Status = Movement.GetWheelState(WheelIndex);
-			const UB1PhysicalMaterial_Mud* Mud = Cast<UB1PhysicalMaterial_Mud>(Status.PhysMaterial.Get());
+			const FWheelStatus& Status = Mud.GetWheelState(WheelIndex);
+			const UB1PhysicalMaterial_Mud* WheelMud = Mud.GetWheelMud(WheelIndex);
 			Lines.Add(FString::Printf(TEXT("w%d %-18s sink %5.1f / %4.0f cm  mu %.2f  rr %5.0f N%s"),
 				WheelIndex,
 				*GetNameSafe(Status.PhysMaterial.Get()),
-				Movement.GetWheelSinkDepth(WheelIndex),
-				Mud ? Mud->MaxSinkDepth : 0.0f,
-				Movement.GetWheelMudFrictionScale(WheelIndex),
-				Movement.GetWheelRollingResistance(WheelIndex),
+				Mud.GetWheelSinkDepth(WheelIndex),
+				WheelMud ? WheelMud->MaxSinkDepth : 0.0f,
+				Mud.GetWheelMudFrictionScale(WheelIndex),
+				Mud.GetWheelRollingResistance(WheelIndex),
 				Status.bInContact ? TEXT("") : TEXT(" (air)")));
 		}
 

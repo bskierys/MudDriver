@@ -2,10 +2,10 @@
 #include "B1AbilitySystemComponent.h"
 #include "B1ImGuiAssetSave.h"
 #include "B1ImGuiWidgets.h"
-#include "B1Jeep.h"
 #include "B1Log.h"
-#include "B1VehicleMovementComponent.h"
-#include "B1VehicleTuningData.h"
+#include "B1FuelConsumptionComponent.h"
+#include "B1FuelConsumptionData.h"
+#include "B1MudVehicleComponent.h"
 #include "B1PlayerState.h"
 #include "B1VehicleAttributeSet.h"
 #include "NetImguiModule.h"
@@ -24,12 +24,20 @@ namespace B1ImGui
 		ImGui::TextUnformatted(Label);
 	}
 
-	static void DrawFuelUse(AB1Jeep& Jeep)
+	static void DrawFuelUse(const UB1FuelConsumptionComponent& Fuel, UB1MudVehicleComponent* Mud)
 	{
-		const float Per100m = Jeep.GetFuelPer100m();
-		ImGui::Text("Engine power %3.0f %%", Jeep.GetB1VehicleMovement()->GetNormalizedEnginePower() * 100.0f);
-		ImGui::Text("Mud strain %3.0f %% (sink %.1f cm)", Jeep.GetMudStrain() * 100.0f, Jeep.GetB1VehicleMovement()->GetAverageSinkDepth());
-		ImGui::Text("Rate %.1f L/h", Jeep.GetFuelRate());
+		const float Per100m = Fuel.GetFuelPer100m();
+		ImGui::Text("Engine power %3.0f %%", Fuel.GetEnginePower() * 100.0f);
+		for (const FB1FuelLoad& Load : Fuel.GetLoads())
+		{
+			ImGui::Text("%s load %3.0f %%", TCHAR_TO_UTF8(*Load.Name.ToString()), Load.Load * 100.0f);
+		}
+		if (Mud)
+		{
+			ImGui::Text("Mud sink %.1f cm avg", Mud->GetAverageSinkDepth());
+			DragFloatTyped("Mud full strain cm (live)", &Mud->MudFullStrainDepth, 0.5f, 1.0f, 200.0f, "%.1f");
+		}
+		ImGui::Text("Rate %.1f L/h", Fuel.GetFuelRate());
 		if (Per100m >= 0.0f)
 		{
 			ImGui::Text("Last 5 s %.2f L/100 m", Per100m);
@@ -39,19 +47,22 @@ namespace B1ImGui
 			ImGui::TextDisabled("Last 5 s: not moving");
 		}
 
-		UB1VehicleTuningData* Tuning = Jeep.GetTuningData();
+		UB1FuelConsumptionData* Tuning = Fuel.GetData();
 		if (!Tuning)
 		{
-			ImGui::TextDisabled("No TuningData on %s", TCHAR_TO_UTF8(*Jeep.GetClass()->GetName()));
+			ImGui::TextDisabled("No consumption Data on %s", TCHAR_TO_UTF8(*GetNameSafe(Fuel.GetOwner())));
 			return;
 		}
 
-		static TSet<TWeakObjectPtr<UB1VehicleTuningData>> Edited;
+		static TSet<TWeakObjectPtr<UB1FuelConsumptionData>> Edited;
 		bool bChanged = false;
 		bChanged |= DragFloatTyped("Idle L/h", &Tuning->IdleRate, 0.1f, 0.0f, 1000.0f, "%.1f");
 		bChanged |= DragFloatTyped("Work L/h", &Tuning->WorkRate, 1.0f, 0.0f, 5000.0f, "%.0f");
-		bChanged |= DragFloatTyped("Mud work L/h", &Tuning->MudWorkRate, 1.0f, 0.0f, 5000.0f, "%.0f");
-		bChanged |= DragFloatTyped("Mud full strain cm", &Tuning->MudFullStrainDepth, 0.5f, 1.0f, 200.0f, "%.1f");
+		for (TPair<FName, float>& Rate : Tuning->LoadRates)
+		{
+			const FString Label = Rate.Key.ToString() + TEXT(" work L/h");
+			bChanged |= DragFloatTyped(TCHAR_TO_UTF8(*Label), &Rate.Value, 1.0f, 0.0f, 5000.0f, "%.0f");
+		}
 		bChanged |= DragFloatTyped("Drain interval s", &Tuning->DrainInterval, 0.01f, 0.02f, 2.0f, "%.2f");
 		if (bChanged)
 		{
@@ -126,9 +137,11 @@ namespace B1ImGui
 			ASC->SetVehicleCondition(Set->GetMaxCondition());
 		}
 
-		if (AB1Jeep* Jeep = Cast<AB1Jeep>(ASC->GetAvatarActor()); Jeep && ImGui::CollapsingHeader("Fuel use", ImGuiTreeNodeFlags_DefaultOpen))
+		const AActor* Avatar = ASC->GetAvatarActor();
+		const UB1FuelConsumptionComponent* Fuel = Avatar ? Avatar->FindComponentByClass<UB1FuelConsumptionComponent>() : nullptr;
+		if (Fuel && ImGui::CollapsingHeader("Fuel use", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			DrawFuelUse(*Jeep);
+			DrawFuelUse(*Fuel, Avatar->FindComponentByClass<UB1MudVehicleComponent>());
 		}
 
 		if (ImGui::CollapsingHeader("Tags", ImGuiTreeNodeFlags_DefaultOpen))

@@ -1,10 +1,7 @@
 #include "B1MudPatch.h"
-#include "B1CollisionChannels.h"
+#include "B1MudSettings.h"
 #include "B1MudShowDebug.h"
-#include "B1MudTrailSubsystem.h"
-#include "Engine/TextureRenderTarget2D.h"
-#include "Kismet/KismetRenderingLibrary.h"
-#include "Materials/MaterialInstanceDynamic.h"
+#include "B1MudTrailSurfaceComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/StaticMeshComponent.h"
@@ -20,10 +17,6 @@ namespace
 	constexpr float SurfaceThickness = 10.0f;
 	/** Thick enough that a fast wheel or chassis can't tunnel through */
 	constexpr float HardBottomThickness = 100.0f;
-
-	/** Trail mask texels per side; a 20 m patch gets ~4 cm per texel */
-	constexpr int32 TrailResolution = 512;
-	const FName TrailMaskParam(TEXT("TrailMask"));
 
 	/** Caps MudVisual at ~160k vertices on very large patches; the grid gets coarser instead */
 	constexpr int32 MaxVisualCellsPerSide = 400;
@@ -43,13 +36,15 @@ AB1MudPatch::AB1MudPatch()
 	MudSurface->SetupAttachment(Root);
 	MudSurface->SetMobility(EComponentMobility::Static);
 	MudSurface->SetStaticMesh(CubeMesh.Object);
-	MudSurface->SetCollisionProfileName(B1_CollisionProfile_MudSurface);
+	MudSurface->SetCollisionProfileName(GetDefault<UB1MudSettings>()->SurfaceProfileName);
 
 	MudVisual = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("MudVisual"));
 	MudVisual->SetupAttachment(Root);
 	MudVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	MudVisual->SetCastShadow(false);
 	MudVisual->bUseAsyncCooking = false;
+
+	TrailSurface = CreateDefaultSubobject<UB1MudTrailSurfaceComponent>(TEXT("TrailSurface"));
 
 	HardBottom = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HardBottom"));
 	HardBottom->SetupAttachment(Root);
@@ -75,6 +70,7 @@ void AB1MudPatch::OnConstruction(const FTransform& Transform)
 	MudSurface->SetRelativeLocation(FVector(0.0f, 0.0f, -SurfaceThickness * 0.5f));
 	MudSurface->SetRelativeScale3D(FVector(Size.X, Size.Y, SurfaceThickness) / CubeMeshSize);
 	MudSurface->SetPhysMaterialOverride(MudMaterial);
+	MudSurface->SetCollisionProfileName(GetDefault<UB1MudSettings>()->SurfaceProfileName);
 	MudSurface->SetVisibility(true);
 	MudSurface->SetHiddenInGame(true);
 
@@ -101,21 +97,12 @@ void AB1MudPatch::BeginPlay()
 
 	ShowDebugHandle = AHUD::OnShowDebugInfo.AddUObject(this, &AB1MudPatch::DrawShowDebug);
 	BuildVisualMesh();
-
-	if (UB1MudTrailSubsystem* Trails = GetWorld()->GetSubsystem<UB1MudTrailSubsystem>())
-	{
-		CreateTrailTarget();
-		Trails->RegisterPatch(this);
-	}
+	TrailSurface->Initialize(MudVisual, Size);
 }
 
 void AB1MudPatch::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	AHUD::OnShowDebugInfo.Remove(ShowDebugHandle);
-	if (UB1MudTrailSubsystem* Trails = GetWorld()->GetSubsystem<UB1MudTrailSubsystem>())
-	{
-		Trails->UnregisterPatch(this);
-	}
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -171,27 +158,6 @@ void AB1MudPatch::BuildVisualMesh()
 	}
 
 	MudVisual->CreateMeshSection(0, Vertices, Triangles, Normals, UVs, TArray<FColor>(), Tangents, false);
-}
-
-void AB1MudPatch::CreateTrailTarget()
-{
-	// Half float: 8-bit depth steps (0.4 cm) show up as stripes once the material takes the normal from the gradient.
-	TrailTarget = UKismetRenderingLibrary::CreateRenderTarget2D(this, TrailResolution, TrailResolution, RTF_R16f, FLinearColor::Black);
-	if (UMaterialInstanceDynamic* Material = MudVisual->CreateDynamicMaterialInstance(0))
-	{
-		Material->SetTextureParameterValue(TrailMaskParam, TrailTarget);
-		Material->SetScalarParameterValue(TEXT("TrailDepthRange"), UB1MudTrailSubsystem::TrailDepthRange);
-		Material->SetScalarParameterValue(TEXT("PatchSizeX"), Size.X);
-		Material->SetScalarParameterValue(TEXT("PatchSizeY"), Size.Y);
-	}
-}
-
-bool AB1MudPatch::WorldToTrailUV(const FVector& WorldLocation, FVector2D& OutUV) const
-{
-	// MudVisual's UV0 spans the patch: UV = local XY / Size + 0.5.
-	const FVector Local = MudVisual->GetComponentTransform().InverseTransformPosition(WorldLocation);
-	OutUV = FVector2D(Local.X, Local.Y) / Size + FVector2D(0.5f);
-	return OutUV.X >= 0.0f && OutUV.X <= 1.0f && OutUV.Y >= 0.0f && OutUV.Y <= 1.0f;
 }
 
 FString AB1MudPatch::DescribeRamps() const

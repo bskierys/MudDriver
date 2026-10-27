@@ -31,6 +31,8 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 - **Flat ground is unchanged.** Gravity along the ground is zero there, so the S1-24 tuning holds; the flat mud suite guards it.
 - **Alternatives.** Hold by preset (rejected by the user: a Deep jeep that hasn't sunk yet should still slide). Lowering grip on slopes (doesn't give "held when deep"). A per-material slope grip factor stays as the fallback if no slope angle gives "firm climbs, medium fails".
 
+**Amended 2026-10-27 (S2-20, portability).** Mud config moved off the movement component onto `UB1MudVehicleComponent` (`BellyClearance`, unstuck settings). `SlopeHoldVsSinkDepth` goes there too (`Mud|Config`), not on `UB1VehicleMovementComponent`; the force itself lives in `FB1MudSimulation`.
+
 ---
 
 ## ADR-002 — Mud parameters live in a custom physical material
@@ -198,6 +200,8 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 
 **Amendment (2026-10-26): mud strain term.** The rationale above didn't hold: Chaos engine torque is throttle² × curve(RPM) and ignores load, and the jeep rarely spins in medium mud, so a slow jeep in mud burned less per hour than a fast one on firm ground (user playtest). Consumption is now `IdleRate + WorkRate * NormalizedEnginePower + MudWorkRate * MudStrain`, with `MudStrain = throttle * clamp(average wheel sink depth / MudFullStrainDepth, 0, 1)`. Both new values sit on `UB1VehicleTuningData` and are editable in the Vehicle Status window. Alternative considered: resistive power (rolling resistance + belly drag × speed), rejected because it's ~0 when stuck at full throttle, which is exactly when the engine strains most.
 
+**Amended 2026-10-27 (S2-22, portability).** Consumption lives in `UB1FuelConsumptionComponent` (`Fuel/`), not the jeep. It knows nothing of this project's GAS classes: `FuelAttribute`, `DrainEffect`, `DrainSetByCallerTag` and `OutOfFuelTag` are properties, and it works on whatever ASC `UAbilitySystemGlobals` finds on the owner. Engine power comes from `IB1EngineLoadSource` (the movement component); extra loads from `IB1FuelLoadSource` components, each a name + load in [0, 1]. `UB1FuelConsumptionData` (was `UB1VehicleTuningData`, CoreRedirect) holds `IdleRate`, `WorkRate`, `DrainInterval` and `LoadRates` (name → L/h at load 1; `Mud` = 300), so mud's rate sits with the other fuel rates and the mud component only reports strain. Out of fuel, the component broadcasts `OnOutOfFuelChanged`; the vehicle cuts its own throttle. `MudFullStrainDepth` moved to `UB1MudVehicleComponent` (S2-21). Rejected: the source returning L/h (rates would be split between fuel data and mud config).
+
 ---
 
 ## ADR-011 — Low-end render budget
@@ -277,3 +281,26 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 **Rationale.** Lyra's pattern, and the user wants Lyra practices. Granting once on the PlayerState fits the single ASC; tags keep on-foot abilities from firing in the jeep and the other way round. Data assets keep bindings editable without code.
 
 **Alternatives.** Grant and remove abilities per pawn on possession (churn on every swap, and specs are lost). Activate by class from pawn input handlers (couples input code to ability classes). Lyra's full `ULyraInputComponent` / pawn data stack (more than a two-pawn prototype needs).
+
+---
+
+## ADR-015 — Mud surface contract
+
+**Status:** accepted (2026-10-27, S2-18)
+
+**Problem.** Mud is only placed as `AB1MudPatch` rectangles today. Later it has to come from spline meshes, modelling-tools blobs and PCG, and the mud code must be copyable into another project. Nothing says what makes a primitive "mud", so every producer would have to copy the patch.
+
+**Decision.** A mud surface is any primitive component that:
+1. has the `B1MudSurface` collision profile (object type `B1Mud`, QueryOnly, blocks only `WorldDynamic`), so only the wheel suspension traces hit it (ADR-012);
+2. reports a `UB1PhysicalMaterial_Mud` on the hit (phys material override or the mesh's material), which carries all tuning (ADR-002);
+3. has something that blocks `WorldDynamic` below it within the material's `MaxSinkDepth`: the hard bottom.
+
+Depth rule: mud sits over a depression. The sink depth is capped by the hard-ground trace (ADR-012, S1-28), so a surface lying flush on the landscape gives ~0 cm sink. To get depth, lower the ground under the surface (a hard-bottom mesh, a landscape dip, PCG lowering the terrain under its output) or raise the surface over it.
+
+Producers: `AB1MudPatch` (surface slab + optional hard bottom and edge ramps) is one. Spline meshes, modelling-tools meshes and, later, PCG output (mud surface at terrain height plus the terrain lowered under it) are others. They only need the three points above; the vehicle side never asks who made the surface.
+
+Visual ruts are optional and separate: a surface that wants them owns a trail receiver (S2-23); one without it is still mud for physics.
+
+**Rationale.** The wheel side already works this way: it reads the trace hit's material and traces for the hard ground. Writing it down lets new producers skip `AB1MudPatch` and keeps the vehicle code producer-agnostic.
+
+**Alternatives.** A mud volume or actor registry the vehicle queries (extra overlaps, ADR-002 already rejected volumes). Requiring every producer to derive from `AB1MudPatch` (rectangles only, no PCG).

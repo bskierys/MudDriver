@@ -2,6 +2,7 @@
 #include "B1Jeep.h"
 #include "B1Log.h"
 #include "B1VehicleMovementComponent.h"
+#include "B1MudVehicleComponent.h"
 #include "B1PlayerState.h"
 #include "B1AbilitySystemComponent.h"
 #include "B1VehicleAttributeSet.h"
@@ -86,7 +87,7 @@ void UB1CheatManager::B1Unstuck()
 		return;
 	}
 
-	Jeep->GetB1VehicleMovement()->Unstuck();
+	Jeep->GetMudVehicle()->Unstuck();
 }
 
 UB1AbilitySystemComponent* UB1CheatManager::GetPlayerASC(const TCHAR* CheatName) const

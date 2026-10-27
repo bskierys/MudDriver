@@ -33,9 +33,11 @@ public class MudDriver : ModuleRules
 			"MudDriver/Variant_TimeTrial",
 			"MudDriver/Variant_TimeTrial/UI",
 			"MudDriver/Debug",
+			"MudDriver/Fuel",
 			"MudDriver/GAS",
 			"MudDriver/Mud",
-			"MudDriver/Physics",
+			"MudDriver/Mud/Sim",
+			"MudDriver/Mud/Debug",
 			"MudDriver/Player",
 			"MudDriver/Vehicle"
 		});

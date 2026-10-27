@@ -9,8 +9,8 @@ class UStaticMeshComponent;
 class AHUD;
 class UCanvas;
 class FDebugDisplayInfo;
-class UTextureRenderTarget2D;
 class UProceduralMeshComponent;
+class UB1MudTrailSurfaceComponent;
 
 /**
  * Mud patch per ADR-012: a wheel-trace-only surface slab with its top at the actor origin,
@@ -36,12 +36,6 @@ public:
 	/** e.g. "+X -X", or "none" */
 	FString DescribeRamps() const;
 
-	/** Rut depth over UB1MudTrailSubsystem::TrailDepthRange, sampled by M_B1Mud as "TrailMask" (ADR-008); null outside game worlds */
-	UTextureRenderTarget2D* GetTrailTarget() const { return TrailTarget; }
-
-	/** UV on the trail target, the same as MudVisual's UV0. False outside the patch */
-	bool WorldToTrailUV(const FVector& WorldLocation, FVector2D& OutUV) const;
-
 protected:
 
 	virtual void BeginPlay() override;
@@ -54,6 +48,10 @@ protected:
 	/** Dense grid that M_B1Mud displaces into ruts (ADR-008); takes MudSurface's material. No collision */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mud|Components")
 	TObjectPtr<UProceduralMeshComponent> MudVisual;
+
+	/** Rut target over MudVisual (its UV0 spans the patch), sampled by M_B1Mud as "TrailMask" */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mud|Components")
+	TObjectPtr<UB1MudTrailSurfaceComponent> TrailSurface;
 
 	/** Vertex spacing of MudVisual; ruts can't be sharper than this */
 	UPROPERTY(EditAnywhere, Category = "Mud|Trails", meta = (Units = "cm", ClampMin = "2"))
@@ -104,11 +102,7 @@ private:
 	void DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos);
 	FDelegateHandle ShowDebugHandle;
 
-	void CreateTrailTarget();
 	void BuildVisualMesh();
-
-	UPROPERTY(Transient)
-	TObjectPtr<UTextureRenderTarget2D> TrailTarget;
 
 	void UpdateEdgeRamp(UStaticMeshComponent& Ramp, const FVector2D& Outward, bool bEnabled);
 };

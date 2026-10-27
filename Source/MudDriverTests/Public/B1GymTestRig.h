@@ -8,6 +8,7 @@
 class AWheeledVehiclePawn;
 class UChaosWheeledVehicleMovementComponent;
 class UB1VehicleMovementComponent;
+class UB1MudVehicleComponent;
 class UB1AbilitySystemComponent;
 
 USTRUCT(BlueprintType)
@@ -30,7 +31,7 @@ struct FB1GymInputStep
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	bool bHandbrake = false;
 
-	/** Runs B1Unstuck when the step starts; needs a UB1VehicleMovementComponent */
+	/** Runs B1Unstuck when the step starts; needs a UB1MudVehicleComponent */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	bool bUnstuck = false;
 };
@@ -189,6 +190,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UB1VehicleMovementComponent> B1Movement;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UB1MudVehicleComponent> MudVehicle;
 
 	/** Player 0's pawn before bPossessWithPlayer took over; possessed again when the test finishes */
 	UPROPERTY(Transient)
