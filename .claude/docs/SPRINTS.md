@@ -888,7 +888,13 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** builds; both rigs PASS headless; winch gym and core suites PASS; IMC lists match the layout above.
   **User check:** on the medium slope, hook a tree, back down on reel-out, then pull back up; detach on Y / Q; E gets you in and out; no leftover template action fires on the arrows, Q, E or Y.
 
-- [ ] **S4-12** Cable lies on the ground and the mud (3 h) _(requires S4-13)_
+- [x] **S4-12** Cable lies on the ground and the mud (3 h) _(requires S4-13)_ <!-- done: 2026-10-27 -->
+  Result:
+  - Research: `UCableComponent` collision sphere-sweeps each free particle every substep (50 Hz) on the component's own object type and response container, with no owner ignore. So the filter is by type: `UB1WinchComponent::SetupCableCollision` sets object WorldDynamic (mud surfaces block only WorldDynamic), QueryOnly, blocks WorldStatic, WorldDynamic and `UB1MudSettings::MudObjectChannel`, ignores the rest (the jeep is `ECC_Vehicle`, the character Pawn). No trace-drape fallback needed.
+  - Segments sized for `MaxCableLength`: `CableSegmentLength` 100 cm (replaces `CableSegments`), so 80 segments on `BP_B1Jeep`. New `CableSolverIterations` (16), `bCableCollision`, `CableCollisionFriction` (0.5), all `Winch|Visual`. Cost not measured: ~4000 sphere sweeps/s per 80 m cable, game thread (prototype first).
+  - Found on the way (S4-13 bug): an attached jeep sitting still went to Chaos sleep despite `SleepThreshold` 0, and a sleeping body skips the physics step, so reel-out stopped at 54 m. `SetWinchInput` now wakes the body while pull ≠ 0 (reel-in on a slack cable had the same hole).
+  - Simulate captures on `Lvl_Gym_Winch` with three temporary `StartAnchor` jeeps (deleted after): slack reel-out across `Mud_DeepStrip` lies on the floor and on the mud surface, and at 80 m piles into loops; taut cable up the medium slope is straight, identical across two frames. The firm-floor-only spot (X −5 m, Y −65 m) isn't streamed in Simulate, so the deep-strip capture covers firm floor on both sides of the patch.
+  - Headless winch gym 23/23 (`s412_winch.log`), same numbers as S4-13. Core and mud not rerun (untouched).
   Added mid-sprint (user, 2026-10-27): the cable has no collision, so a slack cable sags through the floor and into the mud, and from the car you can't see whether you're hooked. It has to rest on whatever is under it: the ground, the mud surface (not the hard bottom), slopes and kerbs. It must never touch the jeep's or the character's physics.
   🔍 Research first, in this order:
   1. `UCableComponent` collision (`bEnableCollision`, `CollisionFriction`). Check:

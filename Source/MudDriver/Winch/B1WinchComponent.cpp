@@ -2,6 +2,7 @@
 #include "B1WinchAnchorComponent.h"
 #include "B1VehicleMovementComponent.h"
 #include "B1Log.h"
+#include "B1MudSettings.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "CableComponent.h"
@@ -144,14 +145,14 @@ bool UB1WinchComponent::AttachTo(UB1WinchAnchorComponent* NewAnchor)
 	// A fresh cable starts its particles on the straight line between the ends.
 	Cable = NewObject<UCableComponent>(GetOwner(), TEXT("WinchCable"));
 	Cable->SetupAttachment(this);
-	Cable->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SetupCableCollision(*Cable);
 	Cable->SetAttachEndToComponent(NewAnchor);
 	Cable->EndLocation = FVector::ZeroVector;
 	Cable->CableLength = RestLength;
-	Cable->NumSegments = CableSegments;
+	Cable->NumSegments = FMath::Clamp(FMath::CeilToInt(MaxCableLength / CableSegmentLength), 4, 400);
 	Cable->CableWidth = CableWidth;
 	// Default single iteration sags a 10+ m steel cable like a rope.
-	Cable->SolverIterations = 16;
+	Cable->SolverIterations = CableSolverIterations;
 	Cable->bEnableStiffness = true;
 	if (CableMaterial)
 	{
@@ -164,6 +165,20 @@ bool UB1WinchComponent::AttachTo(UB1WinchAnchorComponent* NewAnchor)
 	UE_LOG(LogB1Physics, Log, TEXT("%s winch attached to %s, rest %.2f m"), *GetNameSafe(GetOwner()),
 		*GetNameSafe(NewAnchor->GetOwner()), RestLength / 100.0f);
 	return true;
+}
+
+void UB1WinchComponent::SetupCableCollision(UCableComponent& CableComponent) const
+{
+	// The cable sweeps with its own object type and responses and can't ignore its owner, so filter by type.
+	// Mud surfaces block only WorldDynamic, hence that object type.
+	CableComponent.bEnableCollision = bCableCollision;
+	CableComponent.CollisionFriction = CableCollisionFriction;
+	CableComponent.SetCollisionEnabled(bCableCollision ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+	CableComponent.SetCollisionObjectType(ECC_WorldDynamic);
+	CableComponent.SetCollisionResponseToAllChannels(ECR_Ignore);
+	CableComponent.SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+	CableComponent.SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+	CableComponent.SetCollisionResponseToChannel(GetDefault<UB1MudSettings>()->MudObjectChannel, ECR_Block);
 }
 
 void UB1WinchComponent::Detach()

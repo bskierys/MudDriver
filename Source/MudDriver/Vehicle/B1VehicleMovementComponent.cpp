@@ -81,6 +81,12 @@ void UB1VehicleMovementComponent::SetWinchInput(const FB1WinchSimInput& Input)
 {
 	WinchInput = Input;
 	RefreshSleepThreshold();
+
+	// The drum lives in the physics step, which a sleeping body skips; a zero SleepThreshold doesn't stop Chaos island sleep.
+	if (Input.bAttached && Input.Pull != 0.0f && UpdatedPrimitive && !UpdatedPrimitive->IsAnyRigidBodyAwake())
+	{
+		SetSleeping(false);
+	}
 }
 
 FB1WinchSimOutput UB1VehicleMovementComponent::GetWinchOutput() const

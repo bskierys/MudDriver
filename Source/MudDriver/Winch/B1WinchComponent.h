@@ -58,8 +58,19 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Winch|Visual", meta = (Units = "cm", ClampMin = "0.1"))
 	float CableWidth = 7.0f;
 
+	/** Segments are sized for MaxCableLength, so a fully reeled-out cable can still lie on the ground */
+	UPROPERTY(EditAnywhere, Category = "Winch|Visual", meta = (Units = "cm", ClampMin = "10"))
+	float CableSegmentLength = 100.0f;
+
 	UPROPERTY(EditAnywhere, Category = "Winch|Visual", meta = (ClampMin = "1"))
-	int32 CableSegments = 16;
+	int32 CableSolverIterations = 16;
+
+	/** Visual cable rests on WorldStatic, WorldDynamic and the mud surface; vehicles and pawns are ignored */
+	UPROPERTY(EditAnywhere, Category = "Winch|Visual")
+	bool bCableCollision = true;
+
+	UPROPERTY(EditAnywhere, Category = "Winch|Visual", meta = (ClampMin = "0", ClampMax = "1"))
+	float CableCollisionFriction = 0.5f;
 
 	UPROPERTY(EditAnywhere, Category = "Winch|Visual")
 	TObjectPtr<UMaterialInterface> CableMaterial;
@@ -108,6 +119,7 @@ private:
 	void SendSimInput();
 	void ReadSimOutput();
 	void SetWinchingTag(bool bWinching);
+	void SetupCableCollision(UCableComponent& CableComponent) const;
 
 	TWeakObjectPtr<UB1WinchAnchorComponent> Anchor;
 

@@ -1107,3 +1107,26 @@ The winch could only shorten the cable, and the in-car controls still used the S
 ### Open follow-ups
 - Mud gym and full core not rerun this session (untouched); run with the full suite.
 - Next: S4-12 cable on ground and mud.
+
+## 2026-10-27 — S4-12 cable on ground and mud
+
+### Context
+After S4-13 a slack winch cable had no collision, so it sagged through the floor and into the mud, and from the seat you couldn't tell you were hooked.
+
+### What was built
+- `UB1WinchComponent::SetupCableCollision`: the `UCableComponent` sweeps as WorldDynamic, QueryOnly, blocking WorldStatic, WorldDynamic and the mud channel from `UB1MudSettings`, ignoring vehicles and pawns.
+- `CableSegmentLength` (100 cm, replaces `CableSegments`), `CableSolverIterations`, `bCableCollision`, `CableCollisionFriction` in `Winch|Visual`; segments sized for `MaxCableLength`.
+- `UB1VehicleMovementComponent::SetWinchInput` wakes a sleeping body while the winch reels.
+
+### Decisions made
+- `UCableComponent` collision instead of a trace-based drape (ADR-007 amendment). The cable stays visual only.
+
+### What we learned
+- `UCableComponent` collision sweeps on the component's own object type and responses, with no owner ignore; filter by type. Mud surfaces block only WorldDynamic, so the cable must be WorldDynamic.
+- Chaos island sleep can still sleep a still jeep with `SleepThreshold` 0, and a sleeping body skips the vehicle sim, which froze reel-out at 54 m.
+- In Simulate, World Partition cells far from the editor camera (X −5 m, Y −65 m in the winch gym) aren't loaded, so placed vehicles there fall.
+- Live Coding only patches the running editor; rebuild before headless runs.
+
+### Open follow-ups
+- Cable sweep cost not measured (~4000 sweeps/s per 80 m cable).
+- Next: S4-07 winch hook carry.
