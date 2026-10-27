@@ -2,8 +2,6 @@
 
 namespace
 {
-	constexpr float CmPerM = 100.0f;
-	constexpr float GravityCmPerS2 = 980.665f;
 	constexpr float MaxStopForceFraction = 0.4f;
 	/** Rising is limited: cm/s at low speed, cm per cm rolled above it */
 	constexpr float SinkOffsetMinRiseSpeed = 30.0f;

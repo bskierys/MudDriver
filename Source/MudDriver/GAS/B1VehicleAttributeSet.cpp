@@ -5,8 +5,9 @@ UB1VehicleAttributeSet::UB1VehicleAttributeSet()
 {
 	InitCondition(100.f);
 	InitMaxCondition(100.f);
-	InitFuel(60.f);
-	InitMaxFuel(60.f);
+	// Small tank so consumption shows in presentations and tests.
+	InitFuel(20.f);
+	InitMaxFuel(20.f);
 	InitDamage(0.f);
 }
 

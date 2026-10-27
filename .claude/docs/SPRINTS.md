@@ -292,7 +292,7 @@ Detailed design for every task: [plans/2026-10-25-river-crossing.md](plans/2026-
 
 ## Sprint 2 — GAS + fuel + mud polish
 
-**Status:** active, planned 2026-10-26.
+**Status:** ✅ closed 2026-10-27, signed off by the user after the fuel/HUD/spray playtest and the refactor checks.
 
 **Goal.** Close Phase G and Phase 1. A single ASC on the PlayerState carries Condition and Fuel; fighting mud burns fuel; mud gets its state tag, debug, spray and trails. Mud and fuel become components that can be copied into another project (added after /validate).
 
@@ -504,14 +504,36 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** guide and rule exist; the includes in `Mud/` and `Fuel/` match the guide's dependency list.
   **User check:** read the guide: it matches what you'd do in the other project.
 
+### Playtest feedback (added 2026-10-27, S2-15 drive)
+
+- [x] **S2-26** Fuel tank 20 L (0.25 h) <!-- done: 2026-10-27 -->
+  Result: `UB1VehicleAttributeSet` inits Fuel/MaxFuel to 20. `B1Status` shows `fuel=20.00/20`; fuel rigs PASS unchanged (rates are per hour). Also fixed a unity-build break from cf7c2cc: `CmPerM` / `NewtonsToUnreal` / `GravityCmPerS2` were defined in anonymous namespaces of three .cpp files that land in one blob (adaptive unity hid it while they were uncommitted). They're now public in `B1MudWheelModel`; verified with `Build.bat ... -DisableAdaptiveUnity`.
+  `MaxFuel` and starting `Fuel` 60 → 20 L, so consumption is visible in presentations and tests.
+  **Done:** builds; fuel rigs PASS; Vehicle Status shows 20 / 20 L.
+  **User check:** —
+
+- [x] **S2-27** HUD fuel bar (1.5 h) <!-- done: 2026-10-27 -->
+  Result: `UMudDriverUI::UpdateFuel(Fuel, MaxFuel)` fills optional bound widgets `FuelBar` (percent; fill hue 120° → 0° between full and `FuelLowFraction` 0.15) and `FuelText` (`%.0f/%.0f L`). `AB1PlayerController::Tick` feeds it from the PlayerState ASC. The template HUD was duplicated to `/Game/B1/UI/WBP_B1VehicleHUD` (`BP_B1PlayerController.VehicleUIClass` points at it); a `FuelBox` column between gear and speed holds `FuelBarSize` (220×18) → `FuelBar` and `FuelText` (Roboto Light 15, like the unit label). PIE capture: green full bar with `20/20 L` between gear and speed.
+  A bar + text (`20/20 L`) next to speed and gear in the vehicle HUD; colour goes green (full) → red (almost empty). Reads the Fuel/MaxFuel attributes from the player's ASC.
+  **Done:** builds; capture in PIE shows the bar next to speed/gear.
+  **User check:** the bar drains while driving and turns red near empty.
+
+- [x] **S2-28** Mud spray looks like mud (2 h) <!-- done: 2026-10-27 -->
+  Result: every `PM_B1Mud_*` `SprayColor` = (0.13, 0.075, 0.035) linear. Heavy's old 0.26/0.15/0.07 read pale tan in sun once the sprites were shaded. `M_B1MudSpray`: Custom node `SphereNormal` (flattened dome normal from sprite UV, ×0.6 in XY) → Normal, Roughness 0.2, Specular 0.6, so each sprite shades like a wet clump instead of a flat disc. The flat dark discs were what read as smoke; `ScaleColor` only fades alpha, which the masked material ignores. `NS_B1MudSpray` sprite size 10–25 → 10–28 cm. Simulate captures with `B1Mud_DigInMedium` (`bAutoRun` + `SettleTime` toggled and restored; StartPIE blocks ~2 s, so capture right after it): dark brown glossy clumps thrown back off the wheels.
+  Spray reads as smoke, worst when dark. All presets spray brown (Heavy's colour), and the particles look wetter and heavier: glossier, less transparent, bigger clumps.
+  **Done:** capture in Simulate with a digging rig shows brown, wet-looking clumps.
+  **User check:** the spray reads as mud on every preset.
+
 ### Close
 
-- [ ] **S2-15** Fuel playtest + tuning (user + agent, 1 h) _(requires S2-06, S2-09, S2-22)_
+- [x] **S2-15** Fuel playtest + tuning (user + agent, 1 h) _(requires S2-06, S2-09, S2-22)_ <!-- done: 2026-10-27 -->
+  Result: user drove and kept the rates (6 / 240 L/h, `Mud` 300 L/h, 0.25 s); feedback became S2-26..S2-28 (20 L tank, HUD fuel bar, spray look). Fuel rigs PASS: Firm 0.085 L/100 m, Medium 0.368 (4.3×), FirmFull 74 L/h, DeepFull 343.5 L/h, Empty 0 m. ✅ signed off 2026-10-27.
   You drive the gym and tune the rates in Vehicle Status. The agent writes the values into `DA_B1JeepTuning` and re-runs S2-09.
   **Done:** fuel rigs PASS with the tuned values.
   **User check:** sign-off on fuel pressure (Phase G).
 
-- [ ] **S2-16** Phase 1 close playtest (user + agent, 1 h) _(requires S2-10..S2-14b, S2-18..S2-25)_
+- [x] **S2-16** Phase 1 close playtest (user + agent, 1 h) _(requires S2-10..S2-14b, S2-18..S2-25)_ <!-- done: 2026-10-27 -->
+  Result: user checked the refactor (S2-18..S2-25), the HUD fuel bar and the new spray: all good. Both suites PASS (gym 22/22, `Lvl_Offroad` 8/8). ROADMAP Phase 1 and Phase G ticked. ✅ signed off 2026-10-27.
   Mud checklist (ROADMAP Phase 1) plus spray, trails, `ShowDebug B1Mud`, `B1Unstuck`. You also check `stat unit` on the laptop (sanity only).
   Drive `Lvl_Gym_Swamp` too (large mixed mud, lake, hills, basin); S2-15 fuel tuning can use it as well.
   **Done:** both suites PASS; ROADMAP Phase 1 and Phase G ticked.
@@ -525,7 +547,7 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
 
 ## Sprint 3 — Mud + winch core (Phase 2, part 1)
 
-**Status:** planned 2026-10-26, starts after Sprint 2 closes.
+**Status:** next (Sprint 2 closed 2026-10-27); start with `/work`.
 
 **Goal.** Prove mud + winch before any on-foot work. Mud learns slopes (slide when barely sunk, hold when deep, never climb unwinched), the winch pulls the jeep out of deep mud and up the muddy slope, and the user feels it at a checkpoint with the hook attached by cheat.
 

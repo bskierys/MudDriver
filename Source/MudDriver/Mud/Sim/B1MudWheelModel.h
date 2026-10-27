@@ -39,6 +39,11 @@ struct FB1MudSinkInput
 /** Mud wheel physics without Chaos or UObjects. Depths in cm, forces in the caller's units */
 namespace B1MudWheelModel
 {
+	constexpr float CmPerM = 100.0f;
+	constexpr float GravityCmPerS2 = 980.665f;
+	/** Chaos forces are in kg*cm/s^2 */
+	constexpr float NewtonsToUnreal = 100.0f;
+
 	/** Caps the load scaling of sinking, so a hard landing doesn't bury the wheel */
 	constexpr float MaxLoadFactor = 1.5f;
 

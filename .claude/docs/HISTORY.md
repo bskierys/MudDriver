@@ -729,3 +729,51 @@ After /validate, mud and fuel had to become copyable into another project (diffe
 - User validation of S2-18..S2-25 (drive the gym, Vehicle Status rates/save, Project Settings → B1 Mud, read MIGRATION.md).
 - `B1Mud_CrossMedium`'s external actor package was re-saved by the dialog (no intended change); revert if it bothers.
 - S2-15 fuel tuning, S2-16 Phase 1 close playtest.
+
+---
+
+## 2026-10-27 — Playtest feedback: tank, HUD fuel bar, spray look (S2-26..S2-28)
+
+### Context
+The user drove the gym after the portability refactor and asked for three changes: a 20 L tank so consumption shows, a fuel bar in the HUD next to speed and gear, and mud spray that reads as mud, not smoke.
+
+### What was built
+- S2-26: `UB1VehicleAttributeSet` Fuel/MaxFuel 20 L. Fuel rigs unchanged (rates are per hour).
+- S2-27: `UMudDriverUI::UpdateFuel` fills optional bound `FuelBar` / `FuelText` (green → red by hue down to 15 %); `AB1PlayerController::Tick` feeds it from the ASC. HUD duplicated to `/Game/B1/UI/WBP_B1VehicleHUD` via the UMG toolset (`FuelBox` column between gear and speed); `BP_B1PlayerController.VehicleUIClass` points at it.
+- S2-28: one dark brown `SprayColor` on every preset; `M_B1MudSpray` gets a flattened dome normal (Custom node), roughness 0.2, specular 0.6; sprites 10–28 cm.
+- Fixed a unity-build break from cf7c2cc: duplicate anonymous-namespace unit constants in `B1MudWheelModel.cpp`, `B1MudSimulation.cpp`, `B1VehicleSimulation.cpp`. The mud ones are now public in `B1MudWheelModel`.
+
+### Decisions made
+- Template HUD isn't edited; the B1 copy carries project UI.
+- Spray colour is the same on every preset (it was per preset); `SprayColor` stays on the material for later variation.
+
+### What we learned
+- UBT adaptive unity takes files with uncommitted changes out of the unity blobs, so name clashes between .cpp files only show after commit. Check with `Build.bat MudDriverEditor Win64 Development -Project=... -DisableAdaptiveUnity` after adding .cpp files.
+- Flat, unlit-looking dark sprite discs read as smoke; a dome normal plus low roughness makes the same sprites read as wet clumps. In bright sun, linear 0.26 brown looks pale tan on shaded sprites.
+- MCP: `StartPIE` blocks ~2 s (warmup), so a 4 s rig is half over when it returns; capture immediately. `save_assets` with `[]` writes OFPA rig packages that `save_actor` reports as missing. PowerShell's `R` is an alias (`Invoke-History`), don't name helpers `R`.
+- The UMG toolset (`AddWidget`, `ToggleWidgetAsVariable`, `CompileWidgetBlueprint`) plus `ObjectTools` on slots/widgets builds designer layouts end to end.
+
+### Open follow-ups
+- User checks: fuel bar drains and turns red, spray reads as mud on every preset.
+- `B1Mud_DigInMedium`'s external actor package was re-saved (bAutoRun/SettleTime toggled and restored); revert if unwanted.
+- S2-15 fuel tuning (now with the 20 L tank), S2-16 Phase 1 close playtest, user validation of S2-18..S2-25.
+
+---
+
+## 2026-10-27 — Sprint 2 closed
+
+### Context
+The user checked the portability refactor (S2-18..S2-25), the 20 L tank, the HUD fuel bar and the new spray: all good.
+
+### What was built
+- S2-15 and S2-16 marked done; Sprint 2 closed. ROADMAP Phase 1 (Mud) and Phase G (GAS + fuel) ticked and signed off; the fuel gauge stretch item is done.
+
+### Decisions made
+- Fuel rates stay at 6 / 240 L/h, `Mud` 300 L/h with the 20 L tank.
+
+### What we learned
+- PowerShell: in an array literal the comma binds tighter than `+`, so `@('a', 'b' + "`n" + 'c')` yields four elements. A find/replace loop over such pairs replaced every newline in SPRINTS.md; reversing that one substitution restored it. Use the Edit tool for doc edits, or build each pair in parentheses.
+
+### Open follow-ups
+- Sprint 3 (mud + winch core) is next.
+- `B1Mud_DigInMedium`'s external actor package was re-saved with no intended change; left out of the commit.

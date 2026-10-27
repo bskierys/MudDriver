@@ -4,10 +4,6 @@
 
 namespace
 {
-	constexpr float CmPerM = 100.0f;
-	/** Chaos forces are in kg*cm/s^2 */
-	constexpr float NewtonsToUnreal = 100.0f;
-	constexpr float GravityCmPerS2 = 980.665f;
 	constexpr float HardGroundTraceLift = 2.0f;
 }
 
@@ -48,7 +44,7 @@ void FB1MudSimulation::EndStep(UChaosWheeledVehicleSimulation& Vehicle, float De
 	LastDeltaTime = DeltaTime;
 	if (!StepInput.UnstuckAssistForce.IsZero())
 	{
-		Vehicle.AddForce(StepInput.UnstuckAssistForce * NewtonsToUnreal);
+		Vehicle.AddForce(StepInput.UnstuckAssistForce * B1MudWheelModel::NewtonsToUnreal);
 	}
 	UpdateSinkDepth(Vehicle, DeltaTime);
 
@@ -175,9 +171,9 @@ void FB1MudSimulation::ApplyRollingResistance(UChaosWheeledVehicleSimulation& Ve
 		// Chaos sets MassPerWheel to vehicle mass / wheel count for wheels in contact.
 		const Chaos::FSimpleWheelSim& PWheel = Vehicle.PVehicle->Wheels[WheelIdx];
 		const float Mass = PWheel.MassPerWheel * NumWheels;
-		const float WeightShare = Mass * GravityCmPerS2 / NumWheelsInContact * RelativeLoad[WheelIdx];
+		const float WeightShare = Mass * B1MudWheelModel::GravityCmPerS2 / NumWheelsInContact * RelativeLoad[WheelIdx];
 		const float RoadSpeed = PWheel.GetRoadSpeed();
-		const float Coefficient = B1MudWheelModel::GetRollingResistanceCoefficient(GetSinkDepth(WheelIdx), *Mud, RoadSpeed / CmPerM);
+		const float Coefficient = B1MudWheelModel::GetRollingResistanceCoefficient(GetSinkDepth(WheelIdx), *Mud, RoadSpeed / B1MudWheelModel::CmPerM);
 
 		// Opposes motion, or at standstill the tire's push, like static friction, so a spinning wheel can't creep.
 		const float TireForce = PWheel.GetForceFromFriction().X;
@@ -195,7 +191,7 @@ void FB1MudSimulation::ApplyRollingResistance(UChaosWheeledVehicleSimulation& Ve
 		const FVector WheelForward = GroundForward.RotateAngleAxis(PWheel.SteeringAngle, Hit.Normal);
 
 		Vehicle.AddForceAtPosition(WheelForward * -MotionSign * Force, Hit.ImpactPoint);
-		RollingResistance[WheelIdx] = Force / NewtonsToUnreal;
+		RollingResistance[WheelIdx] = Force / B1MudWheelModel::NewtonsToUnreal;
 	}
 }
 
@@ -251,7 +247,7 @@ void FB1MudSimulation::ApplyBellyDrag(UChaosWheeledVehicleSimulation& Vehicle, f
 	}
 
 	Vehicle.AddForce(-Direction * Force);
-	BellyDrag = Force / NewtonsToUnreal;
+	BellyDrag = Force / B1MudWheelModel::NewtonsToUnreal;
 }
 
 void FB1MudSimulation::UpdateRelativeLoads(const UChaosWheeledVehicleSimulation& Vehicle)
@@ -301,8 +297,8 @@ void FB1MudSimulation::UpdateSinkDepth(const UChaosWheeledVehicleSimulation& Veh
 		}
 
 		FB1MudSinkInput Input;
-		Input.SlipSpeed = FMath::Abs(PWheel.GetSlipMagnitude()) / CmPerM;
-		Input.RoadSpeed = FMath::Abs(PWheel.GetRoadSpeed()) / CmPerM;
+		Input.SlipSpeed = FMath::Abs(PWheel.GetSlipMagnitude()) / B1MudWheelModel::CmPerM;
+		Input.RoadSpeed = FMath::Abs(PWheel.GetRoadSpeed()) / B1MudWheelModel::CmPerM;
 		Input.RelativeLoad = RelativeLoad.IsValidIndex(WheelIdx) ? RelativeLoad[WheelIdx] : 1.0f;
 		Input.HardGroundDepth = HardGroundDepth.IsValidIndex(WheelIdx) ? HardGroundDepth[WheelIdx] : MAX_flt;
 		Input.DeltaTime = DeltaTime;

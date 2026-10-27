@@ -32,7 +32,7 @@ Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md]
 ---
 
 ## Phase 1 — Mud
-**Status:** core done and signed off (Sprint 1, 2026-10-26); polish in Sprint 2
+**Status:** done, signed off 2026-10-27 (Sprints 1–2)
 
 **Outcome.** Mud that rewards driving slowly with intent: wheelspin digs you in, careful throttle gets you out, and deep mud stops you without a winch. Tires spray mud and leave trails.
 
@@ -40,10 +40,10 @@ Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md]
 - [x] `UB1PhysicalMaterial_Mud`, per-wheel sinking via trace offset, traction/resistance curves, belly drag (Sprint 1)
 - [x] Mud NetImGui window with live tuning (Sprint 1)
 - [x] `Vehicle.State.InMud` tag, `B1Unstuck`, `ShowDebug B1Mud` (Sprint 2, needs GAS) <!-- done: 2026-10-26 -->
-- [ ] Niagara mud spray (GPU sprites, depth-buffer collision) (Sprint 2)
-- [ ] Visual tire trails (ADR-008) (Sprint 2)
+- [x] Niagara mud spray (GPU sprites, depth-buffer collision) (Sprint 2) <!-- done: 2026-10-27 -->
+- [x] Visual tire trails with rut depth (ADR-008) (Sprint 2) <!-- done: 2026-10-26 -->
 
-**Stretch.** Spray tinted by surface, dirt mask on the jeep, fake trail depth, character slowed in mud.
+**Stretch.** Spray tinted by surface, dirt mask on the jeep, fake trail depth, character slowed in mud. Done beyond scope: mud and fuel made portable (S2-18..S2-25, MIGRATION.md).
 
 **Done when.**
 - Full throttle digs in on medium mud in 2–4 s.
@@ -55,17 +55,17 @@ Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md]
 ---
 
 ## Phase G — GAS + fuel
-**Status:** Sprint 2
+**Status:** done, signed off 2026-10-27 (Sprint 2)
 
 **Outcome.** A single ability system on the PlayerState drives vehicle condition and fuel. The controller and game mode can handle any pawn.
 
 **Scope (minimum).**
-- [ ] GameplayAbilities/Tags/Tasks modules, `AB1GameMode`, `AB1PlayerController` (any-pawn `OnPossess`), `AB1PlayerState` + ASC (ADR-004)
-- [ ] `UB1VehicleAttributeSet` (Condition, MaxCondition, Fuel, MaxFuel), `B1GameplayTags`
-- [ ] Fuel consumption from engine work, `UB1VehicleTuningData`, batched `GE_B1FuelDrain`, out-of-fuel → no torque (ADR-010)
-- [ ] "Vehicle Status" NetImGui window, cheats `B1AddFuel`, `B1SetCondition`, `B1DamageVehicle`
+- [x] GameplayAbilities/Tags/Tasks modules, `AB1GameMode`, `AB1PlayerController` (any-pawn `OnPossess`), `AB1PlayerState` + ASC (ADR-004)
+- [x] `UB1VehicleAttributeSet` (Condition, MaxCondition, Fuel, MaxFuel; 20 L tank), `B1GameplayTags`
+- [x] Fuel consumption from engine work and mud strain, `UB1FuelConsumptionComponent` + `UB1FuelConsumptionData` (was `UB1VehicleTuningData`), batched `GE_B1FuelDrain`, out-of-fuel → no torque (ADR-010)
+- [x] "Vehicle Status" NetImGui window, cheats `B1AddFuel`, `B1SetCondition`, `B1DamageVehicle`
 
-**Stretch.** Fuel gauge in the vehicle UI.
+**Stretch.** Fuel gauge in the vehicle UI. ✅ done (S2-27).
 
 **Done when.**
 - Fuel per 100 m in medium mud is ≥ 2× that on firm ground.

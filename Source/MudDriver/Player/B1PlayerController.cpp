@@ -2,6 +2,8 @@
 #include "B1PlayerState.h"
 #include "B1AbilitySystemComponent.h"
 #include "B1GameplayTags.h"
+#include "B1VehicleAttributeSet.h"
+#include "MudDriverUI.h"
 #include "B1Log.h"
 #include "WheeledVehiclePawn.h"
 
@@ -21,4 +23,17 @@ void AB1PlayerController::OnPossess(APawn* InPawn)
 
 	const bool bVehicle = InPawn->IsA<AWheeledVehiclePawn>();
 	ASC->SetLooseGameplayTagCount(B1GameplayTags::State_Avatar_InVehicle, bVehicle ? 1 : 0);
+}
+
+void AB1PlayerController::Tick(float Delta)
+{
+	Super::Tick(Delta);
+
+	const AB1PlayerState* B1PlayerState = GetPlayerState<AB1PlayerState>();
+	const UB1AbilitySystemComponent* ASC = B1PlayerState ? B1PlayerState->GetB1AbilitySystemComponent() : nullptr;
+	if (IsValid(VehicleUI) && ASC)
+	{
+		VehicleUI->UpdateFuel(ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetFuelAttribute()),
+			ASC->GetNumericAttribute(UB1VehicleAttributeSet::GetMaxFuelAttribute()));
+	}
 }
