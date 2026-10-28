@@ -20,8 +20,9 @@ Role: solo developer about to code. You are not planning. You are building.
 3. Tell the user: "Working on SN-XX: <description>. <one sentence on approach>."
 4. Implement the task. Follow the rules. Don't expand scope.
 5. Build / test as appropriate (TS: `npm run build`; C++: UnrealBuildTool).
-6. Mark the task done in SPRINTS.md: `- [x] **SN-XX** … <!-- done: YYYY-MM-DD -->`.
-7. Tell the user: "SN-XX done — run `/save` to persist this session."
+6. If the task have a user-check, run the editor for the user (if it is not running) to simplify the check procedure.
+7. Mark the task done in SPRINTS.md: `- [x] **SN-XX** … <!-- done: YYYY-MM-DD -->`.
+8. Tell the user: "SN-XX done — run `/save` to persist this session."
 
 ## Hard rules during /work
 
