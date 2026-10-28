@@ -146,8 +146,8 @@ namespace B1VehicleTelemetry
 			return;
 		}
 
-		UE_LOG(LogB1Physics, Log, TEXT("B1Winch %s anchor=%s len=%.2fm rest=%.2fm tension=%.0fN pull=%.2f"),
+		UE_LOG(LogB1Physics, Log, TEXT("B1Winch %s anchor=%s len=%.2fm rest=%.2fm tension=%.0fN pull=%.2f hold=%.0fN%s"),
 			*GetNameSafe(Winch.GetOwner()), *GetNameSafe(Anchor->GetOwner()), Winch.GetCurrentLength() / 100.0f,
-			Winch.GetRestLength() / 100.0f, Winch.GetTension(), Winch.Pull);
+			Winch.GetRestLength() / 100.0f, Winch.GetTension(), Winch.Pull, Winch.GetHoldForce(), Winch.IsHoldActive() ? TEXT("(on)") : TEXT("(off)"));
 	}
 }

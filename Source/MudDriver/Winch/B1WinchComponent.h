@@ -61,6 +61,14 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Winch|Config", meta = (ClampMin = "0"))
 	float CableDamping = 20000.0f;
 
+	/** Cap of the standstill hold while hooked with the handbrake on; cancels the cable pull and slope gravity */
+	UPROPERTY(EditAnywhere, Category = "Winch|Config", meta = (Units = "N", ClampMin = "0"))
+	float HandbrakeHoldForce = 80000.0f;
+
+	/** Below this ground speed the hold also cancels slope gravity and drift; above it, only the cable pull */
+	UPROPERTY(EditAnywhere, Category = "Winch|Config", meta = (Units = "cm/s", ClampMin = "0"))
+	float HandbrakeHoldSpeed = 30.0f;
+
 	/** Loose tag on the owner's ASC while reeling in; set by the host */
 	UPROPERTY(EditAnywhere, Category = "Winch|Config")
 	FGameplayTag WinchingTag;
@@ -129,6 +137,9 @@ public:
 
 	/** Latest physics step; N */
 	float GetTension() const { return Tension; }
+	/** Latest physics step; N */
+	float GetHoldForce() const { return HoldForce; }
+	bool IsHoldActive() const { return bHoldActive; }
 	/** cm */
 	float GetRestLength() const { return RestLength; }
 	/** Winch point to the anchor or the carrier's hand, cm */
@@ -168,5 +179,7 @@ private:
 	float RestLength = 0.0f;
 	float Tension = 0.0f;
 	float PeakTension = 0.0f;
+	float HoldForce = 0.0f;
+	bool bHoldActive = false;
 	bool bWinchingTagSet = false;
 };

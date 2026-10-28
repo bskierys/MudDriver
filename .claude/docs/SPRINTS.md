@@ -990,7 +990,17 @@ Plan: [plans/2026-10-28-fallen-tree.md](plans/2026-10-28-fallen-tree.md) (critiq
 - ⚠️ New thresholds are measured first, then held (as S4-05). Feel wins at the user check.
 - Out of scope: ramming damage (Phase 4), the jeep shoving a log the winch is pulling free, hook-position rules, scripted motion, stump hinge, planar solver, cutting the tree, hook or strap animation, last-used-device key display, several hooks.
 
-- [ ] **S4-14** Handbrake + winch hold, no in-car detach (3 h)
+- [x] **S4-14** Handbrake + winch hold, no in-car detach (3 h) <!-- done: 2026-10-28 -->
+  Result:
+  - `FB1VehicleSimulation::UpdateHandbrakeHold` after `UpdateWinch`: −(winch + gravity) on the wheel-normal ground plane, plus −m·v/0.1 s drift, capped at `HandbrakeHoldForce`, `AddForce` at the COM. Active with handbrake ≥ 0.5, attached, ≥ 3 wheels down, ground speed < `HandbrakeHoldSpeed`. Winch + hold → `Mud.SetExternalForce`. `UB1WinchComponent::HandbrakeHoldForce` 80 kN / `HandbrakeHoldSpeed` 30 cm/s (`Winch|Config`) ride `FB1WinchSimInput`; output `HoldForce` / `bHoldActive`.
+  - Found: `UChaosVehicleSimulation::VehicleInputs` is only filled with network prediction on (reads 0 here), so the hold reads the step's `InputData.PhysicsInputs.NetworkInputs.VehicleInputs`. Mud's idle check reads the same member: backlog.
+  - Found: brake at standstill = Chaos reverse throttle, so brake + handbrake creeps back ~0.2 m/s against the hold. The rigs use the handbrake alone (your "hold B").
+  - `IMC_Vehicle_Default`: `IA_Handbrake` Space + `Gamepad_FaceButton_Right`; removed `IA_Handbrake` LB, `IA_Brake` pad A, `IA_B1WinchDetach` Q / pad Y. `IA_B1WinchDetach` deleted (only `BP_B1Jeep` referenced it, resaved). `AB1Jeep::WinchDetachAction` + binding removed.
+  - Debug: `ShowDebug B1Winch` "hold x / 80 kN active|off", telemetry `hold=<N>(on|off)`, Winch window hold bar + typed fields + Save to asset.
+  - Rig: step `bWinchDetach`, threshold `MinTension`, metric `holdMax`. `B1Winch_HandbrakeHold` (X 0, Y −50 m, `Tree_FirmPull`, handbrake + full pull 10 s): lastDisp 0.023, tensionMax 60000, holdMax 60324. `B1Winch_HandbrakeDetach` (+1 s handbrake + detach): lastDisp 0.014.
+  - Changed rigs: `B1Winch_FirmPull` dropped its handbrake (brake 1 only) to stay a drag rig: 36.1 → 29.2 kN. `B1Winch_Log` (hold on now: 27.8 kN, anchorTravel still passes; retired in S4-17) and `ReelOutLimit` (jeep held, rest 80.00) still pass. Other tree rigs within 1 kN (DeepStrip 34.5 → 33.6, Stability120 38.4 → 39.0).
+  - Headless: winch 29/29 (`s414_winch.log`), mud 22/22 (`s414_mud.log`), core 12/12 (`s414_core.log`). ADR-007 amendment marked built.
+  - User check round 1 (2026-10-28): B then winch held, but winch then B slid. The speed gate disabled the hold while the jeep followed the cable at 3 m/s. Now above `HandbrakeHoldSpeed` the hold cancels the cable pull only (no gravity or drift term), so the handbrake stops the jeep; below it, the full hold. Rig `B1Winch_HandbrakeLate` (same spot): pull 3 s, B + pull 3 s, B + pull 5 s measured: dragged 9.4 m, stopped 0.4 s after B, lastDisp 0.000 at 60 kN. Winch 30/30 (`s414_winch2.log`).
   - **Input layout (user).** `IMC_Vehicle_Default` today (read 2026-10-28): `IA_Handbrake` on Space and pad LB; `IA_Brake` on S, LT and pad A; pad B free. Change it to:
     - `IA_Handbrake` on Space + pad B (`Gamepad_FaceButton_Right`), with the LB binding removed;
     - the pad A binding on `IA_Brake` removed (LT stays).
@@ -1136,3 +1146,7 @@ Plan: [plans/2026-10-28-fallen-tree.md](plans/2026-10-28-fallen-tree.md) (critiq
   Full loop on foot in `Lvl_Gym_Winch`: get stuck, get out, carry the hook, attach, get in, winch out; same on both slopes; lower the jeep down a slope on reel-out; the fallen tree scenario on the road lane (VISION.md). All suites headless.
   **Done:** all suites PASS; ROADMAP Phase 2 ticked.
   **User check:** sign-off on Phase 2.
+
+### Backlog (found during the sprint)
+
+- **Mud idle check reads empty inputs (suspected, S4-14).** `FB1MudSimulation::PreFriction` decides "no input" from `Vehicle.VehicleInputs`, which Chaos only fills with network prediction on (`ChaosVehicleManagerAsyncCallback.cpp`), so it may always read 0. If so, brake, handbrake and parking torque are zeroed on every muddy slope. Verify with a rig (brake on the medium slope vs idle), then pass the step's `InputData` controls like the handbrake hold does.

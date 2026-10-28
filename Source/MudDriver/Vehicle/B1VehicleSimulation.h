@@ -37,11 +37,16 @@ private:
 	/** Before the base step, from the body handle: reels in and sets WinchForce / WinchPoint */
 	void UpdateWinch(const FB1WinchSimInput& Input, const Chaos::FRigidBodyHandle_Internal* Handle, float DeltaTime);
 
+	/** After UpdateWinch: roots a hooked, near-stopped jeep on the handbrake against this step's cable force and gravity */
+	void UpdateHandbrakeHold(const FB1WinchSimInput& Input, const FControlInputs& Controls, const Chaos::FRigidBodyHandle_Internal* Handle);
+
 	FB1MudSimulation Mud;
 
 	/** Physics thread; the rest length shrinks while reeling in */
 	FB1WinchSimOutput Winch;
 	FVector WinchPoint = FVector::ZeroVector;
+	/** World, N, applied at the COM */
+	FVector HoldForce = FVector::ZeroVector;
 
 	/** Set by UpdateWinch for a simulating anchor, cleared once its force is applied */
 	Chaos::FRigidBodyHandle_Internal* AnchorHandle = nullptr;

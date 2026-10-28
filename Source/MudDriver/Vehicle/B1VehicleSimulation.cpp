@@ -7,6 +7,10 @@ namespace
 	constexpr float CmPerM = 100.0f;
 	/** Chaos forces are in kg*cm/s^2 */
 	constexpr float NewtonsToUnreal = 100.0f;
+	constexpr float GravityCmPerS2 = 980.0f;
+	constexpr int32 MinHoldWheelsInContact = 3;
+	/** The hold's velocity term stops a drift over this time; well above the 1/60 s step, so it never overshoots */
+	constexpr float HoldDriftTime = 0.1f;
 }
 
 void FB1VehicleSimulation::SetGameThreadInput(const FB1VehicleSimInput& Input)
@@ -100,6 +104,51 @@ void FB1VehicleSimulation::UpdateWinch(const FB1WinchSimInput& Input, const Chao
 	AnchorHandle = Winch.Tension > 0.0f ? AnchorBody : nullptr;
 }
 
+void FB1VehicleSimulation::UpdateHandbrakeHold(const FB1WinchSimInput& Input, const FControlInputs& Controls, const Chaos::FRigidBodyHandle_Internal* Handle)
+{
+	HoldForce = FVector::ZeroVector;
+	Winch.HoldForce = 0.0f;
+	Winch.bHoldActive = false;
+	if (!Input.bAttached || !Handle || Controls.HandbrakeInput < 0.5f)
+	{
+		return;
+	}
+
+	int32 NumWheelsInContact = 0;
+	FVector GroundUp = FVector::ZeroVector;
+	for (int32 WheelIdx = 0; WheelIdx < PVehicle->Wheels.Num(); ++WheelIdx)
+	{
+		if (PVehicle->Wheels[WheelIdx].InContact())
+		{
+			GroundUp += WheelState.TraceResult[WheelIdx].Normal;
+			++NumWheelsInContact;
+		}
+	}
+	GroundUp = GroundUp.GetSafeNormal();
+	if (NumWheelsInContact < MinHoldWheelsInContact || GroundUp.IsZero())
+	{
+		return;
+	}
+
+	const FVector GroundVelocity = FVector::VectorPlaneProject(Handle->V(), GroundUp);
+	if (GroundVelocity.Size() >= Input.HandbrakeHoldSpeed)
+	{
+		// Moving: only the cable pull is cancelled, so the handbrake stops the jeep whether it or the winch came first.
+		HoldForce = -FVector::VectorPlaneProject(Winch.Force, GroundUp).GetClampedToMaxSize(Input.HandbrakeHoldForce);
+	}
+	else
+	{
+		// Cancels this step's cable pull and slope gravity and kills the drift; a pure reaction, so it can't push a resting jeep.
+		const float Mass = Handle->M();
+		const FVector Gravity(0.0f, 0.0f, -Mass * GravityCmPerS2 / NewtonsToUnreal);
+		const FVector External = FVector::VectorPlaneProject(Winch.Force + Gravity, GroundUp);
+		const FVector Drift = -Mass * GroundVelocity / CmPerM / HoldDriftTime;
+		HoldForce = (-External + Drift).GetClampedToMaxSize(Input.HandbrakeHoldForce);
+	}
+	Winch.HoldForce = HoldForce.Size();
+	Winch.bHoldActive = true;
+}
+
 void FB1VehicleSimulation::ApplyDeferredForces(Chaos::FRigidBodyHandle_Internal* Handle)
 {
 	UChaosWheeledVehicleSimulation::ApplyDeferredForces(Handle);
@@ -124,7 +173,9 @@ void FB1VehicleSimulation::UpdateSimulation(float DeltaTime, const FChaosVehicle
 	}
 	Mud.BeginStep();
 	UpdateWinch(StepInput.Winch, Handle, DeltaTime);
-	Mud.SetExternalForce(Winch.Force);
+	// The member VehicleInputs is only filled with network prediction on; this step's controls are in InputData.
+	UpdateHandbrakeHold(StepInput.Winch, InputData.PhysicsInputs.NetworkInputs.VehicleInputs, Handle);
+	Mud.SetExternalForce(Winch.Force + HoldForce);
 
 	UChaosWheeledVehicleSimulation::UpdateSimulation(DeltaTime, InputData, Handle);
 
@@ -132,6 +183,10 @@ void FB1VehicleSimulation::UpdateSimulation(float DeltaTime, const FChaosVehicle
 	if (Winch.Tension > 0.0f)
 	{
 		AddForceAtPosition(Winch.Force * NewtonsToUnreal, WinchPoint);
+	}
+	if (Winch.bHoldActive)
+	{
+		AddForce(HoldForce * NewtonsToUnreal);
 	}
 	Mud.EndStep(*this, DeltaTime);
 

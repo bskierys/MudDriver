@@ -68,6 +68,11 @@ struct FB1WinchSimInput
 	float Stiffness = 0.0f;
 	/** N*s/m */
 	float Damping = 0.0f;
+
+	/** Standstill hold while the handbrake is on, N cap */
+	float HandbrakeHoldForce = 0.0f;
+	/** cm/s; ground speed below which the hold engages */
+	float HandbrakeHoldSpeed = 0.0f;
 };
 
 struct FB1WinchSimOutput
@@ -75,8 +80,11 @@ struct FB1WinchSimOutput
 	float Tension = 0.0f;
 	float RestLength = 0.0f;
 	float Length = 0.0f;
-	/** World, N. What the drag caps count as push */
+	/** World, N, cable only */
 	FVector Force = FVector::ZeroVector;
+	/** Handbrake hold magnitude, N */
+	float HoldForce = 0.0f;
+	bool bHoldActive = false;
 	uint32 AttachSerial = 0;
 };
 

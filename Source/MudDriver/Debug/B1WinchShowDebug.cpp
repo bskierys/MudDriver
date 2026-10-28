@@ -81,6 +81,8 @@ namespace B1WinchShowDebug
 			Lines.Add(FString::Printf(TEXT("tension %5.1f / %.1f kN"), Winch.GetTension() / 1000.0f, Winch.MaxPullForce / 1000.0f));
 			Lines.Add(FString::Printf(TEXT("length %5.2f / %.0f m  rest %.2f m"), Winch.GetCurrentLength() / 100.0f,
 				Winch.MaxCableLength / 100.0f, Winch.GetRestLength() / 100.0f));
+			Lines.Add(FString::Printf(TEXT("hold %5.1f / %.1f kN  %s"), Winch.GetHoldForce() / 1000.0f,
+				Winch.HandbrakeHoldForce / 1000.0f, Winch.IsHoldActive() ? TEXT("active") : TEXT("off")));
 		}
 		else if (const AActor* Carrier = Winch.GetHookCarrier())
 		{

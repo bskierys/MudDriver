@@ -80,10 +80,6 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Input")
 	TObjectPtr<UInputAction> WinchPullAction;
 
-	/** Releases the hook; attaching happens on foot (S4-07) */
-	UPROPERTY(EditAnywhere, Category = "Input")
-	TObjectPtr<UInputAction> WinchDetachAction;
-
 	virtual void DrawShowDebug(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos) override;
 
 private:
@@ -92,7 +88,6 @@ private:
 	void OnOutOfFuelChanged(bool bOutOfFuel);
 
 	void WinchPull(const FInputActionValue& Value);
-	void WinchDetach(const FInputActionValue& Value);
 
 	TWeakObjectPtr<UAbilitySystemComponent> AbilitySystem;
 };

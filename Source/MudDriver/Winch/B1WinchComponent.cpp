@@ -85,6 +85,8 @@ void UB1WinchComponent::SendSimInput()
 		Input.MaxCableLength = MaxCableLength;
 		Input.Stiffness = CableStiffness;
 		Input.Damping = CableDamping;
+		Input.HandbrakeHoldForce = HandbrakeHoldForce;
+		Input.HandbrakeHoldSpeed = HandbrakeHoldSpeed;
 	}
 	Movement->SetWinchInput(Input);
 }
@@ -105,6 +107,8 @@ void UB1WinchComponent::ReadSimOutput()
 
 	Tension = Output.Tension;
 	RestLength = Output.RestLength;
+	HoldForce = Output.HoldForce;
+	bHoldActive = Output.bHoldActive;
 	PeakTension = FMath::Max(PeakTension, Tension);
 	if (Cable)
 	{
@@ -295,6 +299,8 @@ void UB1WinchComponent::ReleaseAnchor()
 	Anchor.Reset();
 	RestLength = 0.0f;
 	Tension = 0.0f;
+	HoldForce = 0.0f;
+	bHoldActive = false;
 	SetWinchingTag(false);
 	SendSimInput();
 }

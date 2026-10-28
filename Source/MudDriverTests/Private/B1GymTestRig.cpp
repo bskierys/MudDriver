@@ -201,6 +201,7 @@ void AB1GymTestRig::StartTest()
 	StretchLast = FFloatInterval();
 
 	MaxTension = 0.0f;
+	MaxHold = 0.0f;
 	LastStepTension = FFloatInterval();
 	MaxAnchorDistance = 0.0f;
 
@@ -300,6 +301,10 @@ void AB1GymTestRig::EnterStep(int32 StepIndex)
 	if (Step.TeleportPawnTo || Step.bTeleportToVehicle)
 	{
 		TeleportPlayerPawn(Step);
+	}
+	if (Step.bWinchDetach && Winch)
+	{
+		Winch->Detach();
 	}
 	SetAbilityInput(Step.AbilityInputTag);
 }
@@ -559,6 +564,7 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 
 		const float Tension = Winch->GetTension();
 		MaxTension = FMath::Max(MaxTension, Tension);
+		MaxHold = FMath::Max(MaxHold, Winch->GetHoldForce());
 		if (bInLastStep)
 		{
 			LastStepTension.Include(Tension);
@@ -716,6 +722,10 @@ void AB1GymTestRig::FinishScript()
 		{
 			Failures.Add(FString::Printf(TEXT("tensionMax>%.0f"), Thresholds.MaxTension));
 		}
+		if (Thresholds.MinTension >= 0.0f && MaxTension < Thresholds.MinTension)
+		{
+			Failures.Add(FString::Printf(TEXT("tensionMax<%.0f"), Thresholds.MinTension));
+		}
 		if (Thresholds.MaxTensionOscillation >= 0.0f && TensionOscillation > Thresholds.MaxTensionOscillation)
 		{
 			Failures.Add(FString::Printf(TEXT("tensionOsc>%.0f"), Thresholds.MaxTensionOscillation));
@@ -740,8 +750,8 @@ void AB1GymTestRig::FinishScript()
 			Failures.Add(FString::Printf(TEXT("rest>%.2f"), Thresholds.MaxRestLength));
 		}
 
-		WinchMetrics += FString::Printf(TEXT(" tensionMax=%.0f tensionOsc=%.0f tensionMinLast=%.0f anchorDistMax=%.2f rest=%.2f vmaxLast=%.2f anchorTravel=%.2f"),
-			MaxTension, TensionOscillation, TensionMinLast, AnchorDistance, RestLength, LastStepMaxSpeed, AnchorTravel);
+		WinchMetrics += FString::Printf(TEXT(" tensionMax=%.0f tensionOsc=%.0f tensionMinLast=%.0f anchorDistMax=%.2f rest=%.2f vmaxLast=%.2f anchorTravel=%.2f holdMax=%.0f"),
+			MaxTension, TensionOscillation, TensionMinLast, AnchorDistance, RestLength, LastStepMaxSpeed, AnchorTravel, MaxHold);
 		Winch->Detach();
 		Winch = nullptr;
 	}

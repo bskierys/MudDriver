@@ -1254,3 +1254,27 @@ The user didn't accept S4-09. Driving into the log rolled it, the cable hooked t
 - **Physics first (user):** the log moves by Chaos alone, with no hook-position rules or scripted motion. Hooking at the middle probably won't open a passable gap, and that's the puzzle. Tuning uses physical knobs only. Authored root-end drag or a free-log standstill term need the user's OK (deferred from the critique).
 - Hold not scaled on mud (user). The user creates `PM_B1Log`; the band material is checked on MCP first, then asked for.
 - ADR-018, ADR-019 and the ADR-007 amendment (all proposed) updated in place.
+
+## 2026-10-28 — S4-14: handbrake winch hold, no in-car detach
+
+### Context
+First task of the fallen tree replan. Reeling in pulled the jeep toward any heavy anchor with no way to stop it, and detach was on Q / pad Y in the jeep.
+
+### What was built
+- `FB1VehicleSimulation::UpdateHandbrakeHold`: with the handbrake on, the hook attached and ≥ 3 wheels down, it cancels this step's cable pull. Below `HandbrakeHoldSpeed` (30 cm/s) it also cancels gravity along the ground plus a 0.1 s drift term. Capped at `HandbrakeHoldForce` (80 kN), at the COM. Winch + hold → `Mud.SetExternalForce`.
+- `IMC_Vehicle_Default`: handbrake Space + pad B; pad LB handbrake, pad A brake and Q / Y detach removed. `IA_B1WinchDetach` and `AB1Jeep::WinchDetachAction` deleted.
+- Debug: hold in `ShowDebug B1Winch`, `B1Winch` telemetry and the Winch window (typed fields + Save to asset).
+- Rig: step `bWinchDetach`, threshold `MinTension`, metric `holdMax`. Rigs `B1Winch_HandbrakeHold`, `HandbrakeDetach`, `HandbrakeLate` (all PASS). Winch 30/30, mud 22/22, core 12/12 headless.
+
+### Decisions made
+- ADR-007 amendment built. After the user check (winch first, then B slid), the cable cancel runs at any speed and only gravity + drift are speed-gated, so the order doesn't matter.
+- The hold rigs use the handbrake alone. `B1Winch_FirmPull` dropped its handbrake to stay a drag rig (36.1 → 29.2 kN).
+
+### What we learned
+- `UChaosVehicleSimulation::VehicleInputs` is only filled with network physics prediction on. Read the step's controls from `InputData.PhysicsInputs.NetworkInputs.VehicleInputs`.
+- In Chaos, brake at a standstill is reverse throttle: brake + handbrake creeps back about 0.2 m/s against the hold.
+- MCP `set_properties` can grow an array if the appended elements equal an existing element. Append copies first, then edit them, and zero every field (the default step has throttle 1).
+
+### Open follow-ups
+- Suspected: the mud idle check (`FB1MudSimulation::PreFriction`) reads the same empty `VehicleInputs`, which may zero the brake torque on muddy slopes. In the Sprint 4 backlog.
+- User re-check of the late-B order.

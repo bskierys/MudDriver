@@ -143,18 +143,12 @@ void AB1Jeep::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	{
 		EnhancedInput->BindAction(WinchPullAction, ETriggerEvent::Triggered, this, &AB1Jeep::WinchPull);
 		EnhancedInput->BindAction(WinchPullAction, ETriggerEvent::Completed, this, &AB1Jeep::WinchPull);
-		EnhancedInput->BindAction(WinchDetachAction, ETriggerEvent::Started, this, &AB1Jeep::WinchDetach);
 	}
 }
 
 void AB1Jeep::WinchPull(const FInputActionValue& Value)
 {
 	Winch->SetPull(Value.Get<float>());
-}
-
-void AB1Jeep::WinchDetach(const FInputActionValue& Value)
-{
-	Winch->Detach();
 }
 
 void AB1Jeep::OnOutOfFuelChanged(bool bOutOfFuel)

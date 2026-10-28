@@ -75,6 +75,8 @@ namespace B1ImGui
 		Archetype->MinRestLength = Winch.MinRestLength;
 		Archetype->CableStiffness = Winch.CableStiffness;
 		Archetype->CableDamping = Winch.CableDamping;
+		Archetype->HandbrakeHoldForce = Winch.HandbrakeHoldForce;
+		Archetype->HandbrakeHoldSpeed = Winch.HandbrakeHoldSpeed;
 		Archetype->MarkPackageDirty();
 		return SaveAssetPackage(*Blueprint);
 	}
@@ -91,6 +93,8 @@ namespace B1ImGui
 		bChanged |= DragFloatTyped("Min rest cm", &Winch.MinRestLength, 1.0f, 0.0f, 2000.0f, "%.0f");
 		bChanged |= DragFloatTyped("Stiffness N/m", &Winch.CableStiffness, 1000.0f, 0.0f, 2000000.0f, "%.0f");
 		bChanged |= DragFloatTyped("Damping N*s/m", &Winch.CableDamping, 100.0f, 0.0f, 500000.0f, "%.0f");
+		bChanged |= DragFloatTyped("Hold N", &Winch.HandbrakeHoldForce, 100.0f, 0.0f, 300000.0f, "%.0f");
+		bChanged |= DragFloatTyped("Hold below cm/s", &Winch.HandbrakeHoldSpeed, 1.0f, 0.0f, 500.0f, "%.0f");
 		if (bChanged)
 		{
 			Edited.Add(&Winch);
@@ -177,6 +181,9 @@ namespace B1ImGui
 		}
 		ImGui::Text("Rest %.2f m", Winch->GetRestLength() / 100.0f);
 		DrawBar("Tension kN", Winch->GetTension() / 1000.0f, Winch->MaxPullForce / 1000.0f);
+		DrawBar("Hold kN", Winch->GetHoldForce() / 1000.0f, Winch->HandbrakeHoldForce / 1000.0f);
+		ImGui::SameLine();
+		ImGui::TextColored(Winch->IsHoldActive() ? ImVec4(0.3f, 1.0f, 0.3f, 1.0f) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f), Winch->IsHoldActive() ? "active" : "off");
 		ImGui::Text("Pull %+4.0f %% (%s)", Winch->Pull * 100.0f, Winch->Pull > 0.0f ? "in" : Winch->Pull < 0.0f ? "out" : "hold");
 
 		const UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Vehicle);

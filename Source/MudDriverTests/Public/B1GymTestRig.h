@@ -64,6 +64,10 @@ struct FB1GymInputStep
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (ClampMin = "-1", ClampMax = "1"))
 	float WinchPull = 0.0f;
 
+	/** Stows the vehicle's winch hook when the step starts */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	bool bWinchDetach = false;
+
 	/** Pressed through player 0's controller at step start, released at its end; needs bPossessWithPlayer */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Categories = "InputTag"))
 	FGameplayTag AbilityInputTag;
@@ -174,6 +178,10 @@ struct FB1GymThresholds
 	/** Peak cable tension; needs WinchAnchor */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "N"))
 	float MaxTension = -1.0f;
+
+	/** Peak cable tension must reach this, e.g. the drum stall */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "N"))
+	float MinTension = -1.0f;
 
 	/** Tension range (max − min) during the last input step */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "N"))
@@ -407,6 +415,8 @@ private:
 	/** N */
 	float MaxTension = 0.0f;
 	FFloatInterval LastStepTension;
+	/** Peak handbrake hold, N */
+	float MaxHold = 0.0f;
 	/** cm */
 	float MaxAnchorDistance = 0.0f;
 	FVector AnchorStart = FVector::ZeroVector;
