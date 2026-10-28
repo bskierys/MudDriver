@@ -1205,3 +1205,52 @@ After S4-07 the hook carry worked, but nothing on screen said what the interact 
 ### Open follow-ups
 - S4-09 user check: winch the log off the lane, see if it slides and rolls believably.
 - Next: S4-10 Phase 2 playtest.
+
+## 2026-10-28 — Fallen tree replan (S4-09 playtest)
+
+### Context
+The user didn't accept S4-09. Driving into the log rolled it, the cable hooked to its end, and reeling pulled the jeep in with no way to hold it. They rewrote the situation in VISION.md ("Fallen tree"): a tree across a banded road, ramming doesn't move it, hook near one end, hold the handbrake, it swings open like a door. They also asked for free hook placement with a ghost band, a handbrake, controls hints and no in-car detach.
+
+### Tasks created
+- Sprint 4 section "Playtest feedback (S4-09, 2026-10-28)", S4-14..S4-19:
+  - S4-14 handbrake + winch hold, no in-car detach;
+  - S4-15 anchor areas;
+  - S4-16 hook placement ghost;
+  - S4-17 fallen log frozen until pulled;
+  - S4-18 road lane + tuning;
+  - S4-19 controls hints.
+- S4-10 now requires them and includes the scenario.
+- Plan archived as [plans/2026-10-28-fallen-tree.md](plans/2026-10-28-fallen-tree.md). The old Sprint 4 critique moved from PLAN.md to `plans/2026-10-27-sprint4-critique.md`. ROADMAP Phase 2 scope and done-when updated (the "log moves ≥ 3 m" check was replaced).
+
+### Decisions made
+- Log frozen until pulled (user, from four options), ADR-018 proposed.
+- Anchors are areas, the hook is placed by aiming, and the force acts on the trunk axis: ADR-019 proposed.
+- Handbrake: normal while driving; with the hook attached it adds a standstill hold up to 80 kN (user). No in-car detach (user). ADR-007 amendment proposed.
+- Hints show both keys, like the prompt (user).
+
+## 2026-10-28 — Sprint 4 planning: fallen tree critique and revision
+
+### Context
+`/plan-analyse` → `/plan-replan` → `/plan-roadmap` on the fallen tree plan, which had been converted to tasks straight away. The critique found:
+- the log's scaled root would distort every new child (the S4-09 scale bug class);
+- the aim state needed one owner;
+- the template's pad LB handbrake and pad A brake would break the hints;
+- the tip-vs-middle force ratio is about 2 for a log turning about its root end, and the root has to resist about the pull force to stay the pivot;
+- the breakaway lower bound was unmeasured;
+- `logGap` was undefined;
+- the handbrake hold must use the same step's winch force.
+
+### Tasks created
+- S4-14..S4-19 in SPRINTS.md rewritten from revision 1 (no new IDs):
+  - S4-14 adds the input cleanup and `B1Winch_HandbrakeDetach`;
+  - S4-15 makes the cable block PhysicsBody;
+  - S4-16 stores the aim on the winch;
+  - S4-17 rebuilds the log body around an unscaled box root and adds `ShowDebug B1Log`;
+  - S4-18 (3 → 4 h) gets an ordered tuning procedure, `logPivot` / `logDrift`, a defined `logGap` and `B1Log_DriveThrough`.
+- ROADMAP Phase 2 done-when updated; plan re-archived at `plans/2026-10-28-fallen-tree.md`; PLAN.md cleared.
+
+### Decisions made
+- Pad handbrake LB → B; pad A no longer brakes (user).
+- **Physics first (user):** the log moves by Chaos alone, with no hook-position rules or scripted motion. Hooking at the middle probably won't open a passable gap, and that's the puzzle. Tuning uses physical knobs only. Authored root-end drag or a free-log standstill term need the user's OK (deferred from the critique).
+- Hold not scaled on mud (user). The user creates `PM_B1Log`; the band material is checked on MCP first, then asked for.
+- ADR-018, ADR-019 and the ADR-007 amendment (all proposed) updated in place.

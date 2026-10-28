@@ -28,8 +28,23 @@ To give you an example, here is one of the situations in the game. This is what 
 ### Clearing obstacles on foot
 
 The player can get out of the jeep and clear the way before driving on.
-- A log blocks the path. The player takes the winch hook, attaches it to the log, goes back to the jeep and winches the log off the path.
+- A fallen tree blocks the path (see below).
 - Branches block the path. The player cuts them with a machete before driving through. If they don't, the jeep still breaks them, but takes damage doing it.
+
+### Fallen tree
+
+- The player drives on the road. At some point they see a fallen tree blocking the way. It lies across the road and there's no way around it: the road is closed off with bands on both sides.
+- The player tries to ram the tree with the jeep, but it won't budge. It doesn't move at all, and ramming it again only damages the jeep (damage comes later, but it paints the picture).
+- The player gets out, takes the winch hook and hooks it to the tree, then gets back in. Holding the handbrake (pad B / Space roots the jeep in place), they start reeling the cable in.
+- Where the hook goes matters. Hooked near the middle, the tree barely moves. The player hooked it near the right end, so the jeep pulls that end to the left and the tree swings aside.
+- It was hard to move and the player didn't clear it fully. The tree only opened like a door, but the gap is wide enough: the player gets back in and drives through the opening.
+
+How it should behave:
+- **The tree stays put on its own.** Driving into it or over it doesn't move or roll it. That holds with the hook attached too, as long as the winch isn't pulling. It only moves when the cable pulls it hard enough, and then it moves by physics (sliding and turning on the ground), not along a fixed path.
+- **Free hook placement.** While carrying the hook near a tree or a log, the player sees where the hook will go: a semi-transparent yellow band around the trunk. Looking around moves it freely along the part of the trunk where hooking is allowed (no fixed hook points). It works like placing a building in The Alters with a ghost before confirming. On attach the band turns solid black and the hook looks wrapped around the trunk instead of floating next to it. The cable pulls at the band, in the middle of the trunk, not at its side.
+- **Handbrake.** Pad B / Space. While driving it's a normal handbrake. With the winch hooked it also holds the jeep in place, so the winch pulls the object toward the jeep instead of pulling the jeep toward the object.
+- **Detaching is done on foot.** The player gets out and takes the hook off the anchor. There's no detach button in the jeep.
+- **Controls hints.** The lower-left corner lists the controls that work right now. In the jeep: RT drive, LT reverse, B handbrake, X exit, D-pad up/down winch (only while the winch is hooked). On foot: move, look, jump, and the interact prompt.
 
 ### Muddy slope
 

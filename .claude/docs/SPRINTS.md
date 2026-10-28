@@ -736,7 +736,7 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
 
 ## Sprint 4 — On foot (Phase 2, part 2)
 
-**Status:** refined 2026-10-27 after the Sprint 3 checkpoint; start with `/work`.
+**Status:** refined 2026-10-27 after the Sprint 3 checkpoint; S4-14..S4-19 added 2026-10-28 after the S4-09 check (fallen tree). Start with `/work`.
 
 **Goal.** Close Phase 2: the player gets out, carries the hook to a tree, gets back in and winches out; a log can be winched off a lane.
 
@@ -970,8 +970,169 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   ⚠️ Note: slip candidate if the sprint runs long (it doesn't block the on-foot loop); Phase 2's done-when then waits for it.
   **Done:** rig PASS headless.
   **User check:** winch the log off the lane; it slides and rolls believably.
+  ❌ User check (2026-10-28): not accepted.
+  - Driving into or over the log rolls it; it should stay still.
+  - The cable hooks to the end of the log; it should pull from the middle of the trunk.
+  - Reeling pulls the jeep toward the log with no way to hold it.
+  Replanned as the fallen tree, S4-14..S4-19. The in-step anchor force stays.
 
-- [ ] **S4-10** Phase 2 playtest (user + agent, 1–2 h) _(requires S4-06..S4-09, S4-11..S4-13)_
-  Full loop on foot in `Lvl_Gym_Winch`: get stuck, get out, carry the hook, attach, get in, winch out; same on both slopes; lower the jeep down a slope on reel-out; log lane. All suites headless.
+### Playtest feedback (S4-09, 2026-10-28)
+
+Plan: [plans/2026-10-28-fallen-tree.md](plans/2026-10-28-fallen-tree.md) (critique round 1 + revision 1). Scenario: VISION.md → "Fallen tree". Order: S4-14 → S4-15 / S4-17 (parallel) → S4-16 → S4-18 → S4-19 → S4-10.
+- User decisions:
+  - Log: frozen until pulled (picked over a stump hinge, an always-simulated heavy log and our own planar solver).
+  - Handbrake: a normal handbrake while driving, plus a standstill hold while the hook is attached, so the winch pulls heavy objects. Not scaled on mud (see how it plays).
+  - Pad: handbrake moves from LB to B; pad A no longer brakes (LT does).
+  - Hints show both keys, like the prompt.
+  - Detach only on foot.
+  - The user creates `PM_B1Log` by hand. For the band material, the agent checks MCP first and asks if it can't.
+- ⚠️ **Physics first (user).** The log moves by Chaos alone: no hook-position rules, no scripted motion. Hooking at the middle probably won't open a passable gap, and that's expected: the player has to work out where to hook. Tuning touches only physical knobs (mass, friction, root ball). An authored root-end drag or standstill force needs the user's OK.
+- ⚠️ New thresholds are measured first, then held (as S4-05). Feel wins at the user check.
+- Out of scope: ramming damage (Phase 4), the jeep shoving a log the winch is pulling free, hook-position rules, scripted motion, stump hinge, planar solver, cutting the tree, hook or strap animation, last-used-device key display, several hooks.
+
+- [ ] **S4-14** Handbrake + winch hold, no in-car detach (3 h)
+  - **Input layout (user).** `IMC_Vehicle_Default` today (read 2026-10-28): `IA_Handbrake` on Space and pad LB; `IA_Brake` on S, LT and pad A; pad B free. Change it to:
+    - `IA_Handbrake` on Space + pad B (`Gamepad_FaceButton_Right`), with the LB binding removed;
+    - the pad A binding on `IA_Brake` removed (LT stays).
+
+    `AMudDriverPawn` already binds the handbrake (Started/Completed → `SetHandbrakeInput`). Space stays jump in `IMC_B1OnFoot` (separate context).
+  - **Hold.** Without the hook it's a normal Chaos handbrake. While the hook is attached, it adds a standstill hold in `FB1VehicleSimulation`. It's active when all of these are true:
+    - handbrake input on;
+    - hook attached;
+    - ≥ 3 wheels in contact;
+    - ground speed < `HandbrakeHoldSpeed` (30 cm/s).
+
+    Hold = −(this step's winch force + gravity along the ground), on the ground plane, plus a drift-killing velocity term. It's capped at `HandbrakeHoldForce` and applied at the COM, and it never pushes. Computed right after `UpdateWinch` in the same step, never from a cached force, and zero in the step the anchor clears. `HandbrakeHoldForce` (`Winch|Config`, default 80 kN) and `HandbrakeHoldSpeed` ride `FB1WinchSimInput`. Winch + hold go to `Mud.SetExternalForce` as one force.
+  - **No in-car detach.** Remove `IA_B1WinchDetach` from `IMC_Vehicle_Default`, along with `AB1Jeep::WinchDetachAction` and its binding. Delete the IA asset if nothing else references it. Cheat `B1WinchDetach` and the Winch window's Detach stay.
+  - **Debug.** `ShowDebug B1Winch`, the Winch window and the `B1Winch` telemetry show `hold=<N>` and whether it's active. The Winch window gets typed fields for the two new values plus "Save to asset" (imgui.md).
+  - ADR-007 amendment (handbrake hold, no in-car detach; supersedes the S4-13 detach key).
+
+  ⚠️ Note: Chaos's handbrake only acts on wheels with `bAffectedByHandbrake` (rear). That's fine: the hold does the rooting, not the wheels.
+  ⚠️ Note: mud isn't scaled. The hold works at full strength on mud too (user, 2026-10-28: see how it plays).
+
+  Rig: step `bHandbrake` already exists.
+  - `B1Winch_HandbrakeHold` (`Lvl_Gym_Winch`, firm, hooked to `Tree_FirmPull` by `WinchAnchor`): braked + handbrake, full pull 10 s → `lastDisp` ≤ 0.3 m, tension reaches the stall (≥ 95 % of `MaxPullForce`).
+  - `B1Winch_HandbrakeDetach`: the same, then a detach step while holding at the cap → jeep `lastDisp` ≤ 5 cm over the next 1 s (no phantom shove). Needs a rig detach step (`bWinchDetach`) if none exists.
+  - The existing tree rigs (no handbrake) are unchanged within 1 kN.
+
+  **Done:** builds; both rigs PASS headless; winch, mud and core suites PASS; the IMC list matches the layout above.
+  **User check:** hook a tree, hold B and reel in: the jeep stays put; let go of B: the jeep gets pulled; Y / Q do nothing in the jeep; A doesn't brake; B / Space work as a normal handbrake while driving.
+
+- [ ] **S4-15** Anchor areas + pull at the trunk axis (3 h)
+  - **Area.** `UB1WinchAnchorComponent` gets an area:
+    - `AreaStart` / `AreaEnd` (local points on the trunk axis) and `TrunkRadius`;
+    - `GetAreaPoint(Alpha)`, plus closest-point helpers for a world point or a ray.
+
+    The component's own location stops being the hook point.
+  - **Attach at a point.** `UB1WinchComponent::AttachTo(Anchor, AreaAlpha)` replaces the fixed point. The sim input, `IsInReach` and the interaction option point all use the area point. The S4-09 body-frame offset is taken from the area point (unscaled).
+  - **Force on the axis, cable on the surface.** The sim pulls at the axis point. The visual cable ends on the strap's surface on the side facing the winch.
+  - **Cable over a log.** `UB1WinchComponent::SetupCableCollision` also blocks PhysicsBody, so a cable lying across the log rests on it. Vehicles and pawns stay ignored.
+  - **Strap.** On attach, a static strap mesh appears at the point: a cylinder ring of radius `TrunkRadius` + 2 cm, 15 cm wide, solid black (`MI_B1WinchStrap`). It's removed on detach.
+  - **Assets.** `BP_B1WinchTree`: vertical area 40–160 cm, with the right radius. The log's area is set in S4-17 with its new body.
+  - **Callers.** `StartAnchor` gets `StartAnchorAlpha` (default 0.5). `B1WinchAttachNearest` attaches at the area point nearest the jeep. The rig's `WinchAnchor` step gets `WinchAnchorAlpha`.
+  - **Debug.** `ShowDebug B1Winch` draws the area segment and the hook point; the Winch window shows the alpha.
+
+  ⚠️ Note: every place that read the anchor component's location for the hook (option point, reach, sim input, cable, debug draw) has to switch; grep for it.
+
+  Rig: tree rigs re-run with alpha at the old anchor height (80 cm on a 40–160 area = 0.33), so the numbers match within 1 kN.
+
+  **Done:** builds; winch suite PASS (tree rigs unchanged); a Simulate capture shows the strap around a tree and the cable leaving its side.
+  **User check:** the hooked cable looks wrapped around the trunk, not floating next to it.
+
+- [ ] **S4-16** Hook placement ghost (3.5 h) _(requires S4-15)_
+  - **Aim.** `UB1HookAimComponent` on `AB1Character`. It ticks only while this character carries a hook. Each tick:
+    1. find anchors in the interaction range;
+    2. aim with the camera ray: a hit on the trunk is projected onto the area segment; otherwise take the closest point between the ray and the segment;
+    3. clamp to the area.
+  - **Aim result on the winch (ADR-019).** The component only computes. It writes `SetAimTarget(Anchor, Alpha)` on the carried winch (cleared when nothing is in reach). The option, the ability and the debug read it through `FindCarriedBy`, the hook state's one owner.
+  - **Ghost.** A yellow translucent band (`MI_B1WinchStrapGhost`, same ring as the strap) shown at the aimed point; hidden when nothing is in reach.
+  - **Attach.** The anchor's "Attach" option uses the aimed point as its interaction point and only appears on the aimed anchor. `GA_B1AttachHook` attaches at the aimed alpha. The prompt and the attach always agree (ADR-017).
+  - **Debug.** The Abilities panel or the Winch window shows the aimed anchor, the alpha and the distance.
+  - ADR-019 → accepted when the rig passes.
+
+  🔍 Research first: can MCP create a translucent unlit material (`MaterialTools` is in the toolset list)? If not, ask the user to create it (user, 2026-10-28).
+  ⚠️ Note: a thin standing tree is easy to miss with the ray, so the closest-point fallback is the normal case, not an edge case. The ray must ignore the character, the cable and the ghost.
+
+  Rig:
+  - step `LookAt` (world point or actor + offset → control rotation);
+  - metrics `hookAlpha=` and `hookPoint=`;
+  - `B1OnFoot_HookAim` (`Lvl_Gym_Winch`, by `Tree_FirmPull`):
+    - take the hook, look at 1.2 m height, interact → hook point within 10 cm of 1.2 m;
+    - detach, look at 3 m → clamped to 1.6 m.
+
+  **Done:** builds; `B1OnFoot_HookAim` PASS headless; `B1OnFoot_HookCarry` still PASS; PIE capture of the ghost band.
+  **User check:** carrying the hook, the yellow band follows your view along the trunk; on interact it turns into the black strap where you aimed.
+
+- [ ] **S4-17** Fallen log: frozen until pulled (ADR-018) (4 h) _(requires S4-15)_
+  - **Body restructure.** Today the root is the scaled trunk (actor scale 0.5 × 0.5 × 5), so children inherit the scale (the S4-09 scale bug class). New layout:
+    - root: an unscaled `UBoxComponent` (simulating, PhysicsActor, `PM_B1Log`) sized to the trunk. It's the flat-sided no-roll collision, with a clean body frame;
+    - trunk visual: a cylinder mesh child with no collision, scaled freely;
+    - root ball: a welded child primitive at one end with collision and its own mass. The compound mass puts the COM toward the root, so no `COMNudge`;
+    - `Anchor` on the box root (`GetSimulatingBody` reads the attach parent), with its area (S4-15) along most of the trunk.
+
+    Re-place `Log_FirmLane` at actor scale 1.
+  - **States.** Frozen (no simulation, blocks the jeep like a wall) and free (simulating).
+    - Frozen → free when the hooked winch's published `Tension` ≥ `BreakawayTension`.
+    - Free → frozen when tension < `BreakawayTension`, linear speed < 5 cm/s and angular speed < 2 °/s, all for `RefreezeDelay` (0.5 s).
+
+    It switches on the game thread (log tick, one frame late is fine). Config: `Log|Config`.
+  - **Winch side, already in place.** The winch sends `AnchorLocation` every tick (`B1WinchComponent.cpp:70`), and `GetSimulatingBody` checks `IsSimulatingPhysics` per call. So a frozen log is a static anchor at its current pose, and freeing it only adds the proxy to the next input. Verify that the rest length survives (no `AttachSerial` bump).
+  - **Physics only (user).** No hook-position logic and no forces on the log except the cable and Chaos.
+  - **Debug.**
+    - `ShowDebug B1Log`: the log draws its own state (frozen/free, tension vs breakaway, switch count, yaw since spawn) whatever the viewer's winch is.
+    - Each switch logged on `LogB1Winch` with the tension.
+    - NetImGui: log section in the Winch window with typed fields for the config (mass, root ball mass, breakaway, refreeze) + "Save to asset".
+    - Cheat `B1LogReset` (back to the placed pose, frozen).
+  - ADR-018 → accepted when S4-18's rigs pass.
+
+  🔍 Research first: does `SetSimulatePhysics` false ↔ true keep the same physics proxy and the body's pose and velocity? Do welded children stay welded across the toggle? If the proxy changes, the winch must pick up the new one without a stale handle (S4-09 clears it after each step).
+  ⚠️ Note: MCP can't create physical materials (mcp-tools.md). Ask the user to create `PM_B1Log` by hand, as with the mud materials (user, 2026-10-28).
+  ⚠️ Note: the S4-09 rig `B1Winch_Log` changes meaning; retire it or re-point it at the S4-18 rigs.
+
+  Rig: metrics `logState=` (end state), `logSwitches=`, `logMove=` (max anchor-body displacement), `logYaw=`; thresholds `MaxLogMove`, `MinLogYaw`, `ExpectLogState`.
+  - `B1Log_Ram`: 5 s full throttle into the log from 15 m → `logMove` ≤ 1 cm, `logSwitches` = 0.
+  - `B1Log_RamHooked`: the same with the hook attached and no pull.
+
+  **Done:** builds; both ram rigs PASS headless; winch suite PASS.
+  **User check:** drive into the log and over it: it doesn't move or roll.
+
+- [ ] **S4-18** Road lane + fallen tree tuning (4 h) _(requires S4-14, S4-16, S4-17)_
+  - **Road lane.** A banded road in `Lvl_Gym_Winch`, rebuilt from the log lane (X ~57 m, Y −57 m):
+    - firm road 6 m wide, closed off on both sides by bands (blocking posts + a striped band) the jeep can't pass;
+    - a ~10 m fallen tree across it, its root end past one band;
+    - a 30 m run-up.
+  - **Tuning, physical knobs only** (mass, `PM_B1Log` friction, root ball mass and size, contact shape), in this order:
+    1. **Breakaway lower bound.** Run `B1Log_PullNoHandbrake` with breakaway at the cap and read the tension a braked jeep reaches while dragged. Set `BreakawayTension` ≥ 1.2 × that.
+    2. **Tip vs middle.** With uniform friction turning about the root end, the tip needs about μ·m·g/2 and the middle about μ·m·g. Target tip resistance about 0.55–0.8 × cap, so the middle sits above the cap.
+    3. **Pivot.** The root has to push back with about the pull force to stay the pivot; otherwise the log turns about a point roughly 0.3 L from the far end. If `logPivot` > 1 m, try a heavier or wider root ball first. An authored root-end drag force only with the user's OK.
+
+    Record the final values and the numbers per step in the result.
+
+  Rig: metrics `logGap=`, `logPivot=` (distance of the turn centre from the root end, while turning), `logDrift=` (m/s in the last 5 s of pull); threshold `MinLogGap`. `logGap` = the shortest distance, measured across the road, from the free-side band line to the log's footprint (box corners + root ball), sampled across the road at the log's position.
+  - `B1Log_PullNoHandbrake`: alpha 0.9, braked only → the jeep is dragged toward the log; `logSwitches` = 0 once breakaway is set.
+  - `B1Log_PullEnd`: alpha 0.9 (free end), braked + handbrake, full pull → `logGap` ≥ 3 m within *measured* s (target ≤ 60 s); `logPivot` ≤ 1 m; jeep `lastDisp` ≤ 0.5 m; `logState` = frozen 2 s after the pull stops.
+  - `B1Log_PullMiddle`: alpha 0.5, same script → `logGap` smaller than in `PullEnd`, reported as is (physics first: no fixed mark). `logDrift` reported to catch Chaos creep; some creep is acceptable physics, and an authored standstill term only with the user's OK.
+  - `B1Log_DriveThrough`: the `PullEnd` script, then a detach step, then steer through the gap → the jeep passes 5 m beyond the log line.
+
+  ⚠️ Note: if the physical knobs can't make a door at all, stop and bring the numbers to the user rather than adding a scripted assist.
+
+  **Done:** the four rigs + the ram rigs PASS headless; all suites PASS; capture of the opened tree.
+  **User check:** the whole fallen tree scenario: ram it, get out, hook near the end, hold B, reel in, drive through the gap. Hooking at the middle struggles. It feels physical, not scripted.
+
+- [ ] **S4-19** Controls hints (2.5 h) _(requires S4-14)_
+  - **Data.** `UB1ControlHintSet` (data asset): entries of input action, label, required tags and blocked tags. `HintSet_B1Player` in `/Game/B1/Input`, set on `AB1PlayerController`.
+    - In the jeep: Drive (RT / W), Brake / reverse (LT / S), Steer, Handbrake (B / Space), Exit (X / E); Winch in/out (D-pad ↑↓ / arrows ↑↓) only with `Vehicle.State.WinchHooked`. These read right only after S4-14's mapping cleanup (no pad A brake, no LB handbrake), since the helper shows the first pad key.
+    - On foot: Move, Look, Jump. The interact prompt (S4-08) stays separate.
+  - **Widget.** `UB1ControlHintsWidget` (`Player/` or `UI/`, code-only like `UB1InteractionPromptWidget`) in the lower-left corner. It filters entries by the player ASC's tags and shows both keys ("RT / W  Drive"). Extract the key-text code from the prompt into a shared helper so both read keys the same way (Xbox letters for face buttons).
+  - **Tag.** New `Vehicle.State.WinchHooked`: the winch sets it on the owner's ASC while attached and the pawn is controlled (like `WinchingTag`, host-set property `HookedTag`).
+
+  ⚠️ Note: collapsed `UUserWidget`s don't tick (S4-08): keep the root visible.
+  ⚠️ Note: keys come from the mapping contexts, so a rebind updates the hints without touching the asset.
+
+  **Done:** builds; PIE captures in the jeep (unhooked, hooked) and on foot show the right lists; headless core and winch suites PASS with the widget on.
+  **User check:** the hints match what the controls do, and the winch line appears only when hooked.
+
+- [ ] **S4-10** Phase 2 playtest (user + agent, 1–2 h) _(requires S4-06..S4-08, S4-11..S4-19)_
+  Full loop on foot in `Lvl_Gym_Winch`: get stuck, get out, carry the hook, attach, get in, winch out; same on both slopes; lower the jeep down a slope on reel-out; the fallen tree scenario on the road lane (VISION.md). All suites headless.
   **Done:** all suites PASS; ROADMAP Phase 2 ticked.
   **User check:** sign-off on Phase 2.

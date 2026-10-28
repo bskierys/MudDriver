@@ -75,7 +75,7 @@ Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md]
 ---
 
 ## Phase 2 — On foot and winch (was Phase 4)
-**Status:** planned, Sprints 3–4 (plan: [2026-10-26-mud-winch-first](plans/2026-10-26-mud-winch-first.md))
+**Status:** in progress, Sprints 3–4 (plans: [2026-10-26-mud-winch-first](plans/2026-10-26-mud-winch-first.md), [2026-10-28-fallen-tree](plans/2026-10-28-fallen-tree.md))
 
 **Outcome.** Mud + winch is proven: the jeep that can't get out of deep mud or up a muddy slope on its own gets out and up with the winch. The player can get out, carry the hook to a tree or a log, get back in and winch out.
 
@@ -88,6 +88,12 @@ Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md]
 - [ ] Ability sets + input tags (ADR-014), `AB1Character`, mapping-context swap (Sprint 4)
 - [ ] `GA_B1EnterExitVehicle` (seat socket, engine off outside), cheats `B1ExitVehicle` / `B1EnterVehicle` (Sprint 4)
 - [ ] `GA_B1CarryWinchHook` with the cable as a leash, log pull via async physics tick (Sprint 4)
+- [ ] **Fallen tree** (replanned 2026-10-28 after the S4-09 playtest, plan [2026-10-28-fallen-tree](plans/2026-10-28-fallen-tree.md)), Sprint 4 S4-14..S4-19:
+  - handbrake on pad B / Space (pad LB and the pad A brake removed), holding the jeep in place while the hook is attached; no in-car detach (ADR-007 amendment);
+  - anchor areas: the cable pulls at the trunk axis; aimed hook placement with a ghost band → strap (ADR-019);
+  - fallen log frozen until the cable breaks it free, then sliding and turning by physics only: no hook-position rules or scripted motion (ADR-018, user's physics-first rule);
+  - banded road lane with a fallen tree in `Lvl_Gym_Winch`;
+  - controls hints in the lower-left corner.
 
 **Stretch.** Cable sag visuals, hook-in-hand mesh, animations, winch free-spool, character slowed in mud.
 
@@ -97,8 +103,12 @@ Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md]
 - On the medium slope at idle the jeep slides down slowly; on the deep slope it slides, then holds once sunk.
 - Winched, the jeep climbs the medium and deep slopes and leaves the deep strip.
 - Winch tension stays capped and stable at 20 and 120 fps.
-- A winched log moves ≥ 3 m toward the jeep.
-- The user signs off at the Sprint 3 checkpoint (mud + winch) and at the phase playtest (full loop on foot).
+- ~~A winched log moves ≥ 3 m toward the jeep.~~ Replaced 2026-10-28 by the fallen tree:
+  - ramming the tree, hooked or not, moves it ≤ 1 cm;
+  - hooked near its free end with the handbrake held, it swings open a ≥ 3 m gap about its root end while the jeep moves ≤ 0.5 m, and the jeep drives through;
+  - hooked at the middle, it opens less than hooked at the end (probably not passable; that's the puzzle);
+  - with the handbrake held and the hook on a tree, the jeep moves ≤ 0.3 m at full pull, and a detach mid-hold doesn't shove it.
+- The user signs off at the Sprint 3 checkpoint (mud + winch) and at the phase playtest (full loop on foot, including the fallen tree scenario from VISION.md).
 
 ---
 
@@ -122,7 +132,7 @@ Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md]
 
 **Outcome.** Speed has a cost: bumps, trees and branches damage the jeep, and vegetation reacts to it. Branches can be cleared with a machete.
 
-**Scope (minimum).** Impact damage from chassis hits, condition penalties, large tree (also a winch anchor), small tree (topples), bush (drag + scratch), breakable branch, `GA_B1Machete` (moved from the winch phase, uses the ADR-014 ability plumbing), `ShowDebug B1Obstacles`. The physics log moved to Phase 2.
+**Scope (minimum).** Impact damage from chassis hits, condition penalties, large tree (also a winch anchor), small tree (topples), bush (drag + scratch), breakable branch, `GA_B1Machete` (moved from the winch phase, uses the ADR-014 ability plumbing), `ShowDebug B1Obstacles`. The physics log moved to Phase 2. Ramming the fallen tree (Phase 2) costs condition.
 **Stretch.** Bush/branch WPO bending, break VFX, hit sounds.
 
 **Done when.**

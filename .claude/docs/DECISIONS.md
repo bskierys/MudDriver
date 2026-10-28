@@ -170,6 +170,11 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 - **Opposite force from the vehicle sim, same step.** For an anchor whose attach parent simulates, the winch sends its physics proxy and the anchor point in the body frame. `UpdateWinch` reads the anchor body's pose and velocity on the physics thread, damps on relative closing speed, and `ApplyDeferredForces` (the single-threaded pass after Chaos's parallel vehicle update) applies exactly −force plus its torque at the anchor point. No cross-thread read, no frame lag. Rejected: the log's own async tick reading the published tension (one step late, needs its own tick class), and game-thread `AddForce` (a frame late, not equal and opposite).
 - The anchor offset is unscaled (the body frame has no scale). An anchor unhooks its winches in `EndPlay`, so the sim never reads a destroyed body.
 
+**Amended 2026-10-28 (fallen tree replan, proposed; S4-14).** Supersedes the S4-13 detach key.
+- **Handbrake hold.** The handbrake (`IA_Handbrake`: Space and pad B; the template's pad LB removed, and pad A no longer brakes, user) is a normal Chaos handbrake. While the hook is attached, it also adds a standstill hold in `FB1VehicleSimulation`: −(this step's winch force + gravity along the ground) on the ground plane, plus a drift-killing velocity term. The hold is capped at `HandbrakeHoldForce` (`Winch|Config`, 80 kN > `MaxPullForce`) and only acts below `HandbrakeHoldSpeed` with ≥ 3 wheels down. It never pushes. It's computed right after `UpdateWinch` and is zero in the step the anchor clears, so a detach or a sudden drop in tension leaves no phantom shove. Winch + hold reach the mud sim as one external force. The goal: the winch pulls a heavy object toward the jeep instead of pulling the jeep in (user). Not scaled on mud (user: see how it plays).
+- **No in-car detach.** `IA_B1WinchDetach` goes away; the hook is taken off at the anchor on foot (user). The cheat and the Winch window's Detach stay as debug.
+- Rejected: a plain wheel lock (a heavy pull still drags the jeep); the hold on every handbrake (would change the driving handbrake for no gain, since the hold only matters with a hook).
+
 ---
 
 ## ADR-008 — Mud trails are visual only
@@ -380,3 +385,47 @@ The CVar is global; there's no per-vehicle or per-surface switch.
 **Alternatives.** Each interactable grants its own ability on overlap (Lyra's full version; grant churn on a single ASC). Per-feature input checks in each ability (duplicated range logic, prompt can drift). Line trace from the camera (fiddly for a big jeep and a thin tree; can be added as a tie-breaker later).
 
 **Verified.** `B1OnFoot_Interact` (`Lvl_Gym_Core`): walk up to `AB1TestInteractable`, press: interact + `GA_B1TestPing` (abilities = 2); walk 8 m away, press: nothing activates.
+
+---
+
+## ADR-018 — Fallen log: frozen until the cable breaks it free
+
+**Status:** proposed (2026-10-28, fallen tree replan; S4-17/18)
+
+**Problem.** The S4-09 log was a free-simulating cylinder. The jeep rolled it by driving over it, and the winch dragged it easily. The fallen tree (VISION.md) must not budge when rammed, hooked or not. It should move only when the cable pulls it hard enough, and then by physics, not along a path. Where it's hooked must matter: near an end it swings open like a door, at the middle it barely moves.
+
+**Decision.**
+- Two states on `AB1WinchLog`. **Frozen**: no simulation, a kinematic body the jeep can't move. **Free**: simulating.
+- Frozen → free when the hooked winch's published tension ≥ `BreakawayTension`. Free → frozen when tension is below it and the log has been at rest (< 5 cm/s, < 2 °/s) for `RefreezeDelay`. The switch runs on the game thread from the log's tick; the cable force on a free log stays in the vehicle sim's same-step pass (ADR-007).
+- A frozen log is a static anchor to the winch, so without the handbrake hold it pulls the jeep in, like a tree. `BreakawayTension` ≥ 1.2 × the measured tension of a braked jeep being dragged, so freeing the log takes the handbrake.
+- Body: an unscaled simulating box as the root (the flat-sided no-roll collision, with a clean body frame). The round trunk visual is a child with no collision. The root ball is a welded child primitive, and the compound mass puts the COM toward the root. High-friction physical material. The anchor attaches to the box root.
+- **Physics first (user).** Once free, only Chaos moves the log. No hook-position rules, no scripted motion, no authored forces. Where to hook comes out of friction and torque: turning about the root end takes about half the force at the tip that it takes at the middle. So near the tip the cap can swing it, and at the middle it probably can't, which is the intended puzzle. Tuning touches only physical knobs (mass, friction, root ball). An authored root-end drag or standstill term needs the user's OK.
+- The log draws its own state (`ShowDebug B1Log`) and logs each switch with the tension on `LogB1Winch`.
+
+**Rationale.** Ramming immunity costs nothing: a kinematic body is a wall to Chaos. The motion stays physical once it's free; a player who struggles beats a fake that always succeeds (user). No new physics-thread state, and a one-frame lag on a threshold doesn't matter. The unscaled root avoids the S4-09 scale bug class.
+
+**Alternatives.**
+- A stump hinge (the root end pinned to its stump; the most predictable "door", but the root can never slide).
+- Always simulated and heavy (ramming still nudges it, and its mass fights the winch and the jeep's grip).
+- Our own planar solver (full control, but we'd own its collision with the world).
+- Flipping the state on the physics thread inside `ApplyDeferredForces` (no lag, but it changes a body the game thread owns).
+
+---
+
+## ADR-019 — Winch anchors are areas; the hook is placed by aiming
+
+**Status:** proposed (2026-10-28, fallen tree replan; S4-15/16)
+
+**Problem.** Anchors were single points: an 80 cm point on a tree, an end cap on the log. The cable hung off the side of the trunk, and the player couldn't choose where to hook, which the fallen tree needs.
+
+**Decision.**
+- `UB1WinchAnchorComponent` describes an area: a segment on the trunk axis (`AreaStart` / `AreaEnd`) plus `TrunkRadius`. A hook position is an alpha along it.
+- The sim pulls at the axis point, so there's no roll torque from hooking on the side. The visual cable ends on a strap ring around the trunk, on the side facing the winch. The cable's particle sweeps also block PhysicsBody, so a cable across a log rests on it.
+- `UB1HookAimComponent` on the character, ticking only while carrying a hook. The camera ray picks the point: a trunk hit is projected onto the segment, otherwise the closest point between the ray and the segment, clamped to the area. It stores the result on the carried winch (`SetAimTarget(Anchor, Alpha)`), so the anchor's "Attach" option, `GA_B1AttachHook` and the debug read it through `FindCarriedBy`, keeping one owner of hook state (ADR-007). A yellow translucent ghost ring shows it. The prompt and the attach agree (ADR-017). On attach the ring becomes the solid black strap.
+
+**Rationale.** Gives the player free placement (The Alters-style ghost) with the same interaction scan and abilities. The axis point keeps the force clean. One component serves trees and logs.
+
+**Alternatives.**
+- Several fixed hook points per anchor (the user explicitly didn't want this).
+- A GAS targeting actor (`WaitTargetData` + world reticle; heavier, and the carry isn't a long-running ability today).
+- Hooking at the trunk surface point (adds torque that rolls a log).
