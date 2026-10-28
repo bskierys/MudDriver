@@ -10,6 +10,7 @@
 #include "B1VehicleMovementComponent.h"
 #include "B1MudVehicleComponent.h"
 #include "B1WinchAnchorComponent.h"
+#include "B1WinchLog.h"
 #include "Camera/CameraComponent.h"
 #include "B1WinchComponent.h"
 #include "AbilitySystemGlobals.h"
@@ -215,6 +216,15 @@ void AB1GymTestRig::StartTest()
 	Winch = Vehicle ? Vehicle->FindComponentByClass<UB1WinchComponent>() : nullptr;
 	bHookUsed = false;
 	MaxCarryDistance = 0.0f;
+
+	// Earlier rigs in the same round may have moved it.
+	TrackedLog = TargetLog ? TargetLog.Get() : Cast<AB1WinchLog>(WinchAnchor);
+	MaxLogMove = 0.0f;
+	if (TrackedLog)
+	{
+		TrackedLog->ResetToPlacedPose();
+	}
+
 	if (WinchAnchor)
 	{
 		UB1WinchAnchorComponent* Anchor = WinchAnchor->FindComponentByClass<UB1WinchAnchorComponent>();
@@ -603,6 +613,11 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 		}
 	}
 
+	if (TrackedLog)
+	{
+		MaxLogMove = FMath::Max(MaxLogMove, static_cast<float>(FVector::Dist(TrackedLog->GetActorLocation(), TrackedLog->GetPlacedTransform().GetLocation())));
+	}
+
 	StuckTimer = Speed < StuckSpeed ? StuckTimer + DeltaSeconds : 0.0f;
 	if (TimeToStuck < 0.0f && StuckTimer >= StuckHoldTime)
 	{
@@ -794,6 +809,32 @@ void AB1GymTestRig::FinishScript()
 		Winch = nullptr;
 	}
 
+	FString LogMetrics;
+	if (TrackedLog)
+	{
+		const bool bFree = TrackedLog->GetState() == EB1LogState::Free;
+		const float LogMove = MaxLogMove / CmPerM;
+		const float LogYaw = TrackedLog->GetYawSincePlaced();
+		if (Thresholds.MaxLogMove >= 0.0f && LogMove > Thresholds.MaxLogMove)
+		{
+			Failures.Add(FString::Printf(TEXT("logMove>%.3f"), Thresholds.MaxLogMove));
+		}
+		if (Thresholds.MinLogYaw >= 0.0f && FMath::Abs(LogYaw) < Thresholds.MinLogYaw)
+		{
+			Failures.Add(FString::Printf(TEXT("logYaw<%.1f"), Thresholds.MinLogYaw));
+		}
+		if (Thresholds.MaxLogSwitches >= 0 && TrackedLog->GetSwitchCount() > Thresholds.MaxLogSwitches)
+		{
+			Failures.Add(FString::Printf(TEXT("logSwitches>%d"), Thresholds.MaxLogSwitches));
+		}
+		if (Thresholds.ExpectLogState != EB1GymExpectLogState::Any && bFree != (Thresholds.ExpectLogState == EB1GymExpectLogState::Free))
+		{
+			Failures.Add(FString::Printf(TEXT("logState!=%s"), *UEnum::GetValueAsString(Thresholds.ExpectLogState)));
+		}
+		LogMetrics = FString::Printf(TEXT(" logState=%s logSwitches=%d logMove=%.3f logYaw=%.1f logMass=%.0f"), bFree ? TEXT("Free") : TEXT("Frozen"),
+			TrackedLog->GetSwitchCount(), LogMove, LogYaw, TrackedLog->GetMass());
+	}
+
 	FString FuelMetrics;
 	if (AbilitySystem)
 	{
@@ -884,9 +925,9 @@ void AB1GymTestRig::FinishScript()
 
 	const bool bPassed = Failures.Num() == 0;
 	const FString Name = TestLabel.IsEmpty() ? GetName() : TestLabel;
-	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f maxH=%.2f avgDt=%.4f frames=%d%s%s%s%s%s%s%s"),
+	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f maxH=%.2f avgDt=%.4f frames=%d%s%s%s%s%s%s%s%s"),
 		*Name, bPassed ? TEXT("PASS") : TEXT("FAIL"),
-		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, PeakHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics, *WinchMetrics, *FuelMetrics, *PlayerMetrics,
+		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, PeakHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics, *WinchMetrics, *LogMetrics, *FuelMetrics, *PlayerMetrics,
 		bPassed ? TEXT("") : TEXT(" failed="), *FString::Join(Failures, TEXT(",")));
 
 	UE_LOG(LogB1Test, Display, TEXT("%s"), *Line);

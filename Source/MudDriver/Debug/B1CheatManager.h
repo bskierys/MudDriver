@@ -40,6 +40,10 @@ public:
 	UFUNCTION(Exec)
 	void B1WinchDetach();
 
+	/** Every fallen log back to its placed pose, frozen */
+	UFUNCTION(Exec)
+	void B1LogReset();
+
 	/** Spawns the game mode's CharacterClass in front of the current pawn and possesses it */
 	UFUNCTION(Exec)
 	void B1SpawnCharacter();

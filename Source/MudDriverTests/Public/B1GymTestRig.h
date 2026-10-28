@@ -14,6 +14,7 @@ class UB1AbilitySystemComponent;
 class UB1WinchComponent;
 class UGameplayAbility;
 class AB1Character;
+class AB1WinchLog;
 
 UENUM()
 enum class EB1GymExpectAvatar : uint8
@@ -30,6 +31,14 @@ enum class EB1GymExpectHook : uint8
 	Stowed,
 	Carried,
 	Attached,
+};
+
+UENUM()
+enum class EB1GymExpectLogState : uint8
+{
+	Any,
+	Frozen,
+	Free,
 };
 
 USTRUCT(BlueprintType)
@@ -225,6 +234,20 @@ struct FB1GymThresholds
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	EB1GymExpectHook ExpectHook = EB1GymExpectHook::Any;
 
+	/** Peak log displacement from its placed pose; needs TargetLog or a log as WinchAnchor */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
+	float MaxLogMove = -1.0f;
+
+	/** |yaw| turned by the log at script end */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "deg"))
+	float MinLogYaw = -1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	int32 MaxLogSwitches = -1;
+
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	EB1GymExpectLogState ExpectLogState = EB1GymExpectLogState::Any;
+
 	/** Abilities activated on the PlayerState ASC during the script; needs bPossessWithPlayer */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	int32 MinAbilityActivations = -1;
@@ -307,6 +330,10 @@ protected:
 	/** The vehicle's winch hooks this actor's anchor at script start (rest = distance); steps set WinchPull */
 	UPROPERTY(EditInstanceOnly, Category = "B1Test|Config")
 	TObjectPtr<AActor> WinchAnchor;
+
+	/** Log metrics without hooking it; a log as WinchAnchor is tracked too. Reset to its placed pose at script start */
+	UPROPERTY(EditInstanceOnly, Category = "B1Test|Config")
+	TObjectPtr<AB1WinchLog> TargetLog;
 
 	/** Where on WinchAnchor's area; 1/3 is 80 cm on a tree, the pre-area hook height */
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config", meta = (ClampMin = "0", ClampMax = "1"))
@@ -439,6 +466,12 @@ private:
 	FFloatInterval LastStepTension;
 	/** Peak handbrake hold, N */
 	float MaxHold = 0.0f;
+
+	/** TargetLog or a log WinchAnchor */
+	UPROPERTY(Transient)
+	TObjectPtr<AB1WinchLog> TrackedLog;
+	/** cm */
+	float MaxLogMove = 0.0f;
 	/** cm */
 	float MaxAnchorDistance = 0.0f;
 	FVector AnchorStart = FVector::ZeroVector;

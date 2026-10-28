@@ -404,6 +404,12 @@ The CVar is global; there's no per-vehicle or per-surface switch.
 - **Physics first (user).** Once free, only Chaos moves the log. No hook-position rules, no scripted motion, no authored forces. Where to hook comes out of friction and torque: turning about the root end takes about half the force at the tip that it takes at the middle. So near the tip the cap can swing it, and at the middle it probably can't, which is the intended puzzle. Tuning touches only physical knobs (mass, friction, root ball). An authored root-end drag or standstill term needs the user's OK.
 - The log draws its own state (`ShowDebug B1Log`) and logs each switch with the tension on `LogB1Winch`.
 
+**Built (S4-17).**
+- `SetSimulatePhysics` only flips the kinematic flag on the same physics actor (`FBodyInstance::UpdateInstanceSimulatePhysics` → `SetIsKinematic_AssumesLocked`). So the proxy, pose and winch handle survive each switch.
+- Kinematic → simulated runs `ApplyWeldOnChildren`, so the root ball welds in on the first freeing (free mass 3300 kg = trunk + root ball) and stays welded when refrozen.
+- Switches log on `LogB1Physics` with the winch's lines; there is no `LogB1Winch`.
+- `B1Winch_Log` was retired.
+
 **Rationale.** Ramming immunity costs nothing: a kinematic body is a wall to Chaos. The motion stays physical once it's free; a player who struggles beats a fake that always succeeds (user). No new physics-thread state, and a one-frame lag on a threshold doesn't matter. The unscaled root avoids the S4-09 scale bug class.
 
 **Alternatives.**

@@ -1320,3 +1320,24 @@ S4-15 gave anchors areas; the player needed to choose the point. ADR-019 propose
 
 ### Open follow-ups
 - S4-17 fallen log (the user made `PM_B1Log`).
+
+## 2026-10-28 — S4-17: fallen log, frozen until pulled
+
+### Context
+S4-09's log rolled when driven over and was dragged too easily. ADR-018: kinematic until the cable tension reaches breakaway, then Chaos alone.
+
+### What was built
+- `AB1WinchLog` rebuilt: an unscaled `UBoxComponent` root (`Body`), `TrunkVisual` (no collision), a `RootBall` that welds when free, and an `Anchor` area. `Log|Shape` (1000 × 50 radius, root ball 100) is applied in `OnConstruction`; `Log|Config` holds masses, breakaway and refreeze. The tick switches frozen ↔ free.
+- `ShowDebug B1Log`, the Winch window "Log" section, cheat `B1LogReset`. Rig `TargetLog` plus log metrics and thresholds; rigs `B1Log_Ram` and `B1Log_RamHooked`. `B1Winch_Log` retired.
+- User check: the winch on the log works. After it, the log grew to 1 m (the jeep drove over 50 cm) and the user moved it to Y −47.5 m. Both ram rigs now stop the jeep without moving the log. Winch 32/32.
+
+### Decisions made
+- Switch logs go on `LogB1Physics` (no `LogB1Winch`). A slow push for the hooked ram: at full throttle, driving off snatched the slack cable and freed the log, which is right but not a ram.
+
+### What we learned
+- `SetSimulatePhysics` keeps the proxy (kinematic flag only), and freeing welds the children.
+- Renaming or removing a BP's C++ root orphans the placed instances' children (the `Anchor` sat at world coordinates). Check `get_parent_component` after a component layout change.
+- PowerShell variables are case-insensitive: `$o` overwrote `$O`.
+
+### Open follow-ups
+- S4-18 tuning (masses, breakaway, friction); S4-19 hints first (user).

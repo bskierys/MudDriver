@@ -1088,7 +1088,26 @@ Plan: [plans/2026-10-28-fallen-tree.md](plans/2026-10-28-fallen-tree.md) (critiq
   **Done:** builds; `B1OnFoot_HookAim` PASS headless; `B1OnFoot_HookCarry` still PASS; PIE capture of the ghost band.
   **User check:** carrying the hook, the yellow band follows your view along the trunk; on interact it turns into the black strap where you aimed.
 
-- [ ] **S4-17** Fallen log: frozen until pulled (ADR-018) (4 h) _(requires S4-15)_
+- [x] **S4-17** Fallen log: frozen until pulled (ADR-018) (4 h) _(requires S4-15)_ <!-- done: 2026-10-28 -->
+  Result:
+  - Research: `SetSimulatePhysics` false ↔ true keeps the same proxy (kinematic flag only), so the pose stays and the winch's per-call `GetSimulatingBody` check picks it up. Going simulated welds children (`ApplyWeldOnChildren`); welds stay when it goes kinematic again. No stale handle: the S4-09 sim already clears it every step.
+  - `AB1WinchLog` rebuilt:
+    - `Body` (unscaled `UBoxComponent` root, 1000 × 50 × 50 cm along X, PhysicsActor, starts kinematic);
+    - `TrunkVisual` (engine cylinder, no collision; new name so the old `Trunk` overrides can't re-apply);
+    - `RootBall` (engine sphere, 140 cm, collision, at the −X end, bottom flush with the box);
+    - `Anchor` area −400..+480 cm on X, radius 25.
+  - `Log|Config`: `TrunkMass` 1800, `RootBallMass` 1500 (mass overrides), `BreakawayTension` 40 kN (placeholder; measured in S4-18), `RefreezeDelay` 0.5 s, refreeze below 5 cm/s and 2 °/s. Tick: frozen → free at tension ≥ breakaway; free → frozen after the delay below breakaway and at rest. `ResetToPlacedPose`, `GetYawSincePlaced`, `GetMass` (welded mass when free).
+  - `BP_B1WinchLog`: `PM_B1Log` (user) on `Body` and `RootBall`, the stale 48 cm `Anchor` offset cleared. `Log_FirmLane` re-placed at scale 1, yaw 90 (across the lane), X 57.5 m, Y −57 m, Z 26 cm. Its instance `Anchor` had lost its parent with the old root (sitting at world coordinates); re-parented to `Body` through MCP.
+  - Debug: `ShowDebug B1Log` (the log's own HUD binding: state, tension vs breakaway, switches, yaw, mass), switch lines on `LogB1Physics`, Winch window "Log" section (nearest log: state, bar, typed mass / breakaway / refreeze fields, Reset, Save log to asset), cheat `B1LogReset`.
+  - Rig: `TargetLog` (or a log as `WinchAnchor`; reset to its placed pose at script start), metrics `logState logSwitches logMove logYaw logMass`, thresholds `MaxLogMove`, `MinLogYaw`, `MaxLogSwitches`, `ExpectLogState`. `B1Winch_Log` retired (deleted).
+    - `B1Log_Ram` (`B1Tests/Log`, X 42.5 m, 15 m from the log): 5 s full throttle. Hits at speed and jumps it (vmax 22 m/s): logMove 0.000, switches 0, frozen.
+    - `B1Log_RamHooked` (same spot, hooked at alpha 0.5, pull 0): throttle 0.4 for 6 s, brake, handbrake. Climbs over at 6 m/s, tension ≤ 92 N: logMove 0.000, switches 0. The first full-throttle version ran 7 m past and snatched the slack cable to 60 kN, which freed the log: correct physics for driving off while hooked, not a ram.
+  - Headless winch 32/32 (`s417_winch2.log`). ADR-018 stays proposed until S4-18's rigs pass.
+  - User check round 1 (2026-10-28): the winch on the log works. But the 50 cm log was easy to drive over (it should stop the jeep), and it sat too close to the edge, so the user moved it to Y −47.5 m.
+    - New `Log|Shape` (`TrunkLength` 1000, `TrunkRadius` 50, `RootBallRadius` 100), applied in `OnConstruction` to the box, visual, root ball and anchor area: a 1 m trunk with a 2 m root ball.
+    - `Log_FirmLane` at Z 51 (resting on the floor); both ram rigs moved to Y −47.5 m.
+    - `B1Log_Ram`: hits at 13.9 m/s and stops, maxH −0.94 (no climb), logMove 0.000. `B1Log_RamHooked`: stops against it, tension ≤ 71 N, logMove 0.000.
+    - Masses unchanged (tuning is S4-18). Winch 32/32 (`s417_winch3.log`).
   - **Body restructure.** Today the root is the scaled trunk (actor scale 0.5 × 0.5 × 5), so children inherit the scale (the S4-09 scale bug class). New layout:
     - root: an unscaled `UBoxComponent` (simulating, PhysicsActor, `PM_B1Log`) sized to the trunk. It's the flat-sided no-roll collision, with a clean body frame;
     - trunk visual: a cylinder mesh child with no collision, scaled freely;

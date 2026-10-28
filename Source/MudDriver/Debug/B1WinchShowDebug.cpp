@@ -1,6 +1,7 @@
 #include "B1WinchShowDebug.h"
 #include "B1WinchAnchorComponent.h"
 #include "B1WinchComponent.h"
+#include "B1WinchLog.h"
 #include "DisplayDebugHelpers.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
@@ -12,6 +13,7 @@
 namespace B1WinchShowDebug
 {
 	const FName Category(TEXT("B1Winch"));
+	const FName LogCategory(TEXT("B1Log"));
 
 	static constexpr float WinchTextHeight = 100.0f;
 	static constexpr float AnchorTextHeight = 250.0f;
@@ -108,5 +110,20 @@ namespace B1WinchShowDebug
 		{
 			DrawAnchors(Canvas, Winch);
 		}
+	}
+
+	void DrawLog(UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, const AB1WinchLog& Log)
+	{
+		if (!Canvas || !DisplayInfo.IsDisplayOn(LogCategory))
+		{
+			return;
+		}
+
+		const bool bFree = Log.GetState() == EB1LogState::Free;
+		TArray<FString> Lines;
+		Lines.Add(FString::Printf(TEXT("%s  %s"), *Log.GetActorNameOrLabel(), bFree ? TEXT("FREE") : TEXT("frozen")));
+		Lines.Add(FString::Printf(TEXT("tension %5.1f / breakaway %.1f kN"), Log.GetTension() / 1000.0f, Log.BreakawayTension / 1000.0f));
+		Lines.Add(FString::Printf(TEXT("switches %d  yaw %+.1f deg  mass %.0f kg"), Log.GetSwitchCount(), Log.GetYawSincePlaced(), Log.GetMass()));
+		DrawLines(Canvas, Log.GetActorLocation() + FVector(0.0f, 0.0f, WinchTextHeight), Lines, bFree ? FColor::Yellow : FColor(140, 200, 255));
 	}
 }

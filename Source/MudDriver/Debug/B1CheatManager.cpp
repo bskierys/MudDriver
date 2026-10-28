@@ -5,6 +5,7 @@
 #include "B1MudVehicleComponent.h"
 #include "B1WinchComponent.h"
 #include "B1WinchAnchorComponent.h"
+#include "B1WinchLog.h"
 #include "B1PlayerState.h"
 #include "B1Character.h"
 #include "B1GameMode.h"
@@ -131,6 +132,17 @@ void UB1CheatManager::B1WinchDetach()
 	{
 		Winch->Detach();
 	}
+}
+
+void UB1CheatManager::B1LogReset()
+{
+	int32 NumLogs = 0;
+	for (AB1WinchLog* Log : TActorRange<AB1WinchLog>(GetWorld()))
+	{
+		Log->ResetToPlacedPose();
+		++NumLogs;
+	}
+	UE_LOG(LogB1Physics, Log, TEXT("B1LogReset: %d log(s) back to their placed pose"), NumLogs);
 }
 
 void UB1CheatManager::B1SpawnCharacter()

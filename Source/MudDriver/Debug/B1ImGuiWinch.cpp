@@ -6,7 +6,9 @@
 #include "B1PhysicalMaterial_Mud.h"
 #include "B1WinchAnchorComponent.h"
 #include "B1WinchComponent.h"
+#include "B1WinchLog.h"
 #include "AbilitySystemComponent.h"
+#include "EngineUtils.h"
 #include "AbilitySystemGlobals.h"
 #include "NetImguiModule.h"
 #include "Engine/Blueprint.h"
@@ -114,6 +116,84 @@ namespace B1ImGui
 	}
 #endif
 
+#if NETIMGUI_ENABLED
+#if WITH_EDITOR
+	/** Copies Log|Config to the log BP's CDO and saves the BP */
+	static bool SaveLogDefaults(const AB1WinchLog& Log)
+	{
+		AB1WinchLog* Defaults = Cast<AB1WinchLog>(Log.GetClass()->GetDefaultObject());
+		UBlueprint* Blueprint = Cast<UBlueprint>(Log.GetClass()->ClassGeneratedBy);
+		if (!Defaults || !Blueprint)
+		{
+			return false;
+		}
+
+		Defaults->Modify();
+		Defaults->TrunkMass = Log.TrunkMass;
+		Defaults->RootBallMass = Log.RootBallMass;
+		Defaults->BreakawayTension = Log.BreakawayTension;
+		Defaults->RefreezeDelay = Log.RefreezeDelay;
+		Defaults->MarkPackageDirty();
+		return SaveAssetPackage(*Blueprint);
+	}
+#endif
+
+	/** Nearest fallen log to the player: state, config and reset */
+	static void DrawLogSection(UWorld* World, const APawn* PlayerPawn)
+	{
+		AB1WinchLog* Log = nullptr;
+		double NearestDistSq = TNumericLimits<double>::Max();
+		for (AB1WinchLog* Candidate : TActorRange<AB1WinchLog>(World))
+		{
+			const double DistSq = PlayerPawn ? FVector::DistSquared(PlayerPawn->GetActorLocation(), Candidate->GetActorLocation()) : 0.0;
+			if (DistSq < NearestDistSq)
+			{
+				NearestDistSq = DistSq;
+				Log = Candidate;
+			}
+		}
+		if (!Log || !ImGui::CollapsingHeader("Log", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			return;
+		}
+
+		const bool bFree = Log->GetState() == EB1LogState::Free;
+		ImGui::Text("%s: %s, %.1f m away", TCHAR_TO_UTF8(*Log->GetActorNameOrLabel()), bFree ? "FREE" : "frozen", FMath::Sqrt(NearestDistSq) / 100.0f);
+		DrawBar("Tension / breakaway kN", Log->GetTension() / 1000.0f, Log->BreakawayTension / 1000.0f);
+		ImGui::Text("Switches %d  yaw %+.1f deg  mass %.0f kg", Log->GetSwitchCount(), Log->GetYawSincePlaced(), Log->GetMass());
+		if (ImGui::Button("Reset log"))
+		{
+			Log->ResetToPlacedPose();
+		}
+
+		static TSet<TWeakObjectPtr<AB1WinchLog>> Edited;
+		bool bMassChanged = false;
+		bMassChanged |= DragFloatTyped("Trunk kg", &Log->TrunkMass, 10.0f, 1.0f, 20000.0f, "%.0f");
+		bMassChanged |= DragFloatTyped("Root ball kg", &Log->RootBallMass, 10.0f, 1.0f, 20000.0f, "%.0f");
+		bool bChanged = bMassChanged;
+		bChanged |= DragFloatTyped("Breakaway N", &Log->BreakawayTension, 100.0f, 0.0f, 200000.0f, "%.0f");
+		bChanged |= DragFloatTyped("Refreeze s", &Log->RefreezeDelay, 0.05f, 0.0f, 10.0f, "%.2f");
+		if (bMassChanged)
+		{
+			Log->ApplyMass();
+		}
+		if (bChanged)
+		{
+			Edited.Add(Log);
+		}
+#if WITH_EDITOR
+		ImGui::BeginDisabled(!Edited.Contains(Log));
+		if (ImGui::Button("Save log to asset"))
+		{
+			const bool bSaved = SaveLogDefaults(*Log);
+			UE_LOG(LogB1Physics, Log, TEXT("Log defaults of %s %s"), *GetNameSafe(Log->GetClass()), bSaved ? TEXT("saved") : TEXT("FAILED to save (not a BP log?)"));
+			Edited.Remove(Log);
+		}
+		ImGui::EndDisabled();
+#endif
+	}
+#endif
+
 	void DrawWinch(UWorld* World, bool* bOpen)
 	{
 #if NETIMGUI_ENABLED
@@ -134,6 +214,7 @@ namespace B1ImGui
 		if (!Winch || !Vehicle)
 		{
 			ImGui::TextDisabled("No winch on the player's pawn or in their hand");
+			DrawLogSection(World, PlayerPawn);
 			ImGui::End();
 			return;
 		}
@@ -212,6 +293,8 @@ namespace B1ImGui
 		{
 			DrawParams(*Winch);
 		}
+
+		DrawLogSection(World, PlayerPawn);
 
 		ImGui::End();
 #endif
