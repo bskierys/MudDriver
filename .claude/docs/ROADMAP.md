@@ -75,20 +75,20 @@ Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md]
 ---
 
 ## Phase 2 — On foot and winch (was Phase 4)
-**Status:** in progress, Sprints 3–4 (plans: [2026-10-26-mud-winch-first](plans/2026-10-26-mud-winch-first.md), [2026-10-28-fallen-tree](plans/2026-10-28-fallen-tree.md))
+**Status:** done (Sprints 3–4, user sign-off 2026-10-28) (plans: [2026-10-26-mud-winch-first](plans/2026-10-26-mud-winch-first.md), [2026-10-28-fallen-tree](plans/2026-10-28-fallen-tree.md))
 
 **Outcome.** Mud + winch is proven: the jeep that can't get out of deep mud or up a muddy slope on its own gets out and up with the winch. The player can get out, carry the hook to a tree or a log, get back in and winch out.
 
 **Scope (minimum).**
-- [ ] Slope rules (ADR-001 amendment): net-force standstill rule, slope hold by absolute sink depth (Sprint 3)
-- [ ] `Lvl_Gym_Winch`: deep strip, firm/medium/deep slopes, log lane, anchor trees (Sprints 3–4)
-- [ ] `UB1WinchComponent` + `UB1WinchAnchorComponent`, physics-thread tension at the winch point, counted as push in the drag caps, native analog pull input (ADR-007 amendment) (Sprint 3)
-- [ ] Winch debug: NetImGui "Winch", `B1Winch` telemetry, `ShowDebug B1Winch`, cheats `B1WinchAttachNearest` / `B1WinchDetach`, rig winch support (Sprint 3)
-- [ ] **Checkpoint:** mud + winch playtest via cheat attach, end of Sprint 3
-- [ ] Ability sets + input tags (ADR-014), `AB1Character`, mapping-context swap (Sprint 4)
-- [ ] `GA_B1EnterExitVehicle` (seat socket, engine off outside), cheats `B1ExitVehicle` / `B1EnterVehicle` (Sprint 4)
-- [ ] `GA_B1CarryWinchHook` with the cable as a leash, log pull via async physics tick (Sprint 4)
-- [ ] **Fallen tree** (replanned 2026-10-28 after the S4-09 playtest, plan [2026-10-28-fallen-tree](plans/2026-10-28-fallen-tree.md)), Sprint 4 S4-14..S4-19:
+- [x] Slope rules (ADR-001 amendment): net-force standstill rule, slope hold by absolute sink depth (Sprint 3)
+- [x] `Lvl_Gym_Winch`: deep strip, firm/medium/deep slopes, log lane, anchor trees (Sprints 3–4)
+- [x] `UB1WinchComponent` + `UB1WinchAnchorComponent`, physics-thread tension at the winch point, counted as push in the drag caps, native analog pull input (ADR-007 amendment) (Sprint 3)
+- [x] Winch debug: NetImGui "Winch", `B1Winch` telemetry, `ShowDebug B1Winch`, cheats `B1WinchAttachNearest` / `B1WinchDetach`, rig winch support (Sprint 3)
+- [x] **Checkpoint:** mud + winch playtest via cheat attach, end of Sprint 3
+- [x] Ability sets + input tags (ADR-014), `AB1Character`, mapping-context swap (Sprint 4)
+- [x] `GA_B1EnterExitVehicle` (seat socket, engine off outside), cheats `B1ExitVehicle` / `B1EnterVehicle` (Sprint 4)
+- [x] `GA_B1CarryWinchHook` with the cable as a leash, log pull via async physics tick (Sprint 4)
+- [x] **Fallen tree** (replanned 2026-10-28 after the S4-09 playtest, plan [2026-10-28-fallen-tree](plans/2026-10-28-fallen-tree.md)), Sprint 4 S4-14..S4-19:
   - handbrake on pad B / Space (pad LB and the pad A brake removed), holding the jeep in place while the hook is attached; no in-car detach (ADR-007 amendment);
   - anchor areas: the cable pulls at the trunk axis; aimed hook placement with a ghost band → strap (ADR-019);
   - fallen log frozen until the cable breaks it free, then sliding and turning by physics only: no hook-position rules or scripted motion (ADR-018, user's physics-first rule);

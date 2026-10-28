@@ -1389,3 +1389,16 @@ Last task before the Phase 2 playtest. The frozen log from S4-17 needed a road a
 ### Open follow-ups
 - S4-10 Phase 2 playtest, with the fallen tree scenario on the user's road.
 - Backlog: mud idle check reading empty inputs (S4-14) is still unverified.
+
+## 2026-10-28 — S4-10: Phase 2 closed
+
+### Context
+Last Sprint 4 task: the Phase 2 playtest after the fallen tree work (S4-14..S4-19) and the taut-cable fix.
+
+### What was built
+- Agent half: all suites headless on the final build (winch 36/36 on the user's 12 m road, core 12/12, mud 22/22).
+- User playtest of the full loop and sign-off. ROADMAP Phase 2 ticked and marked done.
+
+### Open follow-ups
+- Next is Phase 3 (River): replan with `/plan-new` before starting.
+- Backlog: mud idle check reading empty inputs (S4-14) is still unverified.

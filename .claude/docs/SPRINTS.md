@@ -1203,7 +1203,9 @@ Plan: [plans/2026-10-28-fallen-tree.md](plans/2026-10-28-fallen-tree.md) (critiq
   **Done:** builds; PIE captures in the jeep (unhooked, hooked) and on foot show the right lists; headless core and winch suites PASS with the widget on.
   **User check:** the hints match what the controls do, and the winch line appears only when hooked.
 
-- [ ] **S4-10** Phase 2 playtest (user + agent, 1–2 h) _(requires S4-06..S4-08, S4-11..S4-19)_
+- [x] **S4-10** Phase 2 playtest (user + agent, 1–2 h) _(requires S4-06..S4-08, S4-11..S4-19)_ <!-- done: 2026-10-28 -->
+  User sign-off (2026-10-28): happy with the results; Phase 2 closed.
+  Agent part (2026-10-28, after the taut-cable build `182f282`): headless winch 36/36 (`s418_winch2.log`, on the user's 12 m road), core 12/12 (`s410_core.log`), mud 22/22 (`s410_mud.log`). Waiting on the user's playtest and sign-off.
   Full loop on foot in `Lvl_Gym_Winch`: get stuck, get out, carry the hook, attach, get in, winch out; same on both slopes; lower the jeep down a slope on reel-out; the fallen tree scenario on the road lane (VISION.md). All suites headless.
   **Done:** all suites PASS; ROADMAP Phase 2 ticked.
   **User check:** sign-off on Phase 2.
