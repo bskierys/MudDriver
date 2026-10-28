@@ -120,6 +120,8 @@ void UB1WinchComponent::ReadSimOutput()
 	if (Cable)
 	{
 		Cable->CableLength = RestLength;
+		// The verlet chain can't converge against gravity over this many segments, so a loaded cable drops it instead.
+		Cable->CableGravityScale = 1.0f - FMath::Clamp(Tension / CableTautTension, 0.0f, 1.0f);
 	}
 }
 
@@ -290,6 +292,7 @@ void UB1WinchComponent::CarryTo(USceneComponent& Hand, float Length)
 	{
 		Cable->SetAttachEndToComponent(&Hand);
 		Cable->CableLength = CarryLength;
+		Cable->CableGravityScale = 1.0f;
 	}
 	else
 	{

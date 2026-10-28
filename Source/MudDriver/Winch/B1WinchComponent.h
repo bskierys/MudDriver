@@ -89,6 +89,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Winch|Visual", meta = (ClampMin = "1"))
 	int32 CableSolverIterations = 16;
 
+	/** Tension at which the visual cable loses all gravity and pulls straight; a slack cable keeps full gravity and sags */
+	UPROPERTY(EditAnywhere, Category = "Winch|Visual", meta = (Units = "N", ClampMin = "1"))
+	float CableTautTension = 5000.0f;
+
 	/** Visual cable rests on WorldStatic, WorldDynamic and the mud surface; vehicles and pawns are ignored */
 	UPROPERTY(EditAnywhere, Category = "Winch|Visual")
 	bool bCableCollision = true;

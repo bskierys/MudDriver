@@ -79,6 +79,7 @@ namespace B1ImGui
 		Archetype->CableDamping = Winch.CableDamping;
 		Archetype->HandbrakeHoldForce = Winch.HandbrakeHoldForce;
 		Archetype->HandbrakeHoldSpeed = Winch.HandbrakeHoldSpeed;
+		Archetype->CableTautTension = Winch.CableTautTension;
 		Archetype->MarkPackageDirty();
 		return SaveAssetPackage(*Blueprint);
 	}
@@ -97,6 +98,7 @@ namespace B1ImGui
 		bChanged |= DragFloatTyped("Damping N*s/m", &Winch.CableDamping, 100.0f, 0.0f, 500000.0f, "%.0f");
 		bChanged |= DragFloatTyped("Hold N", &Winch.HandbrakeHoldForce, 100.0f, 0.0f, 300000.0f, "%.0f");
 		bChanged |= DragFloatTyped("Hold below cm/s", &Winch.HandbrakeHoldSpeed, 1.0f, 0.0f, 500.0f, "%.0f");
+		bChanged |= DragFloatTyped("Cable taut at N", &Winch.CableTautTension, 100.0f, 1.0f, 100000.0f, "%.0f");
 		if (bChanged)
 		{
 			Edited.Add(&Winch);
