@@ -6,7 +6,7 @@
 -->
 
 # gdep Agent Context
-> Generated: 2026-10-27  |  Engine: UNREAL · Unreal Engine 5.8 · (C++)  |  Project: MudDriver
+> Generated: 2026-10-28  |  Engine: UNREAL · Unreal Engine 5.8 · (C++)  |  Project: MudDriver
 
 ## Project Analysis Tools
 

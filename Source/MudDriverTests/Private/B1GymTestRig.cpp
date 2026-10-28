@@ -225,6 +225,8 @@ void AB1GymTestRig::StartTest()
 			FinishTest(EFunctionalTestResult::Error, TEXT("WinchAnchor is out of the cable's reach"));
 			return;
 		}
+		AnchorStart = WinchAnchor->GetActorLocation();
+		AnchorPullDirection = (Winch->GetComponentLocation() - Anchor->GetComponentLocation()).GetSafeNormal();
 	}
 	if (!Winch && Thresholds.ExpectHook != EB1GymExpectHook::Any)
 	{
@@ -723,6 +725,12 @@ void AB1GymTestRig::FinishScript()
 			Failures.Add(FString::Printf(TEXT("anchorDistMax>%.2f"), Thresholds.MaxAnchorDistance));
 		}
 
+		const float AnchorTravel = WinchAnchor ? ((WinchAnchor->GetActorLocation() - AnchorStart) | AnchorPullDirection) / CmPerM : 0.0f;
+		if (Thresholds.MinAnchorTravel >= 0.0f && AnchorTravel < Thresholds.MinAnchorTravel)
+		{
+			Failures.Add(FString::Printf(TEXT("anchorTravel<%.2f"), Thresholds.MinAnchorTravel));
+		}
+
 		if (Thresholds.MinLastStepTension >= 0.0f && TensionMinLast < Thresholds.MinLastStepTension)
 		{
 			Failures.Add(FString::Printf(TEXT("tensionMinLast<%.0f"), Thresholds.MinLastStepTension));
@@ -732,8 +740,8 @@ void AB1GymTestRig::FinishScript()
 			Failures.Add(FString::Printf(TEXT("rest>%.2f"), Thresholds.MaxRestLength));
 		}
 
-		WinchMetrics += FString::Printf(TEXT(" tensionMax=%.0f tensionOsc=%.0f tensionMinLast=%.0f anchorDistMax=%.2f rest=%.2f vmaxLast=%.2f"),
-			MaxTension, TensionOscillation, TensionMinLast, AnchorDistance, RestLength, LastStepMaxSpeed);
+		WinchMetrics += FString::Printf(TEXT(" tensionMax=%.0f tensionOsc=%.0f tensionMinLast=%.0f anchorDistMax=%.2f rest=%.2f vmaxLast=%.2f anchorTravel=%.2f"),
+			MaxTension, TensionOscillation, TensionMinLast, AnchorDistance, RestLength, LastStepMaxSpeed, AnchorTravel);
 		Winch->Detach();
 		Winch = nullptr;
 	}

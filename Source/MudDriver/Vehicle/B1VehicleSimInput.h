@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "B1VehicleSimInput.generated.h"
 
+namespace Chaos { class FSingleParticlePhysicsProxy; }
+
 UENUM()
 enum class EB1TestForce : uint8
 {
@@ -41,6 +43,11 @@ struct FB1WinchSimInput
 {
 	bool bAttached = false;
 	FVector AnchorLocation = FVector::ZeroVector;
+
+	/** Simulating anchor body (log); the sim reads its pose in-step and gives it the opposite force */
+	Chaos::FSingleParticlePhysicsProxy* AnchorProxy = nullptr;
+	/** In AnchorProxy's body frame */
+	FVector AnchorPointLocal = FVector::ZeroVector;
 
 	/** In the body's frame, so the sim moves it with the body each step */
 	FVector WinchPointLocal = FVector::ZeroVector;

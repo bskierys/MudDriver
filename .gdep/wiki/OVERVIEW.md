@@ -2,22 +2,22 @@
 title: Project Overview
 type: overview
 engine: UNREAL · Unreal Engine 5.8 · (C++)
-updated: 2026-10-27
+updated: 2026-10-28
 stale: false
 ---
 
 # MudDriver — Project Overview
 
 > Engine: UNREAL · Unreal Engine 5.8 · (C++)  |  Source: `E:\GameDev\Projects\MudDriver\Source`
-> Generated: 2026-10-27
+> Generated: 2026-10-28
 > Regenerate: `gdep init <project_path> --force`
 
 ## Codebase Snapshot
 
 | Metric | Value |
 |--------|-------|
-| Files | **63** |
-| Classes | **66** |
+| Files | **64** |
+| Classes | **68** |
 | Circular deps | **0** |
 | Dead code candidates | **0** |
 
@@ -42,7 +42,7 @@ stale: false
 - GameplayTags (in assets): 0 high-confidence / 22 low
 - GAS .uassets — IS-A: GA 8 / GE 3 / AS 0 / ABP 1  |  Referencers: 8
 - Analysis confidence: **HIGH** (cpp_source_regex + binary_pattern_match)
-- Coverage: 148/148 assets (100.0%)
+- Coverage: 149/149 assets (100.0%)
 
 ---
 See [[index]] for the full wiki page catalog.

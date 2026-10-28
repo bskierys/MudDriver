@@ -191,6 +191,10 @@ struct FB1GymThresholds
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
 	float MaxAnchorDistance = -1.0f;
 
+	/** WinchAnchor's travel toward the winch point at script start, for a movable anchor (log) */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
+	float MinAnchorTravel = -1.0f;
+
 	/** Peak winch point to hand distance while the hook is carried */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
 	float MaxCarryDistance = -1.0f;
@@ -405,6 +409,9 @@ private:
 	FFloatInterval LastStepTension;
 	/** cm */
 	float MaxAnchorDistance = 0.0f;
+	FVector AnchorStart = FVector::ZeroVector;
+	/** Unit, anchor to winch point at script start */
+	FVector AnchorPullDirection = FVector::ZeroVector;
 
 	float TautTime = -1.0f;
 	FFloatInterval StretchFirst;

@@ -2,6 +2,7 @@
 #include "B1WinchComponent.h"
 #include "B1Character.h"
 #include "B1GameplayTags.h"
+#include "Components/PrimitiveComponent.h"
 #include "UObject/UObjectIterator.h"
 
 void UB1WinchAnchorComponent::GatherInteractionOptions(const AB1Character& Character, TArray<FB1InteractionOption>& Options) const
@@ -29,6 +30,22 @@ void UB1WinchAnchorComponent::GatherInteractionOptions(const AB1Character& Chara
 		return;
 	}
 	Options.Add(MoveTemp(Option));
+}
+
+UPrimitiveComponent* UB1WinchAnchorComponent::GetSimulatingBody() const
+{
+	UPrimitiveComponent* Body = Cast<UPrimitiveComponent>(GetAttachParent());
+	return Body && Body->IsSimulatingPhysics() && Body->GetBodyInstance() ? Body : nullptr;
+}
+
+void UB1WinchAnchorComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	while (UB1WinchComponent* Winch = UB1WinchComponent::FindAttachedTo(this))
+	{
+		Winch->Detach();
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 UB1WinchAnchorComponent* UB1WinchAnchorComponent::FindNearest(const UWorld* World, const FVector& Location, float MaxDistance)

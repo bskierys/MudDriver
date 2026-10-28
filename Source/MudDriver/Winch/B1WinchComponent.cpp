@@ -6,6 +6,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "CableComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/UObjectIterator.h"
@@ -67,6 +68,12 @@ void UB1WinchComponent::SendSimInput()
 		const USceneComponent* Body = Movement->UpdatedComponent;
 		Input.bAttached = true;
 		Input.AnchorLocation = AnchorComponent->GetComponentLocation();
+		if (const UPrimitiveComponent* AnchorBody = AnchorComponent->GetSimulatingBody())
+		{
+			Input.AnchorProxy = AnchorBody->GetBodyInstance()->GetPhysicsActor();
+			// The physics body frame has no scale, so no GetRelativeTransform (a scaled log would put the point off).
+			Input.AnchorPointLocal = AnchorBody->GetComponentQuat().UnrotateVector(AnchorComponent->GetComponentLocation() - AnchorBody->GetComponentLocation());
+		}
 		Input.WinchPointLocal = Body ? GetComponentTransform().GetRelativeTransform(Body->GetComponentTransform()).GetLocation() : FVector::ZeroVector;
 		Input.AttachSerial = AttachSerial;
 		Input.InitialRestLength = InitialRestLength;

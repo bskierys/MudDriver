@@ -953,7 +953,14 @@ Why now, not backlog: mud and fuel must be copyable into another project with a 
   **Done:** builds; the panel opens in PIE (capture).
   **User check:** you always know what the interact key will do; the debug views read the carry state and the abilities panel helps while testing.
 
-- [ ] **S4-09** Winchable log (3 h) _(requires S4-01)_
+- [x] **S4-09** Winchable log (3 h) _(requires S4-01)_ <!-- done: 2026-10-28 -->
+  Result:
+  - Research: option 1 wins. Chaos runs vehicle sims in parallel but applies forces in a single-threaded `ApplyDeferredForces` pass afterwards (`FChaosVehicleManagerAsyncCallback::OnPreSimulate_Internal`). `FB1VehicleSimulation` overrides it to give the log exactly −force + torque at the anchor point in the same step. `UpdateWinch` reads the log's pose and velocity from its handle (`FB1WinchSimInput::AnchorProxy`, `AnchorPointLocal`) and damps on relative closing speed. ADR-007 amended (replaces the async-tick "Log" line).
+  - `AB1WinchLog` (`Winch/`): simulating `Trunk` root (PhysicsActor) + `Anchor`. `UB1WinchAnchorComponent::GetSimulatingBody`, and `EndPlay` unhooks winches. `BP_B1WinchLog` (`/Game/B1/Winch`): cylinder, 1000 kg, anchor at one end. `Log_FirmLane` in `Lvl_Gym_Winch` (X 57.5 m, Y −57 m, scale 0.5 × 0.5 × 5 = 50 cm × 5 m; the root's scale is the actor scale, so a placement at scale 1 gives a 1 m cylinder).
+  - Bug found on the way: the first anchor offset used `GetRelativeTransform`, which includes the log's scale. The body frame has none, so the sim saw the anchor 1.9 m further out and stepped to the cap. The offset is now unscaled.
+  - Rig: threshold `MinAnchorTravel`, metric `anchorTravel=`. `B1Winch_Log` (X 40 m, Y −57 m, braked, full pull 12 s): breakaway 17 kN, then a steady ~6.5 kN slide at reel speed (3 m/s), tensionMax 19.1 kN (log meeting the bumper), anchorTravel 11.71 m, jeep moved 0.42 m.
+  - Headless: winch gym 27/27 (`s409_winch.log`; tree rigs unchanged, e.g. FirmPull 36 097 N), core 12/12 (`s409_core.log`), mud 22/22 (`s409_mud.log`).
+  - Tuning note: a heavier log would out-pull the braked jeep's grip (FirmPull drags a braked jeep at well under the cap), so the jeep would slide instead. 1000 kg ≈ a 50 cm × 5 m green trunk.
   `BP_B1WinchLog`: simulating trunk mesh with `UB1WinchAnchorComponent`; it gets the opposite cable force. Log lane in `Lvl_Gym_Winch` (not built in S3-14). Pick mass and friction so the 60 kN cap moves it, but not trivially. Rig `B1Winch_Log`: braked jeep, full pull, the log moves ≥ 3 m toward the jeep, `tensionMax` ≤ 63 kN.
   🔍 Research first, in this order:
   1. Apply the opposite force to the log's body handle from `FB1VehicleSimulation::UpdateWinch` in the same physics step: exactly equal and opposite, no cross-thread read.

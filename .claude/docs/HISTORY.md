@@ -1178,3 +1178,30 @@ After S4-07 the hook carry worked, but nothing on screen said what the interact 
 ### Open follow-ups
 - S4-08 not committed yet; full suite (core, mud, winch) after the user check.
 - Next: S4-09 winchable log.
+
+## 2026-10-28 — S4-09 winchable log
+
+### Context
+`/work` on the last build task of Sprint 4. Starting state: the winch only pulled the jeep toward static anchors (trees); the ADR-007 plan for logs was an async tick on the log reading the published tension. The unreal-mcp server wasn't connected at session start, so editor work went through the HTTP fallback.
+
+### What was built
+- Opposite cable force on simulating anchors from the vehicle sim, in the same physics step: `FB1WinchSimInput::AnchorProxy` / `AnchorPointLocal`, `UpdateWinch` reads the log's pose and point velocity (relative closing-speed damping), `FB1VehicleSimulation::ApplyDeferredForces` applies −force + torque.
+- `UB1WinchAnchorComponent::GetSimulatingBody`; anchors unhook their winches in `EndPlay`.
+- `AB1WinchLog` → `BP_B1WinchLog` (cylinder, 1000 kg, anchor at one end); `Log_FirmLane` in `Lvl_Gym_Winch` (X 57.5 m, Y −57 m, 50 cm × 5 m).
+- Rig threshold `MinAnchorTravel`, metric `anchorTravel=`; rig `B1Winch_Log` (log moves 11.7 m, tension peak 19.1 kN, jeep 0.42 m).
+- Headless: winch 27/27, core 12/12, mud 22/22 (`s409_*.log`).
+
+### Decisions made
+- ADR-007 amended: log force from the vehicle sim's deferred-force pass, replacing the planned async tick on the log.
+- Log mass 1000 kg (≈ green 50 cm × 5 m trunk); heavier logs would out-pull the braked jeep's grip. Up to the user's playtest.
+
+### What we learned
+- Chaos runs vehicle sims in a `PhysicsParallelFor`; forces on other bodies are only safe in the single-threaded `ApplyDeferredForces` pass right after it. A sleeping vehicle skips `UpdateSimulation` but still gets `ApplyDeferredForces`, so per-step forces must be cleared once applied.
+- Chaos body frames have no scale: `GetRelativeTransform` on a scaled body gives a scaled offset (put the log's hook 1.9 m off and stepped to the cap). Use an unrotated world offset.
+- `FPhysicsActorHandle` is `Chaos::FSingleParticlePhysicsProxy*` in 5.8 (forward-declare inside `namespace Chaos`).
+- A placed actor's root component scale is the actor scale; `add_to_scene_from_asset` with scale 1 overrides the BP root's scale.
+- PowerShell `Get-Content -Raw | Set-Content -Encoding utf8` mangles UTF-8 source (→ became mojibake) and adds a BOM; use the Edit tool for source.
+
+### Open follow-ups
+- S4-09 user check: winch the log off the lane, see if it slides and rolls believably.
+- Next: S4-10 Phase 2 playtest.

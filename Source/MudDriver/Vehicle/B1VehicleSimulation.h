@@ -27,6 +27,9 @@ public:
 
 	virtual void ApplyWheelFrictionForces(float DeltaTime) override;
 
+	/** Single-threaded pass after the parallel vehicle update; the only safe place to push another body */
+	virtual void ApplyDeferredForces(Chaos::FRigidBodyHandle_Internal* Handle) override;
+
 private:
 
 	void ApplyTestForce(const FB1VehicleSimInput& Input);
@@ -39,6 +42,10 @@ private:
 	/** Physics thread; the rest length shrinks while reeling in */
 	FB1WinchSimOutput Winch;
 	FVector WinchPoint = FVector::ZeroVector;
+
+	/** Set by UpdateWinch for a simulating anchor, cleared once its force is applied */
+	Chaos::FRigidBodyHandle_Internal* AnchorHandle = nullptr;
+	FVector AnchorPoint = FVector::ZeroVector;
 
 	mutable FCriticalSection OutputLock;
 	FB1WinchSimOutput LatestWinchOutput;

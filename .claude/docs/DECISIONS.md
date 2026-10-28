@@ -166,6 +166,10 @@ Digging also scales with load, so an unloaded wheel spinning in the air doesn't 
 - **Hook carry (S4-07).** `UB1WinchComponent` hook states: stowed (no cable), carried (visual cable to the character's `HookHand`, no sim input, no tension), attached. The carried cable pays out as you walk away and leaves slack when you walk back. Leash in the winch tick: past `MaxCableLength` the carrying `ACharacter` is swept back onto that radius and loses its outward velocity, so a sliding jeep drags it. Each state change is its own instant ability fired by an interaction option (jeep front: take / return; anchor: attach / detach, which puts the hook back in hand). Possessing a jeep stows a carried hook.
 - **Input.** Detach has its own action (`IA_B1WinchDetach`, Q / pad Y). Attaching from the seat ends; `B1WinchAttachNearest` and the Winch window's Attach button stay as debug until the on-foot hook carry (S4-07). Pull: arrow Up/Down, D-pad Up/Down.
 
+**Amended 2026-10-28 (S4-09, log).** Replaces the 2026-10-26 "Log" line (async tick on the log).
+- **Opposite force from the vehicle sim, same step.** For an anchor whose attach parent simulates, the winch sends its physics proxy and the anchor point in the body frame. `UpdateWinch` reads the anchor body's pose and velocity on the physics thread, damps on relative closing speed, and `ApplyDeferredForces` (the single-threaded pass after Chaos's parallel vehicle update) applies exactly −force plus its torque at the anchor point. No cross-thread read, no frame lag. Rejected: the log's own async tick reading the published tension (one step late, needs its own tick class), and game-thread `AddForce` (a frame late, not equal and opposite).
+- The anchor offset is unscaled (the body frame has no scale). An anchor unhooks its winches in `EndPlay`, so the sim never reads a destroyed body.
+
 ---
 
 ## ADR-008 — Mud trails are visual only
