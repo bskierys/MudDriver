@@ -1140,7 +1140,25 @@ Plan: [plans/2026-10-28-fallen-tree.md](plans/2026-10-28-fallen-tree.md) (critiq
   **Done:** builds; both ram rigs PASS headless; winch suite PASS.
   **User check:** drive into the log and over it: it doesn't move or roll.
 
-- [ ] **S4-18** Road lane + fallen tree tuning (4 h) _(requires S4-14, S4-16, S4-17)_
+- [x] **S4-18** Road lane + fallen tree tuning (4 h) _(requires S4-14, S4-16, S4-17)_ <!-- done: 2026-10-28 -->
+  Result:
+  - Road (`Gym/Road`, 35 actors): **8 m wide** for its whole length (user, 2026-10-28: two cars side by side; 6 m was too tight to pull from and to drive through). Bands at Y −43.5 / −51.5 m, X 27.5..77.5 m: BasicShapes cube panel (Z 20..100 cm, 15 cm thick, BlockAll) + cylinder posts every 5 m, `M_B1RoadBand` (new, MCP: world-position Custom node, red/white diagonal stripes). Notch in the south band around the root (X 50.5..59.5 m, back at Y −55.1 m, 30 cm behind the root ball) so the log can swing toward the jeep and the jeep can't get round the root. A 46.5..52 m notch first: at ~48° the trunk jammed on its corner post (rigs stalled at the same yaw for any mass).
+  - `Log_FirmLane`: X 57.5, Y −48.8 m, yaw 90; tip 30 cm inside the north band, root end 2.3 m past the south band.
+  - Rig (`B1GymTestRig`): `LogFreeBandOffset` (cm past the placed tip); metrics `logGap` (end), `logGapT`, `logPivot` (root end's path / yaw turned while turning > 1°/s), `logDrift` (last 5 s of the last pulling step), `logCross` (peak vehicle travel past the placed log line); thresholds `MinLogGap`, `MaxLogGap`, `MaxLogGapTime`, `MaxLogPivot`, `MinLogCross`, `MaxDisplacement`. Step `bSteerToTarget` / `SteerTarget` (rig frame, full lock at 20° off the nose): open-loop steering couldn't thread the gap.
+  - Tuning (physical knobs only, PIE runs):
+    1. Breakaway lower bound: braked jeep (brake 1, no handbrake) holds 40.6 kN statically before it slides (same at Y −47.5 and −50 m) → `BreakawayTension` **49 kN** (1.2 ×).
+    2. Tip: the swing stops where the cable turns along the trunk, not where friction runs out. On the 6 m road: 11 t trunk 49.5° / gap 3.14 m, 10 t 51.2° / 3.34 m (jeep ~2.5 m wide didn't fit). On the 8 m road at 10 t: 58.6°, gap 4.41 m. Stall torque gives tip resistance ≈ 31–35 kN (0.53–0.58 × cap).
+    3. Pivot 0.38–0.40 m from the root end: the root ball holds; no root-end drag needed.
+    - Final: `TrunkMass` **10000**, `RootBallMass` **5000**, `BreakawayTension` **49000**, `PM_B1Log` unchanged (μ 0.7, Average), shape unchanged. Set on `BP_B1WinchLog` and the instance.
+  - Rigs (`B1Tests/Log`, X 42.5 m, Y −50 m, near the root side: the cable stays closer to square with the trunk). Pull script: handbrake 1 s, handbrake + pull 20 s, reel out −0.3 for 0.5 s (a stalled drum keeps 60 kN on a still log, so it stays free), handbrake 2.5 s.
+    - `B1Log_PullNoHandbrake` (alpha 0.9, brake 1 s, brake + pull 4 s, brake 2 s; `MaxTension` 63 kN): tensionMax 40.6 kN, dragged 8.9 m, logSwitches 0.
+    - `B1Log_PullEnd` (alpha 0.9; `MinLogGap` 3, `MaxLogGapTime` 15, `MaxLogPivot` 1, `MaxDisplacement` 0.5, frozen): gap 4.41, 3 m at 7.7 s, yaw 58.6, pivot 0.39, disp **0.49** (close to the limit: the lurch at breakaway), refrozen.
+    - `B1Log_PullMiddle` (alpha 0.5; `MaxLogGap` 3): yaw 6.2, gap 0.27, drift 0.026 m/s (creeps ~2.6 cm/s under 60 kN while free; reported, accepted as physics).
+    - `B1Log_DriveThrough` (PullEnd script, detach, reverse 4.5 s at brake 0.4, handbrake 1 s, steer to (5, +4.25) m 4 s at 0.3, to (30, +4.25) m 7 s at 0.4; `MinLogCross` 5): logCross 22.6.
+    - `B1Log_Ram` / `RamHooked` unchanged, still logMove 0.000, switches 0.
+  - User check (2026-10-28): the user widened the road further (12 m: north band Y −43.1 m, a straight south band `Band_Free2` at Y −55.1 m, notch removed; log unchanged) and likes it. Rigs re-aimed: `LogFreeBandOffset` 70 cm on the four pull rigs; DriveThrough waypoints (0, +5) m for 5 s, then (30, +5) m. On that road, headless winch 36/36 (`s418_winch2.log`): PullEnd yaw 60.7, gap 5.11 at 7.3 s, disp 0.04; PullMiddle yaw 6.4, gap 0.68; NoHandbrake 39.6 kN, no switch; DriveThrough logCross 25.7.
+  - Cable visual (user, same check): a loaded cable sagged on the ground while pulling. `UB1WinchComponent::CableTautTension` (`Winch|Visual`, 5000 N, typed field + Save in the Winch window): the cable's `CableGravityScale` = 1 − tension / that, so it pulls straight under load and sags as before when slack or overpaid; reset to 1 when carried. Simulate capture: slack before the pull, straight mid-pull. User: looks good.
+  - Headless winch 36/36 (`s418_winch.log`), core 12/12 (`s418_core.log`), mud 22/22 (`s418_mud.log`). Simulate captures of the opened tree and the drive-through (top view). ADR-018 accepted.
   - **Road lane.** A banded road in `Lvl_Gym_Winch`, rebuilt from the log lane (X ~57 m, Y −57 m):
     - firm road 6 m wide, closed off on both sides by bands (blocking posts + a striped band) the jeep can't pass;
     - a ~10 m fallen tree across it, its root end past one band;

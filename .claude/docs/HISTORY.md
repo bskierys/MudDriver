@@ -1359,3 +1359,33 @@ The user moved S4-19 ahead of S4-18. After S4-14's mapping cleanup, the hints sh
 
 ### Open follow-ups
 - S4-18 road lane and fallen-tree tuning.
+
+## 2026-10-28 — S4-18: road lane + fallen tree tuning, taut winch cable
+
+### Context
+Last task before the Phase 2 playtest. The frozen log from S4-17 needed a road around it, physics-only tuning and the four pull rigs. The user then asked for a wider road and a cable that pulls straight under load.
+
+### What was built
+- Banded road in `Lvl_Gym_Winch` (`Gym/Road`, cube panels + cylinder posts, `M_B1RoadBand` made over MCP from a world-position Custom node). Built at 6 m, rebuilt at 8 m on the user's ask, then widened by hand to 12 m by the user (north band Y −43.1 m, straight south band Y −55.1 m). `Log_FirmLane` at X 57.5 m, Y −48.8 m.
+- Rig metrics `logGap` (`LogFreeBandOffset`), `logGapT`, `logPivot`, `logDrift`, `logCross`; thresholds `MinLogGap`, `MaxLogGap`, `MaxLogGapTime`, `MaxLogPivot`, `MinLogCross`, `MaxDisplacement`; step `bSteerToTarget` / `SteerTarget` (waypoint in the rig's frame).
+- Rigs `B1Log_PullNoHandbrake`, `PullEnd`, `PullMiddle`, `DriveThrough` (`B1Tests/Log`, X 42.5 m, Y −50 m).
+- Log tuning: breakaway 49 kN (1.2 × the 40.6 kN a braked jeep holds), trunk 10 t, root ball 5 t, `PM_B1Log` unchanged. ADR-018 accepted.
+- `UB1WinchComponent::CableTautTension` (5 kN): visual cable gravity fades with tension, so it pulls straight under load and still sags when slack. User: looks good.
+- Headless on the user's road: winch 36/36, core 12/12, mud 22/22.
+
+### Decisions made
+- No root-end drag or standstill term: the root ball holds the pivot (0.38 m from the root end) and middle creep (~3 cm/s at 60 kN) is accepted physics.
+- Pull rigs stand toward the root side of the road: the swing stops where the cable lines up with the trunk, so position matters more than mass.
+- Roads in gyms and showcases fit two cars (~12 m).
+
+### What we learned
+- The door angle is geometry-limited: trunk mass moved it only a few degrees; road width and jeep position moved it 10°+.
+- A rig that stalls at the same angle for any mass is hitting something: the first notch's corner post caught the trunk at 48°.
+- Open-loop steering can't thread a 3 m gap with a 2.5 m jeep; waypoint steering can. A pursuit step that ends before its waypoint is reached sends the jeep diagonally at the next one.
+- `Select-Object -First 1` stops the upstream PowerShell pipeline: it silently skipped the second `set_properties`.
+- `SceneTools.save_actor` refuses some external-actor packages ("Asset does not exist") even when the file is on disk; the close dialog's Save works.
+- The outliner folder list is empty after a fresh editor start; `find_actors` by name still works.
+
+### Open follow-ups
+- S4-10 Phase 2 playtest, with the fallen tree scenario on the user's road.
+- Backlog: mud idle check reading empty inputs (S4-14) is still unverified.

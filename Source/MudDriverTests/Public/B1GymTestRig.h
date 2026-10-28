@@ -61,6 +61,13 @@ struct FB1GymInputStep
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	bool bHandbrake = false;
 
+	/** Steers toward this point in the rig's frame (cm) every frame instead of using Steer */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (EditCondition = "bSteerToTarget"))
+	FVector SteerTarget = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (InlineEditConditionToggle))
+	bool bSteerToTarget = false;
+
 	/** Runs B1Unstuck when the step starts; needs a UB1MudVehicleComponent */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	bool bUnstuck = false;
@@ -248,6 +255,30 @@ struct FB1GymThresholds
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	EB1GymExpectLogState ExpectLogState = EB1GymExpectLogState::Any;
 
+	/** Gap between the free-side band and the log's footprint at script end; see LogFreeBandOffset */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
+	float MinLogGap = -1.0f;
+
+	/** For a hook spot that shouldn't open the road as far */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
+	float MaxLogGap = -1.0f;
+
+	/** Time from script start until the gap first reached MinLogGap */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "s"))
+	float MaxLogGapTime = -1.0f;
+
+	/** Turn centre's distance from the root end while the log turns */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
+	float MaxLogPivot = -1.0f;
+
+	/** Peak vehicle travel past the log's placed line, along the road */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
+	float MinLogCross = -1.0f;
+
+	/** Vehicle displacement from its start at script end */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
+	float MaxDisplacement = -1.0f;
+
 	/** Abilities activated on the PlayerState ASC during the script; needs bPossessWithPlayer */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	int32 MinAbilityActivations = -1;
@@ -335,6 +366,10 @@ protected:
 	UPROPERTY(EditInstanceOnly, Category = "B1Test|Config")
 	TObjectPtr<AB1WinchLog> TargetLog;
 
+	/** Free-side band line past the log's placed tip (+X end), along the placed trunk axis; logGap is measured to it */
+	UPROPERTY(EditAnywhere, Category = "B1Test|Config", meta = (Units = "cm"))
+	float LogFreeBandOffset = 30.0f;
+
 	/** Where on WinchAnchor's area; 1/3 is 80 cm on a tree, the pre-area hook height */
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config", meta = (ClampMin = "0", ClampMax = "1"))
 	float WinchAnchorAlpha = 1.0f / 3.0f;
@@ -375,6 +410,10 @@ private:
 	void TeleportPlayerPawn(const FB1GymInputStep& Step);
 	/** The rig's on-foot character, or the one player 0 got out as */
 	AB1Character* GetWalker() const;
+	void SampleLog(float DeltaSeconds);
+	/** cm, free-side band line to the footprint (box corners + root ball), in the placed log's frame */
+	float GetLogGap() const;
+	FVector GetLogRootEnd() const;
 
 	/** The rig's vehicle or on-foot character; what the metrics sample */
 	UPROPERTY(Transient)
@@ -472,6 +511,20 @@ private:
 	TObjectPtr<AB1WinchLog> TrackedLog;
 	/** cm */
 	float MaxLogMove = 0.0f;
+	float LogGapTime = -1.0f;
+	/** Root end's horizontal path (cm) and yaw (rad) while turning; their ratio is the pivot distance */
+	float LogRootPath = 0.0f;
+	float LogTurn = 0.0f;
+	FVector LastLogRootEnd = FVector::ZeroVector;
+	float LastLogYaw = 0.0f;
+	/** End of the last pulling step, and the log's location 5 s before it */
+	float PullEndTime = -1.0f;
+	FVector LogDriftStart = FVector::ZeroVector;
+	bool bLogDriftStarted = false;
+	float LogDrift = -1.0f;
+	/** cm past the log's placed line, along the road away from the vehicle's start */
+	float MaxLogCross = 0.0f;
+	FVector LogRoadDirection = FVector::ZeroVector;
 	/** cm */
 	float MaxAnchorDistance = 0.0f;
 	FVector AnchorStart = FVector::ZeroVector;

@@ -392,7 +392,7 @@ The CVar is global; there's no per-vehicle or per-surface switch.
 
 ## ADR-018 — Fallen log: frozen until the cable breaks it free
 
-**Status:** proposed (2026-10-28, fallen tree replan; S4-17/18)
+**Status:** accepted (2026-10-28, S4-18 rigs pass; proposed in the fallen tree replan)
 
 **Problem.** The S4-09 log was a free-simulating cylinder. The jeep rolled it by driving over it, and the winch dragged it easily. The fallen tree (VISION.md) must not budge when rammed, hooked or not. It should move only when the cable pulls it hard enough, and then by physics, not along a path. Where it's hooked must matter: near an end it swings open like a door, at the middle it barely moves.
 

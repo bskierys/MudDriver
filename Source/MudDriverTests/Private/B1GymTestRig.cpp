@@ -27,6 +27,12 @@ namespace
 	constexpr float CmPerM = 100.0f;
 	/** Spare time on top of the script before the framework times the test out */
 	constexpr float TimeLimitMargin = 10.0f;
+	/** rad/s; slower turning counts as sliding, not as a turn for logPivot */
+	constexpr float PivotMinTurnRate = UE_PI / 180.0f;
+	/** s at the end of the last pulling step that logDrift covers */
+	constexpr float LogDriftWindow = 5.0f;
+	/** deg; a SteerTarget this far off the nose gets full lock */
+	constexpr float FullSteerHeadingError = 20.0f;
 }
 
 AB1GymTestRig::AB1GymTestRig()
@@ -220,9 +226,30 @@ void AB1GymTestRig::StartTest()
 	// Earlier rigs in the same round may have moved it.
 	TrackedLog = TargetLog ? TargetLog.Get() : Cast<AB1WinchLog>(WinchAnchor);
 	MaxLogMove = 0.0f;
+	LogGapTime = -1.0f;
+	LogRootPath = 0.0f;
+	LogTurn = 0.0f;
+	bLogDriftStarted = false;
+	LogDrift = -1.0f;
+	MaxLogCross = -UE_BIG_NUMBER;
+	PullEndTime = -1.0f;
+	float StepEnd = 0.0f;
+	for (const FB1GymInputStep& Step : InputScript)
+	{
+		StepEnd += Step.Duration;
+		if (Step.WinchPull > 0.0f)
+		{
+			PullEndTime = StepEnd;
+		}
+	}
 	if (TrackedLog)
 	{
 		TrackedLog->ResetToPlacedPose();
+		LastLogRootEnd = GetLogRootEnd();
+		LastLogYaw = 0.0f;
+		const FTransform& Placed = TrackedLog->GetPlacedTransform();
+		const FVector Across = Placed.GetUnitAxis(EAxis::Y).GetSafeNormal2D();
+		LogRoadDirection = ((StartLocation - Placed.GetLocation()) | Across) > 0.0f ? -Across : Across;
 	}
 
 	if (WinchAnchor)
@@ -522,8 +549,14 @@ void AB1GymTestRig::ApplyInput(const FB1GymInputStep& Step)
 		return;
 	}
 
+	float Steer = Step.Steer;
+	if (Step.bSteerToTarget)
+	{
+		const FVector Local = Vehicle->GetActorTransform().InverseTransformPosition(GetActorTransform().TransformPosition(Step.SteerTarget));
+		Steer = FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan2(Local.Y, Local.X)) / FullSteerHeadingError, -1.0f, 1.0f);
+	}
 	Movement->SetThrottleInput(Step.Throttle);
-	Movement->SetSteeringInput(Step.Steer);
+	Movement->SetSteeringInput(Steer);
 	Movement->SetBrakeInput(Step.Brake);
 	Movement->SetHandbrakeInput(Step.bHandbrake);
 	// Only on a change, so the rig doesn't unpark a jeep the player has just left.
@@ -615,7 +648,7 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 
 	if (TrackedLog)
 	{
-		MaxLogMove = FMath::Max(MaxLogMove, static_cast<float>(FVector::Dist(TrackedLog->GetActorLocation(), TrackedLog->GetPlacedTransform().GetLocation())));
+		SampleLog(DeltaSeconds);
 	}
 
 	StuckTimer = Speed < StuckSpeed ? StuckTimer + DeltaSeconds : 0.0f;
@@ -623,6 +656,67 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 	{
 		TimeToStuck = ScriptTime - StuckHoldTime;
 	}
+}
+
+void AB1GymTestRig::SampleLog(float DeltaSeconds)
+{
+	const FVector LogLocation = TrackedLog->GetActorLocation();
+	const FTransform& Placed = TrackedLog->GetPlacedTransform();
+	MaxLogMove = FMath::Max(MaxLogMove, static_cast<float>(FVector::Dist(LogLocation, Placed.GetLocation())));
+
+	if (LogGapTime < 0.0f && Thresholds.MinLogGap >= 0.0f && GetLogGap() >= Thresholds.MinLogGap * CmPerM)
+	{
+		LogGapTime = ScriptTime;
+	}
+
+	const FVector RootEnd = GetLogRootEnd();
+	const float Yaw = FMath::DegreesToRadians(TrackedLog->GetYawSincePlaced());
+	const float Turn = FMath::Abs(FMath::FindDeltaAngleRadians(LastLogYaw, Yaw));
+	if (Turn >= PivotMinTurnRate * DeltaSeconds)
+	{
+		LogRootPath += FVector::Dist2D(RootEnd, LastLogRootEnd);
+		LogTurn += Turn;
+	}
+	LastLogRootEnd = RootEnd;
+	LastLogYaw = Yaw;
+
+	if (PullEndTime >= 0.0f && !bLogDriftStarted && ScriptTime >= PullEndTime - LogDriftWindow)
+	{
+		bLogDriftStarted = true;
+		LogDriftStart = LogLocation;
+	}
+	if (bLogDriftStarted && LogDrift < 0.0f && ScriptTime >= PullEndTime)
+	{
+		LogDrift = FVector::Dist2D(LogLocation, LogDriftStart) / CmPerM / LogDriftWindow;
+	}
+
+	if (Vehicle)
+	{
+		MaxLogCross = FMath::Max(MaxLogCross, static_cast<float>((LastLocation - Placed.GetLocation()) | LogRoadDirection));
+	}
+}
+
+float AB1GymTestRig::GetLogGap() const
+{
+	const FTransform& Placed = TrackedLog->GetPlacedTransform();
+	const FTransform Current = TrackedLog->GetActorTransform();
+	const float HalfLength = TrackedLog->TrunkLength * 0.5f;
+	auto PlacedX = [&Placed, &Current](const FVector& Local) { return static_cast<float>(Placed.InverseTransformPosition(Current.TransformPosition(Local)).X); };
+
+	float FootprintX = PlacedX(FVector(-HalfLength, 0.0f, 0.0f)) + TrackedLog->RootBallRadius;
+	for (const float X : { -HalfLength, HalfLength })
+	{
+		for (const float Y : { -TrackedLog->TrunkRadius, TrackedLog->TrunkRadius })
+		{
+			FootprintX = FMath::Max(FootprintX, PlacedX(FVector(X, Y, 0.0f)));
+		}
+	}
+	return HalfLength + LogFreeBandOffset - FootprintX;
+}
+
+FVector AB1GymTestRig::GetLogRootEnd() const
+{
+	return TrackedLog->GetActorTransform().TransformPosition(FVector(-TrackedLog->TrunkLength * 0.5f, 0.0f, 0.0f));
 }
 
 void AB1GymTestRig::SampleSpring()
@@ -680,6 +774,10 @@ void AB1GymTestRig::FinishScript()
 	if (Thresholds.MaxDistance >= 0.0f && PathLength > Thresholds.MaxDistance)
 	{
 		Failures.Add(FString::Printf(TEXT("dist>%.2f"), Thresholds.MaxDistance));
+	}
+	if (Thresholds.MaxDisplacement >= 0.0f && Displacement > Thresholds.MaxDisplacement)
+	{
+		Failures.Add(FString::Printf(TEXT("disp>%.2f"), Thresholds.MaxDisplacement));
 	}
 	if (Thresholds.MaxTimeToStuck >= 0.0f && (TimeToStuck < 0.0f || TimeToStuck > Thresholds.MaxTimeToStuck))
 	{
@@ -831,8 +929,36 @@ void AB1GymTestRig::FinishScript()
 		{
 			Failures.Add(FString::Printf(TEXT("logState!=%s"), *UEnum::GetValueAsString(Thresholds.ExpectLogState)));
 		}
-		LogMetrics = FString::Printf(TEXT(" logState=%s logSwitches=%d logMove=%.3f logYaw=%.1f logMass=%.0f"), bFree ? TEXT("Free") : TEXT("Frozen"),
-			TrackedLog->GetSwitchCount(), LogMove, LogYaw, TrackedLog->GetMass());
+		const float LogGap = GetLogGap() / CmPerM;
+		const float LogPivot = LogTurn > 0.0f ? LogRootPath / LogTurn / CmPerM : -1.0f;
+		const float LogCross = Vehicle ? MaxLogCross / CmPerM : 0.0f;
+		if (bLogDriftStarted && LogDrift < 0.0f)
+		{
+			LogDrift = FVector::Dist2D(TrackedLog->GetActorLocation(), LogDriftStart) / CmPerM / LogDriftWindow;
+		}
+		if (Thresholds.MinLogGap >= 0.0f && LogGap < Thresholds.MinLogGap)
+		{
+			Failures.Add(FString::Printf(TEXT("logGap<%.2f"), Thresholds.MinLogGap));
+		}
+		if (Thresholds.MaxLogGap >= 0.0f && LogGap > Thresholds.MaxLogGap)
+		{
+			Failures.Add(FString::Printf(TEXT("logGap>%.2f"), Thresholds.MaxLogGap));
+		}
+		if (Thresholds.MaxLogGapTime >= 0.0f && (LogGapTime < 0.0f || LogGapTime > Thresholds.MaxLogGapTime))
+		{
+			Failures.Add(FString::Printf(TEXT("logGapT>%.1f"), Thresholds.MaxLogGapTime));
+		}
+		if (Thresholds.MaxLogPivot >= 0.0f && (LogPivot < 0.0f || LogPivot > Thresholds.MaxLogPivot))
+		{
+			Failures.Add(FString::Printf(TEXT("logPivot>%.2f"), Thresholds.MaxLogPivot));
+		}
+		if (Thresholds.MinLogCross >= 0.0f && LogCross < Thresholds.MinLogCross)
+		{
+			Failures.Add(FString::Printf(TEXT("logCross<%.2f"), Thresholds.MinLogCross));
+		}
+		LogMetrics = FString::Printf(TEXT(" logState=%s logSwitches=%d logMove=%.3f logYaw=%.1f logMass=%.0f logGap=%.2f logGapT=%.1f logPivot=%.2f logDrift=%.3f logCross=%.2f"),
+			bFree ? TEXT("Free") : TEXT("Frozen"), TrackedLog->GetSwitchCount(), LogMove, LogYaw, TrackedLog->GetMass(), LogGap, LogGapTime, LogPivot,
+			LogDrift, LogCross);
 	}
 
 	FString FuelMetrics;
