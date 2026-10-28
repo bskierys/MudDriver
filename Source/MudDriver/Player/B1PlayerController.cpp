@@ -11,6 +11,7 @@
 #include "B1VehicleAttributeSet.h"
 #include "B1InputConfig.h"
 #include "B1InteractionPromptWidget.h"
+#include "B1ControlHintsWidget.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputMappingContext.h"
@@ -25,6 +26,13 @@ void AB1PlayerController::BeginPlay()
 	if (!IsLocalPlayerController())
 	{
 		return;
+	}
+
+	ControlHintsWidget = CreateWidget<UB1ControlHintsWidget>(this, UB1ControlHintsWidget::StaticClass());
+	if (ControlHintsWidget)
+	{
+		ControlHintsWidget->SetHintSet(ControlHints);
+		ControlHintsWidget->AddToPlayerScreen(1);
 	}
 
 	InteractionPrompt = CreateWidget<UB1InteractionPromptWidget>(this, UB1InteractionPromptWidget::StaticClass());

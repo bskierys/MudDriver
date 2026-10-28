@@ -59,7 +59,7 @@ void UB1WinchComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 	UpdateAttachedCableEnd();
 	ReadSimOutput();
 	SendSimInput();
-	SetWinchingTag(IsWinching());
+	UpdateOwnerTags();
 }
 
 void UB1WinchComponent::SendSimInput()
@@ -123,20 +123,25 @@ void UB1WinchComponent::ReadSimOutput()
 	}
 }
 
-void UB1WinchComponent::SetWinchingTag(bool bWinching)
+void UB1WinchComponent::UpdateOwnerTags()
 {
-	const APawn* Pawn = Cast<APawn>(GetOwner());
-	UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(GetOwner());
-
 	// The ASC is the driver's (ADR-004), so a parked jeep leaves it alone.
-	const bool bWanted = bWinching && Pawn && Pawn->IsPawnControlled();
-	if (!ASC || !WinchingTag.IsValid() || bWanted == bWinchingTagSet)
+	const APawn* Pawn = Cast<APawn>(GetOwner());
+	const bool bControlled = Pawn && Pawn->IsPawnControlled();
+	SetOwnerTag(WinchingTag, bControlled && IsWinching(), bWinchingTagSet);
+	SetOwnerTag(HookedTag, bControlled && IsAttached(), bHookedTagSet);
+}
+
+void UB1WinchComponent::SetOwnerTag(const FGameplayTag& Tag, bool bWanted, bool& bTagSet)
+{
+	UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(GetOwner());
+	if (!ASC || !Tag.IsValid() || bWanted == bTagSet)
 	{
 		return;
 	}
 
-	ASC->SetLooseGameplayTagCount(WinchingTag, bWanted ? 1 : 0);
-	bWinchingTagSet = bWanted;
+	ASC->SetLooseGameplayTagCount(Tag, bWanted ? 1 : 0);
+	bTagSet = bWanted;
 }
 
 bool UB1WinchComponent::AttachTo(UB1WinchAnchorComponent* NewAnchor, float AreaAlpha)
@@ -370,7 +375,7 @@ void UB1WinchComponent::ReleaseAnchor()
 	Tension = 0.0f;
 	HoldForce = 0.0f;
 	bHoldActive = false;
-	SetWinchingTag(false);
+	UpdateOwnerTags();
 	SendSimInput();
 }
 

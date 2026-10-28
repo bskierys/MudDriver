@@ -9,6 +9,8 @@ class UB1InputConfig;
 class AB1Character;
 class AB1Jeep;
 class UB1InteractionPromptWidget;
+class UB1ControlHintSet;
+class UB1ControlHintsWidget;
 
 // Moves the PlayerState ASC avatar to whatever pawn is possessed (ADR-004).
 UCLASS(abstract)
@@ -27,13 +29,15 @@ public:
 	/** The player's one on-foot character; seated in whatever jeep is possessed */
 	AB1Character* GetOnFootCharacter() const { return OnFootCharacter; }
 
+	UB1ControlHintsWidget* GetControlHintsWidget() const { return ControlHintsWidget; }
+
 	/** Parks the possessed jeep and possesses the character at the driver door (or the first free fallback spot) */
 	bool ExitVehicle();
 	/** Possessing the jeep seats the character and unparks it */
 	bool EnterVehicle(AB1Jeep* Jeep);
 
 protected:
-	/** Adds the interaction prompt on local controllers */
+	/** Adds the interaction prompt and the controls hints on local controllers */
 	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void SetupInputComponent() override;
@@ -49,6 +53,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "B1|Input")
 	TArray<TObjectPtr<UInputMappingContext>> OnFootMappingContexts;
 
+	/** Lower-left controls hints (S4-19) */
+	UPROPERTY(EditDefaultsOnly, Category = "B1|Input")
+	TObjectPtr<UB1ControlHintSet> ControlHints;
+
 private:
 	void ApplyPawnMappingContexts(const APawn* InPawn);
 
@@ -63,4 +71,7 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UB1InteractionPromptWidget> InteractionPrompt;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UB1ControlHintsWidget> ControlHintsWidget;
 };

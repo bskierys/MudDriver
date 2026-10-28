@@ -1163,7 +1163,16 @@ Plan: [plans/2026-10-28-fallen-tree.md](plans/2026-10-28-fallen-tree.md) (critiq
   **Done:** the four rigs + the ram rigs PASS headless; all suites PASS; capture of the opened tree.
   **User check:** the whole fallen tree scenario: ram it, get out, hook near the end, hold B, reel in, drive through the gap. Hooking at the middle struggles. It feels physical, not scripted.
 
-- [ ] **S4-19** Controls hints (2.5 h) _(requires S4-14)_
+- [x] **S4-19** Controls hints (2.5 h) _(requires S4-14)_ <!-- done: 2026-10-28 -->
+  Result (done before S4-18, user):
+  - `UB1ControlHintSet` (`Player/`, data asset): `FB1ControlHint` = `Actions` (several, e.g. mouse + stick look), `Label`, `RequiredTags`, `BlockedTags`, `KeysPerDevice`. `HintSet_B1Player` (`/Game/B1/Input`) on `BP_B1PlayerController` (`ControlHints`).
+    - Jeep (`State.Avatar.InVehicle`): Drive, Brake / reverse, Steer (2 keys), Handbrake, Winch in / out (+ `Vehicle.State.WinchHooked`, 2 keys), Get out.
+    - On foot (`State.Avatar.OnFoot`): Move (4 keys), Look (mouse + stick actions), Jump.
+  - `UB1ControlHintsWidget` (`Player/`, code-only, lower-left, 16 pt): rebuilds every 0.2 s from the PlayerState ASC's tags and the applied mapping contexts (so a rebind or a possession change shows up), logs on `LogB1Vehicle` when the text changes. Added by `AB1PlayerController::BeginPlay` next to the prompt.
+  - `B1InputKeyText::GetKeyText` (`Player/`), shared with the prompt: keyboard/mouse keys, then pad keys, short pad names (A/B/X/Y, RT/LT, RB/LB, LS/RS, D-pad, Mouse, Space). Keys are filtered by menu category (keyboard, mouse, gamepad): the template's VR and racing-wheel mappings showed up otherwise ("LS Vive (L) Trackpad X-Axis", and racing wheel first after re-entering, when context order changes). Keyboard first, like the prompt ("W / RT   Drive").
+  - `Vehicle.State.WinchHooked` (native tag): `UB1WinchComponent::HookedTag` (set by `AB1Jeep`), on the owner's ASC while attached and controlled. `SetWinchingTag` became `UpdateOwnerTags` / `SetOwnerTag` for both.
+  - PIE captures (plain PIE; `B1OnFoot_HookCarry` auto-run, reverted): jeep unhooked = Drive, Brake / reverse, Steer `D A / LS`, Handbrake `Space / B`, Get out `E / X`; on foot = `W S A D / LS Move`, `Mouse / RS Look`, `Space / A Jump`; jeep hooked adds `Up Down / D-pad Up D-pad Down  Winch in / out`.
+  - Headless core 12/12 (`s419_core.log`), winch 32/32 (`s419_winch.log`), with the widget on every player controller.
   - **Data.** `UB1ControlHintSet` (data asset): entries of input action, label, required tags and blocked tags. `HintSet_B1Player` in `/Game/B1/Input`, set on `AB1PlayerController`.
     - In the jeep: Drive (RT / W), Brake / reverse (LT / S), Steer, Handbrake (B / Space), Exit (X / E); Winch in/out (D-pad ↑↓ / arrows ↑↓) only with `Vehicle.State.WinchHooked`. These read right only after S4-14's mapping cleanup (no pad A brake, no LB handbrake), since the helper shows the first pad key.
     - On foot: Move, Look, Jump. The interact prompt (S4-08) stays separate.

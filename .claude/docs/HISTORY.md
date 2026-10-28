@@ -1341,3 +1341,21 @@ S4-09's log rolled when driven over and was dragged too easily. ADR-018: kinemat
 
 ### Open follow-ups
 - S4-18 tuning (masses, breakaway, friction); S4-19 hints first (user).
+
+## 2026-10-28 — S4-19: controls hints
+
+### Context
+The user moved S4-19 ahead of S4-18. After S4-14's mapping cleanup, the hints show the real first keys.
+
+### What was built
+- `UB1ControlHintSet` data asset (`HintSet_B1Player` on `BP_B1PlayerController`) and the code-only `UB1ControlHintsWidget` in the lower-left corner, filtered by the PlayerState ASC's tags, rebuilt every 0.2 s.
+- `B1InputKeyText::GetKeyText`, shared with the interaction prompt: keyboard first, short pad names, `KeysPerDevice`.
+- `Vehicle.State.WinchHooked` set by the winch (`HookedTag`). PIE captures in the jeep (unhooked, hooked) and on foot; core 12/12, winch 32/32. User check passed.
+
+### What we learned
+- The template maps VR controllers and a racing wheel; `IsGamepadKey()` is true for VR keys. Filter by `FKey::GetMenuCategory()` against `EKeys::NAME_KeyboardCategory` / `NAME_MouseCategory` / `NAME_GamepadCategory`. The applied context order changes on re-possession.
+- A BP CDO change made through MCP showed up in PIE only after an editor restart (the first captures had no hints).
+- A modal save dialog blocks MCP too. A rig toggled for a capture and set back still leaves a dirty package, so save right after reverting.
+
+### Open follow-ups
+- S4-18 road lane and fallen-tree tuning.

@@ -75,6 +75,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Winch|Config")
 	FGameplayTag WinchingTag;
 
+	/** Loose tag on the owner's ASC while attached; set by the host */
+	UPROPERTY(EditAnywhere, Category = "Winch|Config")
+	FGameplayTag HookedTag;
+
 	UPROPERTY(EditAnywhere, Category = "Winch|Visual", meta = (Units = "cm", ClampMin = "0.1"))
 	float CableWidth = 7.0f;
 
@@ -186,7 +190,9 @@ private:
 
 	void SendSimInput();
 	void ReadSimOutput();
-	void SetWinchingTag(bool bWinching);
+	/** Winching and hooked tags, only while the pawn is controlled (the ASC is the driver's, ADR-004) */
+	void UpdateOwnerTags();
+	void SetOwnerTag(const FGameplayTag& Tag, bool bWanted, bool& bTagSet);
 	void SetupCableCollision(UCableComponent& CableComponent) const;
 	void CreateCable(USceneComponent& End, float Length);
 	/** Ends the anchor's sim cable; keeps the visual cable */
@@ -223,4 +229,5 @@ private:
 	float HoldForce = 0.0f;
 	bool bHoldActive = false;
 	bool bWinchingTagSet = false;
+	bool bHookedTagSet = false;
 };

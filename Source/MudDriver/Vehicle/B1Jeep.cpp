@@ -32,6 +32,7 @@ AB1Jeep::AB1Jeep(const FObjectInitializer& ObjectInitializer)
 	Winch->SetupAttachment(GetMesh());
 	Winch->SetRelativeLocation(FVector(230.0f, 0.0f, 60.0f));
 	Winch->WinchingTag = B1GameplayTags::Vehicle_State_Winching;
+	Winch->HookedTag = B1GameplayTags::Vehicle_State_WinchHooked;
 
 	DriverSeat = CreateDefaultSubobject<USceneComponent>(TEXT("DriverSeat"));
 	DriverSeat->SetupAttachment(GetMesh());

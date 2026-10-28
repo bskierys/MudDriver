@@ -1,6 +1,7 @@
 #include "B1InteractionPromptWidget.h"
 #include "B1Character.h"
 #include "B1InteractionScanComponent.h"
+#include "B1InputKeyText.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
@@ -72,35 +73,5 @@ FText UB1InteractionPromptWidget::BuildKeyText() const
 	{
 		return NSLOCTEXT("B1Interaction", "NoKey", "?");
 	}
-
-	// First keyboard key and first pad button, e.g. "E / X".
-	FKey KeyboardKey;
-	FKey PadKey;
-	for (const FKey& Key : Subsystem->QueryKeysMappedToAction(InteractAction))
-	{
-		FKey& First = Key.IsGamepadKey() ? PadKey : KeyboardKey;
-		if (!First.IsValid())
-		{
-			First = Key;
-		}
-	}
-
-	// Face buttons by their Xbox letters; the engine names them by position.
-	static const TMap<FKey, FString> FaceButtonNames = {
-		{ EKeys::Gamepad_FaceButton_Bottom, TEXT("A") },
-		{ EKeys::Gamepad_FaceButton_Right, TEXT("B") },
-		{ EKeys::Gamepad_FaceButton_Left, TEXT("X") },
-		{ EKeys::Gamepad_FaceButton_Top, TEXT("Y") },
-	};
-
-	TArray<FString> Names;
-	for (const FKey& Key : { KeyboardKey, PadKey })
-	{
-		if (Key.IsValid())
-		{
-			const FString* FaceName = FaceButtonNames.Find(Key);
-			Names.Add(FaceName ? *FaceName : Key.GetDisplayName(false).ToString());
-		}
-	}
-	return Names.IsEmpty() ? NSLOCTEXT("B1Interaction", "Unbound", "unbound") : FText::FromString(FString::Join(Names, TEXT(" / ")));
+	return B1InputKeyText::GetKeyText(*Subsystem, { InteractAction.Get() });
 }
