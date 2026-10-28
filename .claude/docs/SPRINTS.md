@@ -1058,7 +1058,13 @@ Plan: [plans/2026-10-28-fallen-tree.md](plans/2026-10-28-fallen-tree.md) (critiq
   **Done:** builds; winch suite PASS (tree rigs unchanged); a Simulate capture shows the strap around a tree and the cable leaving its side.
   **User check:** the hooked cable looks wrapped around the trunk, not floating next to it.
 
-- [ ] **S4-16** Hook placement ghost (3.5 h) _(requires S4-15)_
+- [x] **S4-16** Hook placement ghost (3.5 h) _(requires S4-15)_ <!-- done: 2026-10-28 -->
+  Result:
+  - Research: MCP can build materials (`MaterialTools.create_material` / `add_expression` / `connect_to_output` / `recompile`, `MaterialInstanceTools.create`). `M_B1WinchGhost` (translucent, unlit, `Color` → emissive, `Opacity` → opacity) + `MI_B1WinchStrapGhost` (yellow, 0.4), all via MCP, no user step.
+  - `UB1HookAimComponent` (`Winch/`) on `AB1Character` (`HookAim`): ticks every frame; while `FindCarriedBy(owner)` finds a winch, picks among anchors within the scan's `Range` and `IsInReach`; alpha = closest point between the control-rotation ray (from the camera) and the axis; a trunk the Visibility trace hits wins, else smallest ray distance. Writes `UB1WinchComponent::SetAimTarget` / `ClearAimTarget` (cleared by `ReleaseAnchor` too). Ghost: unattached absolute `UStaticMeshComponent` with the winch's `StrapMesh` / `StrapClearance` / `StrapWidth` via the new `UB1WinchAnchorComponent::GetRingTransform` (strap uses it too), `GhostMaterial` on `BP_B1Character`.
+  - "Attach" only on the aimed anchor, interaction point = aimed point; `GA_B1AttachHook` attaches at the aim (fails if the aim isn't the event's target). Winch window shows aim anchor, alpha, height, distance.
+  - Rig: step `LookAtActor` + `LookAtOffset` (control rotation every frame), per-step `bCheckHookHeight` / `HookHeightRange` (fail `hookH@<steps>`, logged per step), metrics `hookAlpha=` `hookPoint=` (m above the anchor actor). `B1OnFoot_HookAim` (`B1Tests/OnFoot`, X 5 m, Y −45 m, HookCarry's first 7 steps + teleport by `Tree_FirmPull`): look at 1.2 m → 1.200 (alpha 0.667); detach, look at 3 m → 1.600 (alpha 1.000).
+  - Headless winch `B1OnFoot*` 7/7 (`s416_onfoot.log`); `HookCarry` now hooks at the aim (1.6 m, it looks up after the teleport) and still pulls the jeep in (rest 1.50). PIE capture (HookAim rig auto-run, step 8 stretched, reverted): yellow ring on the trunk + "[E / X]  Attach". ADR-019 accepted.
   - **Aim.** `UB1HookAimComponent` on `AB1Character`. It ticks only while this character carries a hook. Each tick:
     1. find anchors in the interaction range;
     2. aim with the camera ray: a hit on the trunk is projected onto the area segment; otherwise take the closest point between the ray and the segment;

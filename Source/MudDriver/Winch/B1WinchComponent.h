@@ -158,6 +158,12 @@ public:
 	bool IsWinching() const { return IsAttached() && Pull > 0.0f; }
 	UB1WinchAnchorComponent* GetAnchor() const { return Anchor.Get(); }
 	float GetAnchorAlpha() const { return AnchorAlpha; }
+
+	/** Where a carried hook would go (ADR-019); written by the carrier's UB1HookAimComponent, cleared on any hook state change */
+	void SetAimTarget(UB1WinchAnchorComponent* Target, float Alpha);
+	void ClearAimTarget() { AimAnchor.Reset(); }
+	UB1WinchAnchorComponent* GetAimAnchor() const { return AimAnchor.Get(); }
+	float GetAimAlpha() const { return AimAlpha; }
 	/** On the trunk axis, where the sim pulls; the winch point when not attached */
 	FVector GetHookPoint() const;
 
@@ -193,6 +199,8 @@ private:
 
 	TWeakObjectPtr<UB1WinchAnchorComponent> Anchor;
 	float AnchorAlpha = 0.0f;
+	TWeakObjectPtr<UB1WinchAnchorComponent> AimAnchor;
+	float AimAlpha = 0.0f;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> Strap;

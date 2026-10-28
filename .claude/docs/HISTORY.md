@@ -1300,3 +1300,23 @@ The S4-09 check: the cable hooked a fixed point, not the trunk. S4-16 (aim) and 
 
 ### Open follow-ups
 - S4-16 hook aim, S4-17 log rebuild on an unscaled box root with its own area.
+
+## 2026-10-28 — S4-16: hook placement ghost
+
+### Context
+S4-15 gave anchors areas; the player needed to choose the point. ADR-019 proposed a ghost ring driven by the view ray.
+
+### What was built
+- `UB1HookAimComponent` on `AB1Character`: picks the anchor and alpha from the control-rotation ray and writes them on the carried winch (`SetAimTarget`). Shows a ghost ring (`MI_B1WinchStrapGhost` on `M_B1WinchGhost`, translucent unlit, built through MCP).
+- "Attach" only on the aimed anchor, `GA_B1AttachHook` uses the aim. `GetRingTransform` is shared by strap and ghost.
+- Rig: `LookAtActor` / `LookAtOffset`, per-step hook height check, `hookAlpha` / `hookPoint`. `B1OnFoot_HookAim` PASS (1.200 m and the 1.600 m clamp). User check passed.
+
+### Decisions made
+- ADR-019 accepted. Alpha = closest point between the ray and the axis, always. A ray hit only decides which anchor wins (a surface hit reads high when looking down).
+
+### What we learned
+- MCP can build materials: `MaterialTools.create_material`, `add_expression` (`/Script/Engine.MaterialExpressionVectorParameter`), `connect_to_output`, `recompile(material_or_function)`, then `MaterialInstanceTools.create`. BlendMode/ShadingModel go through `ObjectTools.set_properties` on the material.
+- For a PIE capture of a scripted moment, auto-run a rig (`bAutoRun`), stretch the step and capture after a matching `warmupSeconds`, then revert.
+
+### Open follow-ups
+- S4-17 fallen log (the user made `PM_B1Log`).

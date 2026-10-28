@@ -1,6 +1,7 @@
 #include "B1Character.h"
 #include "B1GameplayTags.h"
 #include "B1InteractionScanComponent.h"
+#include "B1HookAimComponent.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "Camera/CameraComponent.h"
@@ -26,6 +27,8 @@ AB1Character::AB1Character(const FObjectInitializer& ObjectInitializer)
 	HookHand = CreateDefaultSubobject<USceneComponent>(TEXT("HookHand"));
 	HookHand->SetupAttachment(FirstPersonCamera);
 	HookHand->SetRelativeLocation(FVector(40.0f, 25.0f, -35.0f));
+
+	HookAim = CreateDefaultSubobject<UB1HookAimComponent>(TEXT("HookAim"));
 
 	bUseControllerRotationYaw = true;
 	bUseControllerRotationPitch = false;

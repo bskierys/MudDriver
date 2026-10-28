@@ -47,6 +47,8 @@ public:
 	FVector GetAreaAxis() const;
 	/** Point on a ring of TrunkRadius + Clearance around the axis at Alpha, on the side facing Toward */
 	FVector GetSurfacePoint(float Alpha, const FVector& Toward, float Clearance) const;
+	/** World transform of a unit (100 cm) Z cylinder as a ring of TrunkRadius + Clearance, Width cm wide, at Alpha */
+	FTransform GetRingTransform(float Alpha, float Clearance, float Width) const;
 
 protected:
 

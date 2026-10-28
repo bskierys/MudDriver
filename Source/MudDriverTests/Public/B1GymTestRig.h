@@ -91,6 +91,20 @@ struct FB1GymInputStep
 	/** Checked when the step ends: player 0's pawn and State.Avatar tag; needs bPossessWithPlayer */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
 	EB1GymExpectAvatar ExpectAvatar = EB1GymExpectAvatar::Any;
+
+	/** Every frame of the step, points player 0's character view at this actor + LookAtOffset (world, cm) */
+	UPROPERTY(EditInstanceOnly, Category = "B1Test")
+	TObjectPtr<AActor> LookAtActor;
+
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	FVector LookAtOffset = FVector::ZeroVector;
+
+	/** Checked when the step ends: hook point height above the hooked anchor's actor, m */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (EditCondition = "bCheckHookHeight"))
+	FFloatInterval HookHeightRange = FFloatInterval(0.0f, 0.0f);
+
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (InlineEditConditionToggle))
+	bool bCheckHookHeight = false;
 };
 
 /** Pass criteria. Negative values disable a check */
@@ -328,6 +342,9 @@ private:
 	void SetAbilityInput(const FGameplayTag& InputTag);
 	void OnAbilityActivated(UGameplayAbility* Ability);
 	void CheckExpectAvatar(int32 StepIndex);
+	void CheckHookHeight(int32 StepIndex);
+	/** Hook point above the hooked anchor's actor, m; 0 when not attached */
+	float GetHookHeight() const;
 	void TeleportPlayerPawn(const FB1GymInputStep& Step);
 	/** The rig's on-foot character, or the one player 0 got out as */
 	AB1Character* GetWalker() const;
@@ -377,6 +394,7 @@ private:
 
 	/** Steps whose ExpectAvatar didn't hold, as step indices */
 	TArray<int32> AvatarFailures;
+	TArray<int32> HookHeightFailures;
 
 	/** Ability input tag currently held through the player controller */
 	FGameplayTag HeldAbilityInputTag;

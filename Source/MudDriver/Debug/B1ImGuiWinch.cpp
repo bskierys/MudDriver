@@ -145,6 +145,17 @@ namespace B1ImGui
 			ImGui::SameLine();
 			ImGui::Text("by %s, winch on %s", TCHAR_TO_UTF8(*GetNameSafe(Winch->GetHookCarrier())), TCHAR_TO_UTF8(*GetNameSafe(Vehicle)));
 			DrawBar("Carry m", Winch->GetCurrentLength() / 100.0f, Winch->MaxCableLength / 100.0f);
+			if (const UB1WinchAnchorComponent* Aim = Winch->GetAimAnchor())
+			{
+				const FVector AimPoint = Aim->GetAreaPoint(Winch->GetAimAlpha());
+				ImGui::Text("Aim: %s  alpha %.2f  height %.2f m  %.2f m away", TCHAR_TO_UTF8(*GetNameSafe(Aim->GetOwner())), Winch->GetAimAlpha(),
+					(AimPoint.Z - Aim->GetOwner()->GetActorLocation().Z) / 100.0f,
+					PlayerPawn ? FVector::Dist(PlayerPawn->GetActorLocation(), AimPoint) / 100.0f : 0.0f);
+			}
+			else
+			{
+				ImGui::TextDisabled("Aim: no anchor in reach");
+			}
 		}
 
 		if (const UB1WinchAnchorComponent* Anchor = Winch->GetAnchor())

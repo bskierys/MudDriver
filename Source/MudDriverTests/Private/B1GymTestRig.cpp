@@ -10,6 +10,7 @@
 #include "B1VehicleMovementComponent.h"
 #include "B1MudVehicleComponent.h"
 #include "B1WinchAnchorComponent.h"
+#include "Camera/CameraComponent.h"
 #include "B1WinchComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -202,6 +203,7 @@ void AB1GymTestRig::StartTest()
 
 	MaxTension = 0.0f;
 	MaxHold = 0.0f;
+	HookHeightFailures.Reset();
 	LastStepTension = FFloatInterval();
 	MaxAnchorDistance = 0.0f;
 
@@ -291,6 +293,7 @@ void AB1GymTestRig::EnterStep(int32 StepIndex)
 	if (CurrentStep != INDEX_NONE)
 	{
 		CheckExpectAvatar(CurrentStep);
+		CheckHookHeight(CurrentStep);
 	}
 	CurrentStep = StepIndex;
 	const FB1GymInputStep& Step = InputScript[StepIndex];
@@ -387,6 +390,30 @@ void AB1GymTestRig::CheckExpectAvatar(int32 StepIndex)
 	}
 }
 
+float AB1GymTestRig::GetHookHeight() const
+{
+	const UB1WinchAnchorComponent* Anchor = Winch ? Winch->GetAnchor() : nullptr;
+	return Anchor && Anchor->GetOwner() ? (Winch->GetHookPoint().Z - Anchor->GetOwner()->GetActorLocation().Z) / CmPerM : 0.0f;
+}
+
+void AB1GymTestRig::CheckHookHeight(int32 StepIndex)
+{
+	const FB1GymInputStep& Step = InputScript[StepIndex];
+	if (!Step.bCheckHookHeight)
+	{
+		return;
+	}
+
+	const float Height = GetHookHeight();
+	const bool bOk = Winch && Winch->IsAttached() && Height >= Step.HookHeightRange.Min && Height <= Step.HookHeightRange.Max;
+	if (!bOk)
+	{
+		HookHeightFailures.Add(StepIndex);
+	}
+	UE_LOG(LogB1Test, Log, TEXT("%s step %d: hook height %.3f m (%.2f..%.2f) alpha %.3f %s"), *GetName(), StepIndex, Height,
+		Step.HookHeightRange.Min, Step.HookHeightRange.Max, Winch ? Winch->GetAnchorAlpha() : -1.0f, bOk ? TEXT("ok") : TEXT("FAIL"));
+}
+
 void AB1GymTestRig::OnAbilityActivated(UGameplayAbility* Ability)
 {
 	++AbilityActivations;
@@ -474,6 +501,11 @@ void AB1GymTestRig::ApplyInput(const FB1GymInputStep& Step)
 	{
 		Walker->AddMovementInput(Walker->GetActorForwardVector(), Step.Move.X);
 		Walker->AddMovementInput(Walker->GetActorRightVector(), Step.Move.Y);
+		if (Step.LookAtActor && Walker->GetController())
+		{
+			const FVector Target = Step.LookAtActor->GetActorLocation() + Step.LookAtOffset;
+			Walker->GetController()->SetControlRotation((Target - Walker->GetFirstPersonCamera()->GetComponentLocation()).Rotation());
+		}
 	}
 	if (Character)
 	{
@@ -603,6 +635,7 @@ void AB1GymTestRig::FinishScript()
 	if (CurrentStep != INDEX_NONE)
 	{
 		CheckExpectAvatar(CurrentStep);
+		CheckHookHeight(CurrentStep);
 	}
 	ApplyInput(FB1GymInputStep());
 	SetAbilityInput(FGameplayTag());
@@ -712,7 +745,12 @@ void AB1GymTestRig::FinishScript()
 		{
 			Failures.Add(FString::Printf(TEXT("carryMax>%.2f"), Thresholds.MaxCarryDistance));
 		}
-		WinchMetrics = FString::Printf(TEXT(" hook=%s carryMax=%.2f"), *HookName, CarryDistance);
+		if (!HookHeightFailures.IsEmpty())
+		{
+			Failures.Add(FString::Printf(TEXT("hookH@%s"), *FString::JoinBy(HookHeightFailures, TEXT("/"), [](int32 Step) { return FString::FromInt(Step); })));
+		}
+		WinchMetrics = FString::Printf(TEXT(" hook=%s carryMax=%.2f hookAlpha=%.3f hookPoint=%.3f"), *HookName, CarryDistance,
+			Winch->IsAttached() ? Winch->GetAnchorAlpha() : -1.0f, GetHookHeight());
 
 		const float TensionOscillation = LastStepTension.IsValid() ? LastStepTension.Size() : 0.0f;
 		const float TensionMinLast = LastStepTension.IsValid() ? LastStepTension.Min : 0.0f;

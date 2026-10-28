@@ -13,10 +13,12 @@ void UB1WinchAnchorComponent::GatherInteractionOptions(const AB1Character& Chara
 
 	if (const UB1WinchComponent* Carried = UB1WinchComponent::FindCarriedBy(&Character))
 	{
-		if (!Carried->IsInReach(this))
+		// Only the aimed anchor offers it, at the aimed point, so the prompt and the attach agree (ADR-017, ADR-019).
+		if (Carried->GetAimAnchor() != this)
 		{
 			return;
 		}
+		Option.InteractionPoint = GetAreaPoint(Carried->GetAimAlpha());
 		Option.Text = NSLOCTEXT("B1Winch", "AttachHook", "Attach");
 		Option.TriggerEventTag = B1GameplayTags::Event_Interact_AttachHook;
 	}
@@ -75,6 +77,13 @@ FVector UB1WinchAnchorComponent::GetSurfacePoint(float Alpha, const FVector& Tow
 	const FVector Center = GetAreaPoint(Alpha);
 	const FVector Radial = FVector::VectorPlaneProject(Toward - Center, GetAreaAxis()).GetSafeNormal();
 	return Center + Radial * (TrunkRadius + Clearance);
+}
+
+FTransform UB1WinchAnchorComponent::GetRingTransform(float Alpha, float Clearance, float Width) const
+{
+	constexpr float UnitMeshSize = 100.0f;
+	const float Diameter = 2.0f * (TrunkRadius + Clearance);
+	return FTransform(FRotationMatrix::MakeFromZ(GetAreaAxis()).ToQuat(), GetAreaPoint(Alpha), FVector(Diameter, Diameter, Width) / UnitMeshSize);
 }
 
 void UB1WinchAnchorComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)

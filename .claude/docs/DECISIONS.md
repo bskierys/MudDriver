@@ -416,7 +416,9 @@ The CVar is global; there's no per-vehicle or per-surface switch.
 
 ## ADR-019 — Winch anchors are areas; the hook is placed by aiming
 
-**Status:** proposed (2026-10-28, fallen tree replan; S4-15/16)
+**Status:** accepted (2026-10-28, S4-16: `B1OnFoot_HookAim` hooks at 1.200 m aiming at 1.2 m, clamps to 1.600 m aiming at 3 m)
+
+**Built (S4-16).** The alpha always comes from the closest point between the view ray and the axis, so the hook lands where the view points at the axis. Projecting a surface hit read a few cm high when looking down at a trunk. A trunk the ray actually hits only decides which anchor wins, and otherwise the anchor with the smallest ray-to-point distance does. The ray is the pawn's control rotation from the camera location (the camera transform only follows the control rotation when the view updates). The aim range is the interaction scan's `Range`, so the ghost and the prompt agree.
 
 **Problem.** Anchors were single points: an 80 cm point on a tree, an end cap on the log. The cable hung off the side of the trunk, and the player couldn't choose where to hook, which the fallen tree needs.
 

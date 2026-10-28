@@ -7,6 +7,7 @@
 
 class UCameraComponent;
 class UB1InteractionScanComponent;
+class UB1HookAimComponent;
 class UInputAction;
 struct FInputActionValue;
 
@@ -49,6 +50,9 @@ protected:
 	/** A carried winch cable ends here */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction")
 	TObjectPtr<USceneComponent> HookHand;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction")
+	TObjectPtr<UB1HookAimComponent> HookAim;
 
 	// Mapping contexts are swapped by AB1PlayerController on possession.
 	UPROPERTY(EditDefaultsOnly, Category = "Input")

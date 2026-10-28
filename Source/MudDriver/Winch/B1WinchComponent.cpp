@@ -14,12 +14,6 @@
 #include "UObject/ConstructorHelpers.h"
 #include "UObject/UObjectIterator.h"
 
-namespace
-{
-	/** Engine BasicShapes are 100 cm across */
-	constexpr float UnitMeshSize = 100.0f;
-}
-
 UB1WinchComponent::UB1WinchComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -192,6 +186,12 @@ bool UB1WinchComponent::AttachTo(UB1WinchAnchorComponent* NewAnchor, float AreaA
 	return true;
 }
 
+void UB1WinchComponent::SetAimTarget(UB1WinchAnchorComponent* Target, float Alpha)
+{
+	AimAnchor = Target;
+	AimAlpha = FMath::Clamp(Alpha, 0.0f, 1.0f);
+}
+
 FVector UB1WinchComponent::GetHookPoint() const
 {
 	return Anchor.IsValid() ? Anchor->GetAreaPoint(AnchorAlpha) : GetComponentLocation();
@@ -227,10 +227,7 @@ void UB1WinchComponent::CreateStrap(UB1WinchAnchorComponent& Target)
 	}
 	Strap->RegisterComponent();
 
-	const float Diameter = 2.0f * (Target.TrunkRadius + StrapClearance);
-	const FTransform World(FRotationMatrix::MakeFromZ(Target.GetAreaAxis()).ToQuat(), Target.GetAreaPoint(AnchorAlpha),
-		FVector(Diameter, Diameter, StrapWidth) / UnitMeshSize);
-	Strap->SetWorldTransform(World);
+	Strap->SetWorldTransform(Target.GetRingTransform(AnchorAlpha, StrapClearance, StrapWidth));
 	// Follows a moving anchor (log); KeepWorld so a scaled parent doesn't distort it.
 	Strap->AttachToComponent(&Target, FAttachmentTransformRules::KeepWorldTransform);
 }
@@ -359,6 +356,7 @@ void UB1WinchComponent::ReleaseAnchor()
 			RestLength / 100.0f, PeakTension, MaxPullForce);
 	}
 	Anchor.Reset();
+	ClearAimTarget();
 	if (Strap)
 	{
 		Strap->DestroyComponent();
