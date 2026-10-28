@@ -1028,7 +1028,16 @@ Plan: [plans/2026-10-28-fallen-tree.md](plans/2026-10-28-fallen-tree.md) (critiq
   **Done:** builds; both rigs PASS headless; winch, mud and core suites PASS; the IMC list matches the layout above.
   **User check:** hook a tree, hold B and reel in: the jeep stays put; let go of B: the jeep gets pulled; Y / Q do nothing in the jeep; A doesn't brake; B / Space work as a normal handbrake while driving.
 
-- [ ] **S4-15** Anchor areas + pull at the trunk axis (3 h)
+- [x] **S4-15** Anchor areas + pull at the trunk axis (3 h) <!-- done: 2026-10-28 -->
+  Result:
+  - `UB1WinchAnchorComponent`: `AreaStart` / `AreaEnd` / `TrunkRadius` (`Winch|Anchor`), points in the component's frame **without scale**; both zero = the old single point (the log until S4-17). `GetAreaPoint`, `GetAreaAlphaClosestTo`, `GetAreaAlphaClosestToRay` (for S4-16), `GetClosestAreaPoint`, `GetAreaAxis`, `GetSurfacePoint`. `FindNearest`, the option point and `IsInReach` use the closest area point.
+  - `UB1WinchComponent::AttachTo(Anchor, AreaAlpha)` (negative = point nearest the winch); `GetHookPoint` / `GetAnchorAlpha`. Sim input, the S4-09 body-frame offset, `GetCurrentLength` use the hook point. Cable `EndLocation` follows the strap surface facing the winch every tick (end component's space, scale included). Cable also blocks PhysicsBody.
+  - Strap: `UStaticMeshComponent` from `StrapMesh` (engine cylinder default), `StrapWidth` 15, `StrapClearance` 2, no collision, attached KeepWorld to the anchor, destroyed in `ReleaseAnchor`. `MI_B1WinchStrap` (duplicate of the cable MI, color 0.015 grey) on `BP_B1Jeep`'s `StrapMaterial`.
+  - `AB1WinchTree` defaults: anchor at 80 cm, area −40..+80 (40–160 cm), radius 25 (trunk 0.5 scale cylinder = 50 cm). `BP_B1WinchTree` inherits them.
+  - Callers: `StartAnchorAlpha` (0.5); `B1WinchAttachNearest` / `ToggleAttachNearest` point nearest the winch; `GA_B1AttachHook` point nearest the hand (S4-16 replaces with aim); rig `WinchAnchorAlpha` default 1/3 (= old 80 cm).
+  - Debug: `ShowDebug B1Winch` draws each area (orange hooked, green in range) and the hook point, winch line shows alpha; Winch window shows alpha and cm along the area.
+  - Simulate capture (temp jeep 7 m from `Tree_FirmPull`, StartAnchor alpha 0.33, deleted after): black strap around the trunk at 80 cm, cable leaves its jeep side.
+  - Headless winch 30/30 (`s415_winch.log`): tree rigs unchanged (FirmPull 29 228 N, Stability20 38 231 N, CableLimit rest 77.79). Core and mud not rerun (anchors not used there).
   - **Area.** `UB1WinchAnchorComponent` gets an area:
     - `AreaStart` / `AreaEnd` (local points on the trunk axis) and `TrunkRadius`;
     - `GetAreaPoint(Alpha)`, plus closest-point helpers for a world point or a ray.

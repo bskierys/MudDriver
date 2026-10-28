@@ -9,7 +9,7 @@ void UB1WinchAnchorComponent::GatherInteractionOptions(const AB1Character& Chara
 {
 	FB1InteractionOption Option;
 	Option.Priority = 10;
-	Option.InteractionPoint = GetComponentLocation();
+	Option.InteractionPoint = GetClosestAreaPoint(Character.GetActorLocation());
 
 	if (const UB1WinchComponent* Carried = UB1WinchComponent::FindCarriedBy(&Character))
 	{
@@ -38,6 +38,45 @@ UPrimitiveComponent* UB1WinchAnchorComponent::GetSimulatingBody() const
 	return Body && Body->IsSimulatingPhysics() && Body->GetBodyInstance() ? Body : nullptr;
 }
 
+FVector UB1WinchAnchorComponent::ToWorld(const FVector& Local) const
+{
+	return GetComponentLocation() + GetComponentQuat().RotateVector(Local);
+}
+
+FVector UB1WinchAnchorComponent::GetAreaPoint(float Alpha) const
+{
+	return ToWorld(FMath::Lerp(AreaStart, AreaEnd, FMath::Clamp(Alpha, 0.0f, 1.0f)));
+}
+
+float UB1WinchAnchorComponent::GetAreaAlphaClosestTo(const FVector& WorldPoint) const
+{
+	const FVector Start = ToWorld(AreaStart);
+	const FVector Segment = ToWorld(AreaEnd) - Start;
+	const double LengthSq = Segment.SizeSquared();
+	return LengthSq > UE_KINDA_SMALL_NUMBER ? FMath::Clamp(static_cast<float>(((WorldPoint - Start) | Segment) / LengthSq), 0.0f, 1.0f) : 0.0f;
+}
+
+float UB1WinchAnchorComponent::GetAreaAlphaClosestToRay(const FVector& Origin, const FVector& Direction, float Length) const
+{
+	FVector OnArea;
+	FVector OnRay;
+	FMath::SegmentDistToSegmentSafe(ToWorld(AreaStart), ToWorld(AreaEnd), Origin, Origin + Direction.GetSafeNormal() * Length, OnArea, OnRay);
+	return GetAreaAlphaClosestTo(OnArea);
+}
+
+FVector UB1WinchAnchorComponent::GetAreaAxis() const
+{
+	const FVector Axis = GetComponentQuat().RotateVector(AreaEnd - AreaStart);
+	return Axis.IsNearlyZero() ? GetUpVector() : Axis.GetSafeNormal();
+}
+
+FVector UB1WinchAnchorComponent::GetSurfacePoint(float Alpha, const FVector& Toward, float Clearance) const
+{
+	const FVector Center = GetAreaPoint(Alpha);
+	const FVector Radial = FVector::VectorPlaneProject(Toward - Center, GetAreaAxis()).GetSafeNormal();
+	return Center + Radial * (TrunkRadius + Clearance);
+}
+
 void UB1WinchAnchorComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	while (UB1WinchComponent* Winch = UB1WinchComponent::FindAttachedTo(this))
@@ -60,7 +99,7 @@ UB1WinchAnchorComponent* UB1WinchAnchorComponent::FindNearest(const UWorld* Worl
 			continue;
 		}
 
-		const float DistSq = FVector::DistSquared(Location, Anchor->GetComponentLocation());
+		const float DistSq = FVector::DistSquared(Location, Anchor->GetClosestAreaPoint(Location));
 		if (DistSq <= NearestDistSq)
 		{
 			NearestDistSq = DistSq;

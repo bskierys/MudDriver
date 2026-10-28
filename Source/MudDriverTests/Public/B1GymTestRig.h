@@ -294,6 +294,10 @@ protected:
 	UPROPERTY(EditInstanceOnly, Category = "B1Test|Config")
 	TObjectPtr<AActor> WinchAnchor;
 
+	/** Where on WinchAnchor's area; 1/3 is 80 cm on a tree, the pre-area hook height */
+	UPROPERTY(EditAnywhere, Category = "B1Test|Config", meta = (ClampMin = "0", ClampMax = "1"))
+	float WinchAnchorAlpha = 1.0f / 3.0f;
+
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
 	FB1GymThresholds Thresholds;
 

@@ -1278,3 +1278,25 @@ First task of the fallen tree replan. Reeling in pulled the jeep toward any heav
 ### Open follow-ups
 - Suspected: the mud idle check (`FB1MudSimulation::PreFriction`) reads the same empty `VehicleInputs`, which may zero the brake torque on muddy slopes. In the Sprint 4 backlog.
 - User re-check of the late-B order.
+
+## 2026-10-28 — S4-15: anchor areas, strap, pull at the trunk axis
+
+### Context
+The S4-09 check: the cable hooked a fixed point, not the trunk. S4-16 (aim) and S4-17 (log) both need a hook point anywhere along a trunk.
+
+### What was built
+- `UB1WinchAnchorComponent` area (`AreaStart` / `AreaEnd` / `TrunkRadius`, unscaled component frame) with point, closest-point and ray helpers.
+- `UB1WinchComponent::AttachTo(Anchor, Alpha)`: the sim pulls at the axis point, and the cable ends on the strap surface facing the winch. A black strap ring (`MI_B1WinchStrap`) shows while attached. The cable now rests on PhysicsBody too.
+- Tree area 40–160 cm, radius 25. Rig `WinchAnchorAlpha` (1/3 = old height), `StartAnchorAlpha`. ShowDebug draws the areas and the hook point.
+- Winch 30/30 headless, tree numbers unchanged. User check passed ("works well").
+
+### Decisions made
+- Area points ignore component scale (the S4-09 scale bug class); an empty area = the old single point, so the log keeps working until S4-17.
+- On-foot attach uses the point nearest the hand until S4-16's aim.
+
+### What we learned
+- `UCableComponent::EndLocation` is in the end component's space with scale, so it's set through `InverseTransformPosition`.
+- MCP: a BP's C++ default subobject is reachable as `/Game/...BP.Default__BP_C:<Name>`. `list_properties` on a material instance is ~30k chars; go straight to `get_properties` (`Parent`, `VectorParameterValues`).
+
+### Open follow-ups
+- S4-16 hook aim, S4-17 log rebuild on an unscaled box root with its own area.

@@ -71,7 +71,8 @@ UB1GameplayAbility_AttachHook::UB1GameplayAbility_AttachHook()
 bool UB1GameplayAbility_AttachHook::RunHookAction(AB1Character& Character, AActor& Target) const
 {
 	UB1WinchComponent* Winch = UB1WinchComponent::FindCarriedBy(&Character);
-	return Winch && Winch->AttachTo(Target.FindComponentByClass<UB1WinchAnchorComponent>());
+	UB1WinchAnchorComponent* Anchor = Target.FindComponentByClass<UB1WinchAnchorComponent>();
+	return Winch && Anchor && Winch->AttachTo(Anchor, Anchor->GetAreaAlphaClosestTo(Character.GetHookHand()->GetComponentLocation()));
 }
 
 UB1GameplayAbility_DetachHook::UB1GameplayAbility_DetachHook()

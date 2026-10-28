@@ -6,6 +6,7 @@
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
 #include "Engine/World.h"
+#include "DrawDebugHelpers.h"
 #include "UObject/UObjectIterator.h"
 
 namespace B1WinchShowDebug
@@ -49,7 +50,7 @@ namespace B1WinchShowDebug
 				continue;
 			}
 
-			const float Distance = FVector::Dist(WinchLocation, Anchor->GetComponentLocation());
+			const float Distance = FVector::Dist(WinchLocation, Anchor->GetClosestAreaPoint(WinchLocation));
 			if (Distance > AnchorDrawDistance)
 			{
 				continue;
@@ -57,6 +58,13 @@ namespace B1WinchShowDebug
 
 			const bool bInRange = Distance <= Winch.MaxCableLength;
 			const bool bHooked = Winch.GetAnchor() == Anchor;
+			// One frame each: ShowDebug redraws every frame.
+			const FColor AreaColor = bHooked ? FColor::Orange : bInRange ? FColor::Green : FColor(160, 160, 160);
+			DrawDebugLine(World, Anchor->GetAreaPoint(0.0f), Anchor->GetAreaPoint(1.0f), AreaColor, false, -1.0f, SDPG_Foreground, 3.0f);
+			if (bHooked)
+			{
+				DrawDebugPoint(World, Winch.GetHookPoint(), 12.0f, FColor::Red, false, -1.0f, SDPG_Foreground);
+			}
 			TArray<FString> Lines;
 			Lines.Add(Anchor->GetOwner()->GetActorNameOrLabel());
 			Lines.Add(FString::Printf(TEXT("%.1f m  %s"), Distance / 100.0f,
@@ -77,7 +85,7 @@ namespace B1WinchShowDebug
 		const UB1WinchAnchorComponent* Anchor = Winch.GetAnchor();
 		if (Anchor && Anchor->GetOwner())
 		{
-			Lines.Add(FString::Printf(TEXT("winch  %s"), *Anchor->GetOwner()->GetActorNameOrLabel()));
+			Lines.Add(FString::Printf(TEXT("winch  %s  alpha %.2f"), *Anchor->GetOwner()->GetActorNameOrLabel(), Winch.GetAnchorAlpha()));
 			Lines.Add(FString::Printf(TEXT("tension %5.1f / %.1f kN"), Winch.GetTension() / 1000.0f, Winch.MaxPullForce / 1000.0f));
 			Lines.Add(FString::Printf(TEXT("length %5.2f / %.0f m  rest %.2f m"), Winch.GetCurrentLength() / 100.0f,
 				Winch.MaxCableLength / 100.0f, Winch.GetRestLength() / 100.0f));

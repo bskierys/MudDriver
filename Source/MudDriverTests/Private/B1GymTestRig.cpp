@@ -221,13 +221,13 @@ void AB1GymTestRig::StartTest()
 			FinishTest(EFunctionalTestResult::Error, TEXT("WinchAnchor needs a UB1WinchComponent on the vehicle and a UB1WinchAnchorComponent on the anchor"));
 			return;
 		}
-		if (!Winch->AttachTo(Anchor))
+		if (!Winch->AttachTo(Anchor, WinchAnchorAlpha))
 		{
 			FinishTest(EFunctionalTestResult::Error, TEXT("WinchAnchor is out of the cable's reach"));
 			return;
 		}
 		AnchorStart = WinchAnchor->GetActorLocation();
-		AnchorPullDirection = (Winch->GetComponentLocation() - Anchor->GetComponentLocation()).GetSafeNormal();
+		AnchorPullDirection = (Winch->GetComponentLocation() - Winch->GetHookPoint()).GetSafeNormal();
 	}
 	if (!Winch && Thresholds.ExpectHook != EB1GymExpectHook::Any)
 	{

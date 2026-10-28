@@ -7,7 +7,7 @@
 class UStaticMeshComponent;
 class UB1WinchAnchorComponent;
 
-/** Placeholder tree: a trunk mesh (set in BP) with a winch anchor at strap height */
+/** Placeholder tree: a trunk mesh (set in BP) with a winch anchor area at strap height */
 UCLASS()
 class MUDDRIVER_API AB1WinchTree : public AActor
 {

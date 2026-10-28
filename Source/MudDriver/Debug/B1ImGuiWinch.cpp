@@ -149,7 +149,8 @@ namespace B1ImGui
 
 		if (const UB1WinchAnchorComponent* Anchor = Winch->GetAnchor())
 		{
-			ImGui::Text("Anchor: %s", TCHAR_TO_UTF8(*GetNameSafe(Anchor->GetOwner())));
+			ImGui::Text("Anchor: %s  alpha %.2f  (%.0f cm along the area)", TCHAR_TO_UTF8(*GetNameSafe(Anchor->GetOwner())),
+				Winch->GetAnchorAlpha(), FVector::Dist(Anchor->GetAreaPoint(0.0f), Winch->GetHookPoint()));
 			if (ImGui::Button("Detach"))
 			{
 				Winch->Detach();
@@ -161,7 +162,7 @@ namespace B1ImGui
 			if (Nearest)
 			{
 				ImGui::Text("Not attached; nearest %s at %.1f m", TCHAR_TO_UTF8(*GetNameSafe(Nearest->GetOwner())),
-					FVector::Dist(Winch->GetComponentLocation(), Nearest->GetComponentLocation()) / 100.0f);
+					FVector::Dist(Winch->GetComponentLocation(), Nearest->GetClosestAreaPoint(Winch->GetComponentLocation())) / 100.0f);
 			}
 			else
 			{

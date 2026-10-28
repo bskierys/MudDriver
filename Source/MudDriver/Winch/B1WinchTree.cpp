@@ -13,4 +13,8 @@ AB1WinchTree::AB1WinchTree()
 	Anchor = CreateDefaultSubobject<UB1WinchAnchorComponent>(TEXT("Anchor"));
 	Anchor->SetupAttachment(RootComponent);
 	Anchor->SetRelativeLocation(FVector(0.0f, 0.0f, 80.0f));
+	// 40..160 cm above the root; alpha 1/3 is the old 80 cm hook height.
+	Anchor->AreaStart = FVector(0.0f, 0.0f, -40.0f);
+	Anchor->AreaEnd = FVector(0.0f, 0.0f, 80.0f);
+	Anchor->TrunkRadius = 25.0f;
 }

@@ -7,14 +7,26 @@
 #include "AbilitySystemGlobals.h"
 #include "CableComponent.h"
 #include "Components/PrimitiveComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "UObject/ConstructorHelpers.h"
 #include "UObject/UObjectIterator.h"
+
+namespace
+{
+	/** Engine BasicShapes are 100 cm across */
+	constexpr float UnitMeshSize = 100.0f;
+}
 
 UB1WinchComponent::UB1WinchComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.TickGroup = TG_PrePhysics;
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	StrapMesh = Cylinder.Object;
 }
 
 void UB1WinchComponent::BeginPlay()
@@ -29,7 +41,7 @@ void UB1WinchComponent::BeginPlay()
 
 	if (StartAnchor)
 	{
-		AttachTo(StartAnchor->FindComponentByClass<UB1WinchAnchorComponent>());
+		AttachTo(StartAnchor->FindComponentByClass<UB1WinchAnchorComponent>(), StartAnchorAlpha);
 	}
 }
 
@@ -50,6 +62,7 @@ void UB1WinchComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 	}
 
 	TickCarriedHook();
+	UpdateAttachedCableEnd();
 	ReadSimOutput();
 	SendSimInput();
 	SetWinchingTag(IsWinching());
@@ -67,12 +80,12 @@ void UB1WinchComponent::SendSimInput()
 	{
 		const USceneComponent* Body = Movement->UpdatedComponent;
 		Input.bAttached = true;
-		Input.AnchorLocation = AnchorComponent->GetComponentLocation();
+		Input.AnchorLocation = GetHookPoint();
 		if (const UPrimitiveComponent* AnchorBody = AnchorComponent->GetSimulatingBody())
 		{
 			Input.AnchorProxy = AnchorBody->GetBodyInstance()->GetPhysicsActor();
 			// The physics body frame has no scale, so no GetRelativeTransform (a scaled log would put the point off).
-			Input.AnchorPointLocal = AnchorBody->GetComponentQuat().UnrotateVector(AnchorComponent->GetComponentLocation() - AnchorBody->GetComponentLocation());
+			Input.AnchorPointLocal = AnchorBody->GetComponentQuat().UnrotateVector(Input.AnchorLocation - AnchorBody->GetComponentLocation());
 		}
 		Input.WinchPointLocal = Body ? GetComponentTransform().GetRelativeTransform(Body->GetComponentTransform()).GetLocation() : FVector::ZeroVector;
 		Input.AttachSerial = AttachSerial;
@@ -132,15 +145,16 @@ void UB1WinchComponent::SetWinchingTag(bool bWinching)
 	bWinchingTagSet = bWanted;
 }
 
-bool UB1WinchComponent::AttachTo(UB1WinchAnchorComponent* NewAnchor)
+bool UB1WinchComponent::AttachTo(UB1WinchAnchorComponent* NewAnchor, float AreaAlpha)
 {
 	if (!NewAnchor)
 	{
 		return false;
 	}
 
-	const float Distance = FVector::Dist(GetComponentLocation(), NewAnchor->GetComponentLocation());
-	if (!IsInReach(NewAnchor))
+	const float Alpha = AreaAlpha < 0.0f ? NewAnchor->GetAreaAlphaClosestTo(GetComponentLocation()) : FMath::Min(AreaAlpha, 1.0f);
+	const float Distance = FVector::Dist(GetComponentLocation(), NewAnchor->GetAreaPoint(Alpha));
+	if (Distance > MaxCableLength)
 	{
 		UE_LOG(LogB1Physics, Warning, TEXT("%s winch: %s is %.1f m away, max %.1f m"), *GetNameSafe(GetOwner()),
 			*GetNameSafe(NewAnchor->GetOwner()), Distance / 100.0f, MaxCableLength / 100.0f);
@@ -151,6 +165,7 @@ bool UB1WinchComponent::AttachTo(UB1WinchAnchorComponent* NewAnchor)
 	HookCarrier.Reset();
 
 	Anchor = NewAnchor;
+	AnchorAlpha = Alpha;
 	++AttachSerial;
 	InitialRestLength = Distance;
 	RestLength = Distance;
@@ -167,12 +182,57 @@ bool UB1WinchComponent::AttachTo(UB1WinchAnchorComponent* NewAnchor)
 	{
 		CreateCable(*NewAnchor, RestLength);
 	}
+	UpdateAttachedCableEnd();
+	CreateStrap(*NewAnchor);
 
 	SendSimInput();
 
-	UE_LOG(LogB1Physics, Log, TEXT("%s winch attached to %s, rest %.2f m"), *GetNameSafe(GetOwner()),
-		*GetNameSafe(NewAnchor->GetOwner()), RestLength / 100.0f);
+	UE_LOG(LogB1Physics, Log, TEXT("%s winch attached to %s at alpha %.2f, rest %.2f m"), *GetNameSafe(GetOwner()),
+		*GetNameSafe(NewAnchor->GetOwner()), AnchorAlpha, RestLength / 100.0f);
 	return true;
+}
+
+FVector UB1WinchComponent::GetHookPoint() const
+{
+	return Anchor.IsValid() ? Anchor->GetAreaPoint(AnchorAlpha) : GetComponentLocation();
+}
+
+void UB1WinchComponent::UpdateAttachedCableEnd()
+{
+	const UB1WinchAnchorComponent* AnchorComponent = Anchor.Get();
+	if (!Cable || !AnchorComponent)
+	{
+		return;
+	}
+
+	// EndLocation is in the end component's space, scale included.
+	const FVector Surface = AnchorComponent->GetSurfacePoint(AnchorAlpha, GetComponentLocation(), StrapClearance);
+	Cable->EndLocation = AnchorComponent->GetComponentTransform().InverseTransformPosition(Surface);
+}
+
+void UB1WinchComponent::CreateStrap(UB1WinchAnchorComponent& Target)
+{
+	if (!StrapMesh)
+	{
+		return;
+	}
+
+	Strap = NewObject<UStaticMeshComponent>(GetOwner(), TEXT("WinchStrap"));
+	Strap->SetStaticMesh(StrapMesh);
+	Strap->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Strap->SetCastShadow(false);
+	if (StrapMaterial)
+	{
+		Strap->SetMaterial(0, StrapMaterial);
+	}
+	Strap->RegisterComponent();
+
+	const float Diameter = 2.0f * (Target.TrunkRadius + StrapClearance);
+	const FTransform World(FRotationMatrix::MakeFromZ(Target.GetAreaAxis()).ToQuat(), Target.GetAreaPoint(AnchorAlpha),
+		FVector(Diameter, Diameter, StrapWidth) / UnitMeshSize);
+	Strap->SetWorldTransform(World);
+	// Follows a moving anchor (log); KeepWorld so a scaled parent doesn't distort it.
+	Strap->AttachToComponent(&Target, FAttachmentTransformRules::KeepWorldTransform);
 }
 
 void UB1WinchComponent::CreateCable(USceneComponent& End, float Length)
@@ -284,6 +344,8 @@ void UB1WinchComponent::SetupCableCollision(UCableComponent& CableComponent) con
 	CableComponent.SetCollisionResponseToAllChannels(ECR_Ignore);
 	CableComponent.SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
 	CableComponent.SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+	// Rests on a log lying under it.
+	CableComponent.SetCollisionResponseToChannel(ECC_PhysicsBody, ECR_Block);
 	CableComponent.SetCollisionResponseToChannel(GetDefault<UB1MudSettings>()->MudObjectChannel, ECR_Block);
 }
 
@@ -297,6 +359,15 @@ void UB1WinchComponent::ReleaseAnchor()
 			RestLength / 100.0f, PeakTension, MaxPullForce);
 	}
 	Anchor.Reset();
+	if (Strap)
+	{
+		Strap->DestroyComponent();
+		Strap = nullptr;
+	}
+	if (Cable)
+	{
+		Cable->EndLocation = FVector::ZeroVector;
+	}
 	RestLength = 0.0f;
 	Tension = 0.0f;
 	HoldForce = 0.0f;
@@ -331,7 +402,7 @@ EB1WinchHook UB1WinchComponent::GetHookState() const
 
 bool UB1WinchComponent::IsInReach(const UB1WinchAnchorComponent* Target) const
 {
-	return Target && FVector::Dist(GetComponentLocation(), Target->GetComponentLocation()) <= MaxCableLength;
+	return Target && FVector::Dist(GetComponentLocation(), Target->GetClosestAreaPoint(GetComponentLocation())) <= MaxCableLength;
 }
 
 UB1WinchComponent* UB1WinchComponent::FindCarriedBy(const AActor* Carrier)
@@ -383,6 +454,9 @@ UB1WinchAnchorComponent* UB1WinchComponent::FindNearestAnchor() const
 
 float UB1WinchComponent::GetCurrentLength() const
 {
-	const USceneComponent* HookEnd = Anchor.IsValid() ? static_cast<const USceneComponent*>(Anchor.Get()) : HookCarrier.Get();
-	return HookEnd ? FVector::Dist(GetComponentLocation(), HookEnd->GetComponentLocation()) : 0.0f;
+	if (Anchor.IsValid())
+	{
+		return FVector::Dist(GetComponentLocation(), GetHookPoint());
+	}
+	return HookCarrier.IsValid() ? FVector::Dist(GetComponentLocation(), HookCarrier->GetComponentLocation()) : 0.0f;
 }
