@@ -439,3 +439,24 @@ The CVar is global; there's no per-vehicle or per-surface switch.
 - Several fixed hook points per anchor (the user explicitly didn't want this).
 - A GAS targeting actor (`WaitTargetData` + world reticle; heavier, and the carry isn't a long-running ability today).
 - Hooking at the trunk surface point (adds torque that rolls a log).
+
+---
+
+## ADR-020 — Vehicle looks: pawn BP variants on the shared Offroad skeleton
+
+**Status:** accepted (2026-11-07)
+
+**Problem.** The player jeep should look like a Jeep Wrangler (Sketchfab FBX), keep the template buggy available, and keep working with the existing Chaos setup, AnimBP wheel controller, mud, fuel and winch. The Sketchfab model is a static part hierarchy with no bones, and the Unreal MCP can't set an AnimBP's target skeleton.
+
+**Decision.**
+- Each look is a child BP of `BP_B1Jeep` (`BP_B1Jeep_Wrangler`) that overrides only visuals and geometry-bound values: mesh, AnimBP, chassis/tire meshes, wheel classes (radius/width), COM, winch point, cameras. The game modes and controller pick the look (`DefaultPawnClass`, `VehiclePawnClass`).
+- Vehicle meshes are generated offline (`Scripts/VehicleImport`): SM body + one centred SM tire + a small SKM whose bones are a subset of `SKM_Offroad_Skeleton` (`OffroadCar`, `PhysWheel_*`) with `VisWheel_*` mesh sockets on the wheel bones. The SKM shares that skeleton, and the AnimBP is a copy of `Offroad_AnimBP` without the suspension ControlRig.
+
+**Rationale.** Gameplay stays in `AB1Jeep` / `BP_B1Jeep`, so a look swap changes no code and no tuning beyond what the geometry dictates. Sharing a skeleton is standard UE and is the only MCP-reachable way to get a working AnimBP. Sockets let the C++ tire components (attached to `VisWheel_*`) follow the wheel bones without touching code.
+
+**Alternatives.**
+- Rigid-hierarchy skeletal import of the raw FBX (no control over bone names or pivots; wheels would pivot at the origin).
+- Overlaying the Wrangler on the buggy's skeleton without moving the wheels (buggy track 2.3 m doesn't fit a jeep body).
+- A native wheel-visual component instead of an AnimBP (new C++ for something the template already does).
+
+**Consequences.** `SKM_Offroad_Skeleton` is now shared; removing the template car means moving the skeleton first. The Wrangler mesh carries the skeleton's unused suspension bones at their Offroad ref pose. Gym rigs still spawn `BP_B1Jeep`, so tests keep the buggy's geometry.

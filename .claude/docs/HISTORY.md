@@ -1402,3 +1402,30 @@ Last Sprint 4 task: the Phase 2 playtest after the fallen tree work (S4-14..S4-1
 ### Open follow-ups
 - Next is Phase 3 (River): replan with `/plan-new` before starting.
 - Backlog: mud idle check reading empty inputs (S4-14) is still unverified.
+
+## 2026-11-07 — Wrangler look for the player jeep
+
+### Context
+Before Phase 3 the user wanted the prototype to look better: drive a Jeep Wrangler (Sketchfab "jeep-wrangler-1997-reworked" FBX, concept shot `Concept/jeep-wrangler.png`) instead of the template buggy, keep the buggy switchable, and lay the files out like `Vehicles/OffroadCar`. The user had dumped a raw Interchange import (~100 part meshes, Lambert MIs, 4K textures) into `Vehicles/Wrangler/textures`.
+
+### What was built
+- `Scripts/VehicleImport/` (Python + numpy/pillow, see its README): binary FBX reader, scene baker, ASCII FBX writer, `convert_wrangler.py` (drops the turntable; writes `SM_Wrangler_Body`, `SM_Wrangler_Tire` = front-left tire + rim centred on the axle, `SKM_Wrangler` = axles on `OffroadCar` + hubs on `PhysWheel_*`) and `pack_textures.py` (2K D / N with green flipped / MRA).
+- `/Game/Vehicles/Wrangler`: `SKM_Wrangler` (shares `SKM_Offroad_Skeleton`, mesh sockets `VisWheel_*` on `PhysWheel_*`), `SKM_Wrangler_PhysicsAsset` (root boxes for tub / cabin / spare tire, kinematic 46.3 cm spheres on the wheels, free constraints like the template), `Wrangler_AnimBP` (copy of `Offroad_AnimBP` without the ControlRig node), `SM_Wrangler_Body`, `SM_Wrangler_Tire`, `Materials/M_Wrangler_Base` (BaseColor × Tint, Normal, MRA) + `MI_Wrangler_*` (CarPaint, Bumper, MetalPart, PlasticPart, RoofTop, Sheets, Tire; Glass is a child of `M_SportsCar_Lights`), `Materials/Textures/T_Wrangler_*`. The raw import folder was deleted on the user's OK.
+- `/Game/B1/Vehicles/BP_B1Jeep_Wrangler` (child of `BP_B1Jeep`) and `BP_B1WranglerWheelFront/Rear` (radius 46.3, width 36.4). `BP_B1GameMode`, `BP_B1GymGameMode` and `BP_B1PlayerController` now spawn the Wrangler.
+- Size after the user's "too small" note: 19.5 cm per model unit, wheels ×1.2 about their centres, 6 cm lift, 3 cm wider per side → 4.6 m long, 2.2 m wide, 2.73 m wheelbase, 1.61 m track, body raised 13.7 cm. COM override z 65, winch (205, 0, 80), chase arm 680 / socket z 160 / camera pitch −7°, in-car camera (−25, −42, 175).
+- Checked: PIE in `Lvl_Gym_Winch` (all wheels in contact, no anim/vehicle warnings), viewport captures from both sides, chase-camera capture.
+
+### Decisions made
+- Wrangler shares the Offroad skeleton and gets its own pawn BP (ADR-020).
+
+### What we learned
+- MCP `import_file` uses the legacy FbxFactory: `.fbx` / `.obj` only, and it won't overwrite an existing asset (delete, re-import, reassign).
+- A hand-written ASCII FBX skeleton needs `DefaultAttributeIndex` on every Model, or UE says "'X' has no bones".
+- Importing against an existing skeleton fills the mesh with all the skeleton's bones at the skeleton's ref pose; mesh sockets resolve before bones, so same-named sockets redirect attachments.
+- No MCP path sets an AnimBP's `TargetSkeleton`, and folder `duplicate` doesn't remap internal references.
+- `CaptureEditorImage` shows the content browser when it's the front tab; PIE in a floating window captures the game view.
+
+### Open follow-ups
+- User playtest: handling with the new size (track, wheel radius, COM), steering/spin visuals, normal map direction, fender clearance at full suspension raise (20 cm).
+- Body is ~360k tris and each wheel ~52k; no LODs yet (prototype first, ADR-011 budget later).
+- `Config/DefaultEditor.ini` picked up an editor preview-profile block; don't commit it.
