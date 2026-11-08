@@ -4,6 +4,7 @@ Source plans (closed):
 - [plans/2026-10-25-river-crossing.md](plans/2026-10-25-river-crossing.md): the whole prototype, Testing model, Phases 0, 1, G.
 - [plans/2026-10-26-mud-winch-first.md](plans/2026-10-26-mud-winch-first.md): phase reorder (mud + winch first), Phase 2 design, slope rules.
 - [plans/2026-11-07-visuals.md](plans/2026-11-07-visuals.md): Phase V (mud spray rework, dirt on the jeep).
+- [plans/2026-11-08-mud-lens.md](plans/2026-11-08-mud-lens.md): Phase V addition (mud on the camera lens).
 
 Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md](SPRINTS.md); tick them there.
 
@@ -114,28 +115,30 @@ Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md]
 ---
 
 ## Phase V — Visuals
-**Status:** planned (Sprint 5) (plan: [2026-11-07-visuals](plans/2026-11-07-visuals.md), ADR-021)
+**Status:** done (Sprint 5, signed off 2026-11-08) (plans: [2026-11-07-visuals](plans/2026-11-07-visuals.md), [2026-11-08-mud-lens](plans/2026-11-08-mud-lens.md); ADR-021, ADR-022)
 
-**Outcome.** Mud reads as mud. The tires throw a dense spray of small clumps of mixed sizes with a faint haze, when spinning and when rolling (`Concept/mud-car-drive.mp4`). The Wrangler starts clean (`Concept/jeep-wrangler.png`) and collects mud in stages (tires, then arches and sills, then splatter on the doors and bumpers, then spots on the hood, roof and glass), capped at `Concept/jeep_wrangler_mud_reference.jpg`.
+**Outcome.** Mud reads as mud. The tires throw a dense spray of small clumps of mixed sizes with a faint haze, when spinning and when rolling (`Concept/mud-car-drive.mp4`). The Wrangler starts clean (`Concept/jeep-wrangler.png`) and collects mud in stages (tires, then arches and sills, then splatter on the doors and bumpers, then spots on the hood, roof and glass), capped at `Concept/jeep_wrangler_mud_reference.jpg`. Hard wheelspin splashes the chase camera's lens; the mud builds up and fades, capped at `Concept/mud-on-the-screen.jpg` (added 2026-11-08).
 
 **Scope (minimum).**
-- [ ] Spikes: CPD and tags on the inherited Wrangler components, Niagara mesh renderer + depth-buffer collision through MCP, body-space arch centres (Sprint 5)
-- [ ] `Scripts/MudTextures` generator (masks + clump mesh), `MF_B1MudDirt` (local-space triplanar, region-weighted reveal) in the Wrangler materials, including a Wrangler glass material (Sprint 5)
-- [ ] `UB1MudDirtComponent` (portable): `B1MudDirt`-tagged targets matched to wheels, CPD writes, `PreviewDirt`, accumulation from `B1MudThrow` in seconds-to-full, capped and monotonic (ADR-021) (Sprint 5)
-- [ ] Photo booth stills at 5 dirt levels from the two concept angles; **checkpoint 1** (user signs off the look before the accumulation is built) (Sprint 5)
-- [ ] Dirt debug: Mud window section, `B1Dirt` cheat, telemetry, `ShowDebug B1Mud`; rig `StartDirt` + dirt metrics and four dirt rigs (Sprint 5)
-- [ ] `NS_B1MudSpray` rebuilt as clumps (mesh) + droplets + haze, rate from `B1MudThrow` (rolling spray), `User.Intensity`, Spray section in the Mud window (Sprint 5)
+- [x] Spikes: CPD and tags on the inherited Wrangler components, Niagara mesh renderer + depth-buffer collision through MCP, body-space arch centres (Sprint 5)
+- [x] `Scripts/MudTextures` generator (masks + clump mesh), `MF_B1MudDirt` (local-space triplanar, region-weighted reveal) in the Wrangler materials, including a Wrangler glass material (Sprint 5)
+- [x] `UB1MudDirtComponent` (portable): `B1MudDirt`-tagged targets matched to wheels, CPD writes, `PreviewDirt`, accumulation from `B1MudThrow` in seconds-to-full, capped and monotonic (ADR-021) (Sprint 5)
+- [x] Photo booth stills at 5 dirt levels from the two concept angles; **checkpoint 1** (user signs off the look before the accumulation is built) (Sprint 5)
+- [x] Dirt debug: Mud window section, `B1Dirt` cheat, telemetry, `ShowDebug B1Mud`; rig `StartDirt` + dirt metrics and four dirt rigs (Sprint 5)
+- [x] `NS_B1MudSpray` rebuilt as clumps (mesh) + droplets + haze, rate from `B1MudThrow` (rolling spray), `User.Intensity`, Spray section in the Mud window (Sprint 5)
+- [x] **Mud on the lens** (ADR-022, Sprint 5 S5-21..S5-28): portable `UB1MudLensComponent` (exposure from the spray's launch speed, wide aim and distance; 4 splash slots with hold + fade; `LensSecondsToFull`), `M_B1LensMud` post-process on the `B1MudLens`-tagged chase camera, generated drop/speck textures, preview-volume stills + **lens checkpoint**, Lens section / cheats / telemetry, four lens rigs
 
-**Stretch.** Fresh vs dried mud (`Wetness`, CPD slot 5); spray spawned along the tread arc.
+**Stretch.** Fresh vs dried mud (`Wetness`, CPD slot 5); spray spawned along the tread arc; lens drops running down as they age; lens splashes centred on the throwing wheel.
 
-**Out of scope.** The `mud-car-splash.mp4` sheet splash, washing dirt off (Phase 3 can add it), UV-painted dirt, the dirt material on the buggy, performance work.
+**Out of scope.** The `mud-car-splash.mp4` sheet splash, washing dirt off (Phase 3 can add it), UV-painted dirt, the dirt material on the buggy, performance work. Lens: particle-to-lens hits, body occlusion of the throw, the in-cabin camera, wipers, water on the lens, other vehicles' spray.
 
 **Done when.**
 - On firm ground the jeep stays clean (`B1Dirt_Firm`: all 0).
 - In medium mud the tires lead the body (`B1Dirt_Medium`).
 - 90 s at 50 % in medium mud gives body ≥ 0.9 and wheels at 1 (`B1Dirt_Drive90`); dirt holds at exactly 1 once capped (`B1Dirt_Cap`).
+- Lens: firm driving never splashes (`B1Lens_Firm`), rolling through medium stays below wheelspin (`B1Lens_Roll`), wheelspin in medium splashes (`B1Lens_Spin`: ≥ 3 splashes, peak ≥ 0.3, capped at 1), and the lens clears within 10 s (`B1Lens_Fade`).
 - Existing suites unchanged (core, mud, winch).
-- The user signs off the stills (checkpoint 1) and the Swamp playtest (checkpoint 2).
+- The user signs off the stills (checkpoint 1), the lens look (lens checkpoint) and the Swamp playtest (checkpoint 2).
 
 ---
 

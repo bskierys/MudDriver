@@ -4,6 +4,7 @@
 #include "B1VehicleMovementComponent.h"
 #include "B1MudVehicleComponent.h"
 #include "B1MudDirtComponent.h"
+#include "B1MudLensComponent.h"
 #include "B1WinchComponent.h"
 #include "B1WinchAnchorComponent.h"
 #include "B1WinchLog.h"
@@ -47,7 +48,8 @@ void UB1CheatManager::NetImGuiLaunch()
 	const FString ServerDir = FPaths::ConvertRelativePathToFull(FPaths::Combine(Plugin->GetBaseDir(), TEXT("NetImguiServer")));
 	const FString ServerExe = FPaths::Combine(ServerDir, ServerExeName);
 
-	FProcHandle Proc = FPlatformProcess::CreateProc(*ServerExe, nullptr, true, false, false, nullptr, 0, *ServerDir, nullptr);
+	// UE 5.8 asserts on null Parms.
+	FProcHandle Proc = FPlatformProcess::CreateProc(*ServerExe, TEXT(""), true, false, false, nullptr, 0, *ServerDir, nullptr);
 	if (!Proc.IsValid())
 	{
 		UE_LOG(LogMudDriver, Error, TEXT("NetImGuiLaunch: failed to start %s"), *ServerExe);
@@ -122,6 +124,33 @@ void UB1CheatManager::B1DirtClean()
 	if (UB1MudDirtComponent* Dirt = GetPlayerDirt(TEXT("B1DirtClean")))
 	{
 		Dirt->Clean();
+	}
+}
+
+UB1MudLensComponent* UB1CheatManager::GetPlayerLens(const TCHAR* CheatName) const
+{
+	const APawn* Pawn = GetOuterAPlayerController()->GetPawn();
+	UB1MudLensComponent* Lens = Pawn ? Pawn->FindComponentByClass<UB1MudLensComponent>() : nullptr;
+	if (!Lens)
+	{
+		UE_LOG(LogB1Vehicle, Warning, TEXT("%s: the player's pawn has no UB1MudLensComponent"), CheatName);
+	}
+	return Lens;
+}
+
+void UB1CheatManager::B1Lens(float Value)
+{
+	if (UB1MudLensComponent* Lens = GetPlayerLens(TEXT("B1Lens")))
+	{
+		Lens->SetLensDirt(Value < 0.0f ? 0.0f : Value);
+	}
+}
+
+void UB1CheatManager::B1LensSplash()
+{
+	if (UB1MudLensComponent* Lens = GetPlayerLens(TEXT("B1LensSplash")))
+	{
+		Lens->Splash();
 	}
 }
 

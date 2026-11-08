@@ -10,6 +10,7 @@ class UB1VehicleMovementComponent;
 class UAbilitySystemComponent;
 class UB1FuelConsumptionComponent;
 class UB1MudDirtComponent;
+class UB1MudLensComponent;
 class UB1MudSprayComponent;
 class UB1MudTrailComponent;
 class UB1MudVehicleComponent;
@@ -38,6 +39,7 @@ public:
 
 	UB1MudVehicleComponent* GetMudVehicle() const { return MudVehicle; }
 	UB1MudDirtComponent* GetMudDirt() const { return MudDirt; }
+	UB1MudLensComponent* GetMudLens() const { return MudLens; }
 	UB1FuelConsumptionComponent* GetFuelConsumption() const { return FuelConsumption; }
 	UB1WinchComponent* GetWinch() const { return Winch; }
 	USceneComponent* GetDriverSeat() const { return DriverSeat; }
@@ -68,6 +70,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mud|Components")
 	TObjectPtr<UB1MudDirtComponent> MudDirt;
+
+	/** The back (chase) camera is tagged for it */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mud|Components")
+	TObjectPtr<UB1MudLensComponent> MudLens;
 
 	/** Sits at the winch point on the front bumper */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Winch|Components")

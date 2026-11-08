@@ -1,4 +1,4 @@
-# HISTORY
+﻿# HISTORY
 
 Session snapshots, newest at the bottom. Grown by `/save` and `/plan-roadmap`.
 
@@ -1528,3 +1528,138 @@ Sprint 5 started with `/work`. It ran the look-first path: spikes, the texture g
 ### Open follow-ups
 - User checks for S5-11 (bars, Clean / Max / `B1Dirt 0.5`, Save across a restart) and S5-20 (tires coat and darken fast, lighten and thin on firm).
 - Spray section next: S5-13 (rate from `B1MudThrow`), S5-02 spike, S5-14..17.
+
+## 2026-11-08 — Phase V: spray rework (S5-13..S5-16)
+
+### Context
+`/work` on S5-13..S5-16 with the user checks at the end. Start state: dirt accumulation done; the spray was still the S2 sprite emitter, driven by slip only. S5-14 needed the S5-02 Niagara spike, which was folded into it.
+
+### What was built
+- **S5-13:** spray rate = `B1MudThrow` intensity × `MaxSpawnRate`, × `RollingRateFactor` (0.4) below `MinSlipSpeed`; `SpawnRatePerSlip` removed. `User.Intensity`, `GetWheelIntensity`, telemetry `spray=rate/intensity`. A rolling wheel throws backward along its travel.
+- **S5-16:** Mud window "Spray" section (rate bars, typed `Mud|Spray` fields, Save to the pawn BP archetype).
+- **S5-02 + S5-14:** `NS_B1MudSpray` `Spray` emitter now renders `SM_B1MudClump` with new `M_B1MudClump`: skewed 2–12 cm sizes scaled by intensity, random orientation, tumble that stops at rest, scale-out, no-bounce depth-buffer collision.
+- **S5-15:** `Droplets` (GPU velocity-aligned sprites, 2× rate) and `Haze` (CPU, ≤ 8/s, new `M_B1MudHaze`) emitters.
+- Fix: `NetImGuiLaunch` crashed the editor (UE 5.8 `CreateProc` asserts on null Parms); now passes `TEXT("")`.
+- Fix: unity-build clash of `CmPerM` between `B1MudThrow.cpp` and `B1VehicleSimulation.cpp` → `B1MudThrowPrivate::CmPerM`.
+- Headless: mud 27/27, core 12/12; with `b1.Mud.Spray=0` dirt is unchanged.
+
+### Decisions made
+- Spray rate is a pure function of throw intensity (one cap, one rolling factor) instead of slip excess, so what's thrown matches what sticks (plan revision 1).
+- Clump tumble axis/rate come from the velocity (no per-particle random state), so clumps stop turning when they rest.
+- No new ADR.
+
+### What we learned
+- The Niagara toolset can build the whole spray: renderers, modules, enum/linked/HLSL inputs; HLSL expressions accept `rand(1.0f)`, `User.*`, `Particles.*`. Tool arg names differ per call (`renderer`, `rendererToRemove`, `emitter`, `emitterRef`), and every stack ref needs all six fields.
+- `GetEmitterTopology` / `GetEmitterInputValues` are ~60k chars: filter them inside `execute_tool_script`.
+- Capturing a rig: temporarily set `bAutoRun` (and the Wrangler class) on an existing rig, Simulate with the camera set first, `CaptureEditorImage`, then revert in the same script.
+- New `.cpp`/header edits can regroup unity files and expose clashing anonymous-namespace names.
+- If unreal-mcp failed at session start, ask the user to reconnect it (`/mcp`) instead of raw JSON-RPC (user preference).
+
+### Open follow-ups
+- Spray look tuning (clumps a bit grey in sun, droplets tiny, haze faint): S5-17 capture rig + reference sheet, then checkpoint 2.
+- `stat Niagara` counts (user-side).
+- S5-17, S5-18 docs pass, S5-19 checkpoint 2.
+
+## 2026-11-08 — Phase V close-out: spray capture rig, docs pass, checkpoint 2 start
+
+### Context
+`/work` on the last Sprint 5 tasks. Start state: dirt and spray features done (S5-01..16, S5-20); S5-17 capture rig, S5-18 docs pass and S5-19 checkpoint 2 left. The user started the Swamp playtest and asked how to tune the spray and tire colours, then asked for two new spray controls.
+
+### What was built
+- **S5-17:** rig `B1Spray_Medium` (`Lvl_Gym_Mud`, `B1Tests/Spray`, X 15 / Y 29 m, Wrangler, 5 s full throttle, no thresholds). `Scripts/MudTextures/spray_sheet.py` + README "Spray sheet" section: decodes Simulate `CaptureEditorImage` results, crops the 3D view, sheet next to `mud-car-drive.mp4` frames. Camera (3300, 2450, 110, −3, 158).
+- **S5-18:** MIGRATION.md gaps filled (spray emitters, debug, dirt/spray rigs); ADR-021 "As built" note.
+- **S5-19 (agent part):** headless core 12/12, mud 28/28, winch 36/36. Editor opened for the user's playtest.
+- **Playtest request:** `UB1MudSprayComponent` gets `SpawnBackOffset`, `SpawnLift` (replace the hard-coded 20 cm `SurfaceLift`), `SpraySpread`, `SpraySpeedSpread`; new `NS_B1MudSpray` user params `SpraySpread`/`SpeedSpread` drive the Spray and Droplets cone angle and per-particle speed. Mud window Spray section: typed fields + Save to asset for all four. Full rebuild OK; system compiles clean.
+- Tuning answers given (no code): spray colour = `SprayColor` on the `PM_B1Mud_*` assets (also tints haze); tire mud colour = `DirtMudColor` / `DirtTireWetDarken` overrides on `MI_Wrangler_Tire`/`MI_Wrangler_Rim` (tire mud is 1.6× in the Custom node); haze colour = the Haze Initialize Particle colour expression; droplet/clump size = the Sprite Size / Mesh Scale expressions.
+
+### Decisions made
+- `B1Spray_Medium` is saved with `bAutoRun` off; capture scripts toggle it. Saved on, it would also start in headless suite runs and drive into the medium lane next to other rigs.
+- Spray randomness lives in the component (passed as user params), not hard-coded in the Niagara asset, so it's tunable from the Mud window. Haze keeps its own cone and speed.
+- No new ADR.
+
+### What we learned
+- The clump emitter had a fixed 25° cone and no speed variation: that's why the spray read as an even fountain.
+- Comparison vs the reference: our spray is a low flat trail at wheel height; the clip's is a rooster tail above the roof with dark clumps and a big tan haze. The Wrangler reaches 13 m/s within 5 s in medium mud, so captures at 2–3 s show mostly rolling throw.
+- `CaptureEditorImage` is only ~680×440 of 3D view inside the editor shot; after an editor restart, restored asset-editor tabs sit in front and the capture shows them instead of the level.
+- `SceneTools.load_level` refused `/Game/B1/Gym/Lvl_Gym_Swamp` ("level does not exist") although the `.umap` is on disk; `StartEditor.ps1 -Map` loads it fine. Not investigated.
+- Inline Python in PowerShell `-c @'...'@` loses double quotes; write the script to a file.
+
+### Open follow-ups
+- S5-19: user Swamp playtest with the new spray controls, then sign-off → ROADMAP Phase V.
+- Optional `DirtTireMudBoost` parameter (replace the 1.6 in `MF_B1MudDirt`) if the tire MI overrides aren't enough.
+- Spray look not yet re-captured after the spread change (capture blocked by the open Niagara tab).
+- The user's colour edits (`PM_B1Mud_*`, `MI_Wrangler_Tire`) are on disk, uncommitted.
+
+## 2026-11-08 — Sprint 5 addition: mud on the lens
+
+### Context
+Before signing off Phase V (checkpoint 2, S5-19), the user asked for one more effect: mud on the camera lens. Big spray shots from the tires dirty the chase camera, the mud builds up like the tire coat and fades after a while, capped at `Concept/mud-on-the-screen.jpg`. The trigger should be cheap, tied to the large Niagara throw, not real drops hitting the camera. Planned through `/plan-new` → `/plan-analyse` → `/plan-replan` → `/plan-roadmap`; archived at `plans/2026-11-08-mud-lens.md`.
+
+### Tasks created
+- S5-21 through S5-28 in SPRINTS.md (section "Lens mud"): component core, texture generator, material, preview stills, lens checkpoint, debug, rigs, docs. S5-19 now requires them.
+
+### Decisions made
+- ADR-022: lens mud is a post-process MID on `B1MudLens`-tagged cameras, driven by a portable `UB1MudLensComponent` reading the spray's launch data; 4 splash slots with hold + fade; `LensSecondsToFull`.
+- Critique round 1 found the first-draft ballistic reach gate would never fire: the last PIE log shows medium wheelspin at slip 4.2–5.0 m/s → launch ~510 cm/s, which can't reach a camera ~5.5 m back. Replaced by a launch-speed band (350 → 500 cm/s).
+- User feedback: wide aim (full to 75°, zero at 110°), so the chase camera gets splashed more often than not.
+- No body occlusion trace; in-cabin camera out of scope (windshield glass dirt covers it).
+- Look loop on a bound, saved-disabled preview post-process volume in `Lvl_Gym_Core` (editor `CaptureViewport`), plus one PIE capture to confirm the camera path.
+
+## 2026-11-08 — Lens mud: component, textures, material, look checkpoint rounds 1–3
+
+### Context
+`/work` on Sprint 5's lens tasks (ADR-022). Starting state: S5-21..S5-28 planned, nothing built. The user asked to continue through to the next user check (S5-25, the lens look) with few test runs, then gave three rounds of look feedback.
+
+### What was built
+- **S5-21:** `UB1MudSprayComponent` read-only `GetNumWheels` / `GetWheelSprayOrigin` / `GetWheelSprayVelocity`. New portable `Mud/B1MudLensComponent` on `AB1Jeep` as `MudLens` (exposure, seeded splash slots, hold/fade, MID on `B1MudLens`-tagged cameras, preview/debug calls, CVar `b1.Mud.Lens`). `AB1Jeep` tags `BackCamera`. `UB1MudSettings::LensMaterial` (ini → `MI_B1LensMud`). Headless mud 28/28: lens lines on medium spin (`B1Spray_Medium` up to 0.52, buggy DigInMedium 0.32) and deep spin (cap rig 1.0), none on firm or rolling rigs.
+- **S5-22:** `Scripts/MudTextures/gen_lens_textures.py` → `T_B1LensDrops` (2048×1024, normal xy, 1 − radius, reveal id).
+- **S5-23:** `M_B1LensMud` (post-process after tonemapping, one Custom node = `M_B1LensMud.hlsl`), `MI_B1LensMud`, `MI_B1LensMud_Preview`.
+- **S5-24:** `B1PhotoBooth_LensPreview` volume in `Lvl_Gym_Core`, `photobooth.py` lens mode, `stage_sheet.py --lens`. PIE check: mud on the back camera, HUD clean on top. Core 12/12 with the volume placed.
+- **S5-25 rounds 1–3** (signed off on round 3): specks removed; drops translucent, blurred, irregular (wobble + satellite blobs), brown towards lower edges, varied per drop; more and larger at the bottom; medium drops first and a front-loaded reveal so 0.25 is visible. Latest sheet `Saved/MudTextures/lens/stills4/lens_sheet.png`.
+
+### Decisions made
+- Drops only, no specks (user: the concept's dots were an image artifact). Recorded as an interim "As built" note on ADR-022.
+- Lens look params live as defaults on `M_B1LensMud` (both MIs inherit), except `LensDropFill`, which `MI_B1LensMud` also overrides (5).
+- `LensMaterial` was left unset in the ini until the MI existed (a missing asset path would warn on every load).
+- Generated lens/dirt texture output moved from the session scratchpad to `Saved/MudTextures/` (git-ignored), because the scratchpad disappeared mid-session.
+
+### What we learned
+- Custom node `Inputs` over MCP grow only by appending an element **as read back** (full struct); a bare `{inputName}` copy is "ambiguous". Replacing the whole node (delete, add, rewire) is simpler than shrinking it.
+- `SceneTextureLookup(ClampSceneTextureUV(ViewportUVToSceneTextureUV(uv, 14), 14), 14, true)` works in a 5.8 post-process Custom node when a `SceneTexture` PostProcessInput0 node is also wired in.
+- A `PostProcessVolume` spawned with `SceneTools.add_to_scene_from_class` has a brush (bound volumes work); `Brush` isn't readable via `get_properties`.
+- `StartPIE` takes `{"options": {"bSimulate", "playMode"}}`; `CaptureEditorImage` returns `{data, mimeType}`; a floating PIE window captures the game view.
+- A capture right after a material recompile can show a transient (a brown blurred frame); wait or re-shoot.
+- Zooming a screen-space tile to enlarge drops also spreads them out: density has to beat zoom² to get *more* drops there.
+- The lens log line repeated at the cap (fade between splashes crossed a tenth); one tenth of slack fixed it (51 → 10 lines).
+- Also seen: the 50 % shuttle and other rolling rigs never splash with the start band (good sign for S5-27).
+
+### Open follow-ups
+- S5-25 signed off by the user on the round 3 sheet (marked after /save).
+- S5-26 (lens debug section, cheats, telemetry, ShowDebug), S5-27 (lens rig metrics, measure launch speeds, thresholds), S5-28 (docs), then S5-19 checkpoint 2.
+- An unknown save-changes dialog blocked `StopEditor.ps1` once (none of the lens assets were dirty); the core run went with the editor open.
+- `Lvl_Gym_Core/7/J4/…` (booth Wrangler) got re-saved by a save-all after a reverted BP CDO preview edit; same values, check the diff before committing if in doubt.
+
+## 2026-11-08 — Lens debug, lens rigs, Phase V sign-off
+
+### Context
+`/work` after the lens look sign-off (S5-25). Starting state: lens component, textures, material and stills done; S5-26 (debug), S5-27 (rigs), S5-28 (docs) and the S5-19 checkpoint open.
+
+### What was built
+- **S5-26:** Mud window "Lens" section (`DrawLens`: bar, slot table, per-wheel exposure table, Splash / Clean / Max, typed preview and 10 `Mud|Lens` floats, Save to the pawn BP archetype). Cheats `B1Lens <v>` / `B1LensSplash`. Telemetry `lens=d/exp`; ShowDebug `lens d exp slots`. User checked it in PIE: all works.
+- **S5-27:** `AB1GymTestRig` lens metrics (`StartLensDirt`, six thresholds, `lensPeak lensEnd lensSplashes lensExpPeak throwPeak lensCams`). Five rigs in `Lvl_Gym_Mud` `B1Tests/Lens`: Firm, Roll, Spin, Cap, Fade. Headless mud 33/33, core 12/12, winch 36/36.
+- **S5-28:** ADR-022 final "As built" note; MIGRATION.md §7 (lens debug, cheats) and §9 (lens rigs).
+- **S5-19:** user signed off the Swamp playtest; Phase V ticked in ROADMAP.
+
+### Decisions made
+- `LensMinThrowSpeed` / `LensFullThrowSpeed` stay 350 / 500 cm/s: measured rolling throw ≤ 291, wheelspin ≥ 547 (ADR-022 "As built").
+- `throwPeak` is read from the spray, not from the lens's per-wheel exposure, so it's measured even without an active camera.
+
+### What we learned
+- Wrangler medium wheelspin throws at 675 cm/s (the plan guessed ~510); deep 900; buggy medium 547–555.
+- An unpossessed rig jeep's `BackCamera` is active (`lensCams=1`), so lens rigs need no controller.
+- `SceneTools.save_actor` keeps failing ("Asset does not exist") on a WP actor created this session, even after `save_assets([])` wrote it and the editor restarted; `save_assets([])` works.
+- `RunGymTests.ps1` for core + winch back to back exceeds the 10 min tool timeout; run them as separate calls or in the background.
+
+### Open follow-ups
+- A save-changes dialog for packages not touched by the agent blocked `BuildEditor.ps1` again; the user closed the editor. Source still unknown.
+- Phase V done. Next: plan the next phase (Phase 3 River per ROADMAP) with `/plan-new`.

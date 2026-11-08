@@ -6,6 +6,7 @@
 #include "B1MudSettings.generated.h"
 
 class UNiagaraSystem;
+class UMaterialInterface;
 
 /** Project Settings → Game → B1 Mud. Must match the channel and profile in DefaultEngine.ini (ADR-012, ADR-015) */
 UCLASS(Config = Game, DefaultConfig, meta = (DisplayName = "B1 Mud"))
@@ -26,4 +27,8 @@ public:
 	/** Default for UB1MudSprayComponent::SpraySystem */
 	UPROPERTY(Config, EditAnywhere, Category = "Spray")
 	TSoftObjectPtr<UNiagaraSystem> SpraySystem;
+
+	/** Post-process material UB1MudLensComponent instances on its cameras (ADR-022); unset = no lens look */
+	UPROPERTY(Config, EditAnywhere, Category = "Lens")
+	TSoftObjectPtr<UMaterialInterface> LensMaterial;
 };

@@ -3,6 +3,8 @@
 #include "B1PhysicalMaterial_Mud.h"
 #include "B1MudVehicleComponent.h"
 #include "B1MudDirtComponent.h"
+#include "B1MudSprayComponent.h"
+#include "B1MudLensComponent.h"
 #include "NetImguiModule.h"
 #include "Engine/Blueprint.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -207,6 +209,256 @@ namespace B1ImGui
 #endif
 	}
 
+#if WITH_EDITOR
+	/** Copies the Mud|Spray tuning to the pawn BP's component template and saves the BP */
+	static bool SaveSprayDefaults(const UB1MudSprayComponent& Spray)
+	{
+		UB1MudSprayComponent* Archetype = Cast<UB1MudSprayComponent>(Spray.GetArchetype());
+		const AActor* Owner = Spray.GetOwner();
+		UBlueprint* Blueprint = Owner ? Cast<UBlueprint>(Owner->GetClass()->ClassGeneratedBy) : nullptr;
+		if (!Archetype || !Blueprint || Archetype->GetPackage() != Blueprint->GetPackage())
+		{
+			return false;
+		}
+
+		Archetype->Modify();
+		Archetype->MinSlipSpeed = Spray.MinSlipSpeed;
+		Archetype->MaxSpawnRate = Spray.MaxSpawnRate;
+		Archetype->RollingRateFactor = Spray.RollingRateFactor;
+		Archetype->SpraySpeedPerSlip = Spray.SpraySpeedPerSlip;
+		Archetype->MinSpraySpeed = Spray.MinSpraySpeed;
+		Archetype->MaxSpraySpeed = Spray.MaxSpraySpeed;
+		Archetype->SprayElevation = Spray.SprayElevation;
+		Archetype->SpraySpread = Spray.SpraySpread;
+		Archetype->SpraySpeedSpread = Spray.SpraySpeedSpread;
+		Archetype->SpawnBackOffset = Spray.SpawnBackOffset;
+		Archetype->SpawnLift = Spray.SpawnLift;
+		Archetype->MarkPackageDirty();
+		return SaveAssetPackage(*Blueprint);
+	}
+#endif
+
+	static void DrawSpray(UB1MudSprayComponent& Spray, int32 NumWheels)
+	{
+		static TSet<TWeakObjectPtr<UB1MudSprayComponent>> Edited;
+
+		for (int32 WheelIndex = 0; WheelIndex < NumWheels; ++WheelIndex)
+		{
+			const float Rate = Spray.GetWheelSpawnRate(WheelIndex);
+			char Overlay[48];
+			FCStringAnsi::Snprintf(Overlay, sizeof(Overlay), "%.0f /s  (throw %.2f)", Rate, Spray.GetWheelIntensity(WheelIndex));
+			ImGui::ProgressBar(Spray.MaxSpawnRate > 0.0f ? Rate / Spray.MaxSpawnRate : 0.0f, ImVec2(-120.0f, 0.0f), Overlay);
+			ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+			ImGui::Text("w%d", WheelIndex);
+		}
+
+		bool bChanged = false;
+		bChanged |= DragFloatTyped("Min slip m/s", &Spray.MinSlipSpeed, 0.05f, 0.0f, 20.0f);
+		bChanged |= DragFloatTyped("Max spawn rate /s", &Spray.MaxSpawnRate, 5.0f, 0.0f, 5000.0f);
+		bChanged |= DragFloatTyped("Rolling rate factor", &Spray.RollingRateFactor, 0.01f, 0.0f, 1.0f);
+		bChanged |= DragFloatTyped("Speed per slip", &Spray.SpraySpeedPerSlip, 0.01f, 0.0f, 10.0f);
+		bChanged |= DragFloatTyped("Min speed cm/s", &Spray.MinSpraySpeed, 5.0f, 0.0f, 5000.0f);
+		bChanged |= DragFloatTyped("Max speed cm/s", &Spray.MaxSpraySpeed, 5.0f, 0.0f, 5000.0f);
+		bChanged |= DragFloatTyped("Elevation deg", &Spray.SprayElevation, 0.5f, 0.0f, 90.0f);
+		bChanged |= DragFloatTyped("Spread deg", &Spray.SpraySpread, 0.5f, 0.0f, 90.0f);
+		bChanged |= DragFloatTyped("Speed spread", &Spray.SpraySpeedSpread, 0.01f, 0.0f, 1.0f);
+		bChanged |= DragFloatTyped("Spawn back offset cm", &Spray.SpawnBackOffset, 0.5f, -50.0f, 100.0f);
+		bChanged |= DragFloatTyped("Spawn lift cm", &Spray.SpawnLift, 0.5f, 0.0f, 100.0f);
+		if (bChanged)
+		{
+			Edited.Add(&Spray);
+		}
+
+#if WITH_EDITOR
+		ImGui::BeginDisabled(!Edited.Contains(&Spray));
+		if (ImGui::Button("Save to asset##Spray"))
+		{
+			const bool bSaved = SaveSprayDefaults(Spray);
+			UE_LOG(LogB1Mud, Log, TEXT("Spray defaults of %s %s"), *GetNameSafe(Spray.GetOwner()->GetClass()), bSaved ? TEXT("saved") : TEXT("FAILED to save (not a BP vehicle?)"));
+			if (bSaved)
+			{
+				Edited.Remove(&Spray);
+			}
+		}
+		ImGui::EndDisabled();
+#endif
+	}
+
+#if WITH_EDITOR
+	/** Copies the Mud|Lens tuning (not PreviewLensDirt) to the pawn BP's component template and saves the BP */
+	static bool SaveLensDefaults(const UB1MudLensComponent& Lens)
+	{
+		UB1MudLensComponent* Archetype = Cast<UB1MudLensComponent>(Lens.GetArchetype());
+		const AActor* Owner = Lens.GetOwner();
+		UBlueprint* Blueprint = Owner ? Cast<UBlueprint>(Owner->GetClass()->ClassGeneratedBy) : nullptr;
+		if (!Archetype || !Blueprint || Archetype->GetPackage() != Blueprint->GetPackage())
+		{
+			return false;
+		}
+
+		Archetype->Modify();
+		Archetype->LensMinThrowSpeed = Lens.LensMinThrowSpeed;
+		Archetype->LensFullThrowSpeed = Lens.LensFullThrowSpeed;
+		Archetype->LensAimFull = Lens.LensAimFull;
+		Archetype->LensAimZero = Lens.LensAimZero;
+		Archetype->LensFalloffDistance = Lens.LensFalloffDistance;
+		Archetype->LensSplashThreshold = Lens.LensSplashThreshold;
+		Archetype->LensSplashInterval = Lens.LensSplashInterval;
+		Archetype->LensSecondsToFull = Lens.LensSecondsToFull;
+		Archetype->LensHoldSeconds = Lens.LensHoldSeconds;
+		Archetype->LensFadeSeconds = Lens.LensFadeSeconds;
+		Archetype->MarkPackageDirty();
+		return SaveAssetPackage(*Blueprint);
+	}
+#endif
+
+	static void DrawLensSlots(const UB1MudLensComponent& Lens)
+	{
+		constexpr ImGuiTableFlags Flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
+		if (!ImGui::BeginTable("LensSlots", 5, Flags))
+		{
+			return;
+		}
+
+		ImGui::TableSetupColumn("Slot");
+		ImGui::TableSetupColumn("Strength", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+		ImGui::TableSetupColumn("State");
+		ImGui::TableSetupColumn("Offset");
+		ImGui::TableSetupColumn("Variant");
+		ImGui::TableHeadersRow();
+
+		for (int32 SlotIndex = 0; SlotIndex < UB1MudLensComponent::NumSlots; ++SlotIndex)
+		{
+			const FB1MudLensSlot& Slot = Lens.GetSlot(SlotIndex);
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn(); ImGui::Text("%d", SlotIndex);
+			ImGui::TableNextColumn();
+			{
+				char Overlay[16];
+				FCStringAnsi::Snprintf(Overlay, sizeof(Overlay), "%.2f", Slot.Strength);
+				ImGui::ProgressBar(Slot.Strength, ImVec2(-1.0f, 0.0f), Overlay);
+			}
+			ImGui::TableNextColumn();
+			if (Slot.Strength <= 0.0f)
+			{
+				ImGui::TextDisabled("empty");
+			}
+			else if (Slot.SinceHit <= Lens.LensHoldSeconds)
+			{
+				ImGui::Text("hold %.1f s", Lens.LensHoldSeconds - Slot.SinceHit);
+			}
+			else
+			{
+				ImGui::Text("fade %.1f s", Slot.Strength * Lens.LensFadeSeconds);
+			}
+			ImGui::TableNextColumn(); ImGui::Text("%.2f, %.2f", Slot.Offset.X, Slot.Offset.Y);
+			ImGui::TableNextColumn(); ImGui::Text("%d", Slot.Variant);
+		}
+
+		ImGui::EndTable();
+	}
+
+	static void DrawLensExposure(const UB1MudLensComponent& Lens)
+	{
+		constexpr ImGuiTableFlags Flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
+		if (!ImGui::BeginTable("LensExposure", 8, Flags))
+		{
+			return;
+		}
+
+		ImGui::TableSetupColumn("Wheel");
+		ImGui::TableSetupColumn("Exposure", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+		ImGui::TableSetupColumn("Intensity");
+		ImGui::TableSetupColumn("Throw");
+		ImGui::TableSetupColumn("Aim");
+		ImGui::TableSetupColumn("Distance");
+		ImGui::TableSetupColumn("Speed cm/s");
+		ImGui::TableSetupColumn("Angle deg");
+		ImGui::TableHeadersRow();
+
+		for (int32 WheelIndex = 0; WheelIndex < Lens.GetNumWheelExposures(); ++WheelIndex)
+		{
+			const FB1MudLensWheelExposure& Wheel = Lens.GetWheelExposure(WheelIndex);
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn(); ImGui::Text("%d", WheelIndex);
+			ImGui::TableNextColumn();
+			{
+				char Overlay[16];
+				FCStringAnsi::Snprintf(Overlay, sizeof(Overlay), "%.2f", Wheel.Exposure);
+				ImGui::ProgressBar(Wheel.Exposure, ImVec2(-1.0f, 0.0f), Overlay);
+			}
+			ImGui::TableNextColumn(); ImGui::Text("%.2f", Wheel.Intensity);
+			ImGui::TableNextColumn(); ImGui::Text("%.2f", Wheel.Throw);
+			ImGui::TableNextColumn(); ImGui::Text("%.2f", Wheel.Aim);
+			ImGui::TableNextColumn(); ImGui::Text("%.2f", Wheel.Distance);
+			ImGui::TableNextColumn(); ImGui::Text("%.0f", Wheel.LaunchSpeed);
+			ImGui::TableNextColumn(); ImGui::Text("%.0f", Wheel.AimAngle);
+		}
+
+		ImGui::EndTable();
+	}
+
+	static void DrawLens(UB1MudLensComponent& Lens)
+	{
+		static TSet<TWeakObjectPtr<UB1MudLensComponent>> Edited;
+
+		DrawDirtBar("lens", Lens.GetLensDirt(), -1.0f);
+		ImGui::Text("Exposure %.2f  splashes %d  cameras %d", Lens.GetExposure(), Lens.GetSplashCount(), Lens.GetNumCameras());
+		DrawLensSlots(Lens);
+		DrawLensExposure(Lens);
+
+		if (ImGui::Button("Splash"))
+		{
+			Lens.Splash();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Clean"))
+		{
+			Lens.CleanLens();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Max"))
+		{
+			Lens.SetLensDirt(1.0f);
+		}
+
+		float Preview = Lens.PreviewLensDirt;
+		if (DragFloatTyped("Preview lens (-1 off)", &Preview, 0.01f, -1.0f, 1.0f))
+		{
+			Lens.SetPreviewLensDirt(Preview);
+		}
+
+		bool bChanged = false;
+		bChanged |= DragFloatTyped("Min throw cm/s", &Lens.LensMinThrowSpeed, 5.0f, 0.0f, 5000.0f);
+		bChanged |= DragFloatTyped("Full throw cm/s", &Lens.LensFullThrowSpeed, 5.0f, 0.0f, 5000.0f);
+		bChanged |= DragFloatTyped("Aim full deg", &Lens.LensAimFull, 0.5f, 0.0f, 180.0f);
+		bChanged |= DragFloatTyped("Aim zero deg", &Lens.LensAimZero, 0.5f, 0.0f, 180.0f);
+		bChanged |= DragFloatTyped("Falloff distance cm", &Lens.LensFalloffDistance, 5.0f, 1.0f, 10000.0f);
+		bChanged |= DragFloatTyped("Splash threshold", &Lens.LensSplashThreshold, 0.01f, 0.0f, 1.0f);
+		bChanged |= DragFloatTyped("Splash interval s", &Lens.LensSplashInterval, 0.01f, 0.02f, 5.0f);
+		bChanged |= DragFloatTyped("s to full", &Lens.LensSecondsToFull, 0.1f, 0.1f, 60.0f);
+		bChanged |= DragFloatTyped("Hold s", &Lens.LensHoldSeconds, 0.1f, 0.0f, 30.0f);
+		bChanged |= DragFloatTyped("Fade s", &Lens.LensFadeSeconds, 0.1f, 0.1f, 60.0f);
+		if (bChanged)
+		{
+			Edited.Add(&Lens);
+		}
+
+#if WITH_EDITOR
+		ImGui::BeginDisabled(!Edited.Contains(&Lens));
+		if (ImGui::Button("Save to asset##Lens"))
+		{
+			const bool bSaved = SaveLensDefaults(Lens);
+			UE_LOG(LogB1Mud, Log, TEXT("Lens defaults of %s %s"), *GetNameSafe(Lens.GetOwner()->GetClass()), bSaved ? TEXT("saved") : TEXT("FAILED to save (not a BP vehicle?)"));
+			if (bSaved)
+			{
+				Edited.Remove(&Lens);
+			}
+		}
+		ImGui::EndDisabled();
+#endif
+	}
+
 	static void SavePreset(UB1PhysicalMaterial_Mud& Mud)
 	{
 		const bool bSaved = SaveAssetPackage(Mud);
@@ -301,6 +553,26 @@ namespace B1ImGui
 			{
 				ImGui::PushID("Dirt");
 				DrawDirt(*Dirt);
+				ImGui::PopID();
+			}
+		}
+
+		if (UB1MudSprayComponent* Spray = Vehicle ? Vehicle->FindComponentByClass<UB1MudSprayComponent>() : nullptr)
+		{
+			if (ImGui::CollapsingHeader("Spray", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::PushID("Spray");
+				DrawSpray(*Spray, Mud ? Mud->GetNumWheels() : 0);
+				ImGui::PopID();
+			}
+		}
+
+		if (UB1MudLensComponent* Lens = Vehicle ? Vehicle->FindComponentByClass<UB1MudLensComponent>() : nullptr)
+		{
+			if (ImGui::CollapsingHeader("Lens", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::PushID("Lens");
+				DrawLens(*Lens);
 				ImGui::PopID();
 			}
 		}

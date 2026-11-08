@@ -10,6 +10,8 @@
 #include "B1VehicleMovementComponent.h"
 #include "B1MudVehicleComponent.h"
 #include "B1MudDirtComponent.h"
+#include "B1MudLensComponent.h"
+#include "B1MudSprayComponent.h"
 #include "B1WinchAnchorComponent.h"
 #include "B1WinchLog.h"
 #include "Camera/CameraComponent.h"
@@ -83,6 +85,8 @@ void AB1GymTestRig::PrepareTest()
 	B1Movement = Cast<UB1VehicleMovementComponent>(Movement);
 	MudVehicle = Vehicle ? Vehicle->FindComponentByClass<UB1MudVehicleComponent>() : nullptr;
 	MudDirt = Vehicle ? Vehicle->FindComponentByClass<UB1MudDirtComponent>() : nullptr;
+	MudLens = Vehicle ? Vehicle->FindComponentByClass<UB1MudLensComponent>() : nullptr;
+	MudSpray = Vehicle ? Vehicle->FindComponentByClass<UB1MudSprayComponent>() : nullptr;
 	if (StartOnFootClass && !Character)
 	{
 		FinishTest(EFunctionalTestResult::Error, TEXT("StartOnFootClass didn't spawn, or there is no player 0"));
@@ -234,6 +238,20 @@ void AB1GymTestRig::StartTest()
 		}
 		MudDirt->SetDirt(StartDirt);
 	}
+
+	if (StartLensDirt >= 0.0f)
+	{
+		if (!MudLens)
+		{
+			FinishTest(EFunctionalTestResult::Error, TEXT("StartLensDirt needs a UB1MudLensComponent on the vehicle"));
+			return;
+		}
+		MudLens->SetLensDirt(StartLensDirt);
+	}
+	LensPeak = MudLens ? MudLens->GetLensDirt() : 0.0f;
+	LensExposurePeak = 0.0f;
+	LensSplashesAtStart = MudLens ? MudLens->GetSplashCount() : 0;
+	ThrowPeak = 0.0f;
 
 	Winch =Vehicle ? Vehicle->FindComponentByClass<UB1WinchComponent>() : nullptr;
 	bHookUsed = false;
@@ -632,6 +650,7 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 	}
 
 	SampleTireCoat();
+	SampleLens();
 
 	float SlopePull = 0.0f;
 	for (int32 WheelIndex = 0; WheelIndex < MaxSinkDepth.Num(); ++WheelIndex)
@@ -792,6 +811,22 @@ void AB1GymTestRig::SampleTireCoat()
 		{
 			TireCoatDistance[WheelIndex] = PathLength - TireMudStartPath[WheelIndex];
 		}
+	}
+}
+
+void AB1GymTestRig::SampleLens()
+{
+	if (MudSpray)
+	{
+		for (int32 WheelIndex = 0; WheelIndex < MudSpray->GetNumWheels(); ++WheelIndex)
+		{
+			ThrowPeak = FMath::Max(ThrowPeak, static_cast<float>(MudSpray->GetWheelSprayVelocity(WheelIndex).Size()));
+		}
+	}
+	if (MudLens)
+	{
+		LensPeak = FMath::Max(LensPeak, MudLens->GetLensDirt());
+		LensExposurePeak = FMath::Max(LensExposurePeak, MudLens->GetExposure());
 	}
 }
 
@@ -995,6 +1030,45 @@ void AB1GymTestRig::FinishScript()
 	else if (bDirtChecks)
 	{
 		Failures.Add(TEXT("noDirtComponent"));
+	}
+
+	FString LensMetrics;
+	const bool bLensChecks = Thresholds.MinLensPeak >= 0.0f || Thresholds.MaxLensPeak >= 0.0f || Thresholds.MaxLensEnd >= 0.0f
+		|| Thresholds.MinLensSplashes >= 0 || Thresholds.MaxLensSplashes >= 0 || Thresholds.MaxLensExposure >= 0.0f;
+	if (MudLens)
+	{
+		const float LensEnd = MudLens->GetLensDirt();
+		const int32 LensSplashes = MudLens->GetSplashCount() - LensSplashesAtStart;
+		if (Thresholds.MinLensPeak >= 0.0f && LensPeak < Thresholds.MinLensPeak)
+		{
+			Failures.Add(FString::Printf(TEXT("lensPeak<%.3f"), Thresholds.MinLensPeak));
+		}
+		if (Thresholds.MaxLensPeak >= 0.0f && LensPeak > Thresholds.MaxLensPeak)
+		{
+			Failures.Add(FString::Printf(TEXT("lensPeak>%.3f"), Thresholds.MaxLensPeak));
+		}
+		if (Thresholds.MaxLensEnd >= 0.0f && LensEnd > Thresholds.MaxLensEnd)
+		{
+			Failures.Add(FString::Printf(TEXT("lensEnd>%.3f"), Thresholds.MaxLensEnd));
+		}
+		if (Thresholds.MinLensSplashes >= 0 && LensSplashes < Thresholds.MinLensSplashes)
+		{
+			Failures.Add(FString::Printf(TEXT("lensSplashes<%d"), Thresholds.MinLensSplashes));
+		}
+		if (Thresholds.MaxLensSplashes >= 0 && LensSplashes > Thresholds.MaxLensSplashes)
+		{
+			Failures.Add(FString::Printf(TEXT("lensSplashes>%d"), Thresholds.MaxLensSplashes));
+		}
+		if (Thresholds.MaxLensExposure >= 0.0f && LensExposurePeak > Thresholds.MaxLensExposure)
+		{
+			Failures.Add(FString::Printf(TEXT("lensExpPeak>%.3f"), Thresholds.MaxLensExposure));
+		}
+		LensMetrics = FString::Printf(TEXT(" lensPeak=%.3f lensEnd=%.3f lensSplashes=%d lensExpPeak=%.3f throwPeak=%.0f lensCams=%d"),
+			LensPeak, LensEnd, LensSplashes, LensExposurePeak, ThrowPeak, MudLens->GetNumCameras());
+	}
+	else if (bLensChecks)
+	{
+		Failures.Add(TEXT("noLensComponent"));
 	}
 
 	FString WinchMetrics;
@@ -1203,9 +1277,9 @@ void AB1GymTestRig::FinishScript()
 
 	const bool bPassed = Failures.Num() == 0;
 	const FString Name = TestLabel.IsEmpty() ? GetName() : TestLabel;
-	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f maxH=%.2f avgDt=%.4f frames=%d%s%s%s%s%s%s%s%s%s"),
+	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f maxH=%.2f avgDt=%.4f frames=%d%s%s%s%s%s%s%s%s%s%s"),
 		*Name, bPassed ? TEXT("PASS") : TEXT("FAIL"),
-		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, PeakHeight, AvgDt, NumFrames, *SinkMetrics, *DirtMetrics, *SpringMetrics, *WinchMetrics, *LogMetrics, *FuelMetrics, *PlayerMetrics,
+		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, PeakHeight, AvgDt, NumFrames, *SinkMetrics, *DirtMetrics, *LensMetrics, *SpringMetrics, *WinchMetrics, *LogMetrics, *FuelMetrics, *PlayerMetrics,
 		bPassed ? TEXT("") : TEXT(" failed="), *FString::Join(Failures, TEXT(",")));
 
 	UE_LOG(LogB1Test, Display, TEXT("%s"), *Line);

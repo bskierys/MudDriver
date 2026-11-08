@@ -11,6 +11,8 @@ class UChaosWheeledVehicleMovementComponent;
 class UB1VehicleMovementComponent;
 class UB1MudVehicleComponent;
 class UB1MudDirtComponent;
+class UB1MudLensComponent;
+class UB1MudSprayComponent;
 class UB1AbilitySystemComponent;
 class UB1WinchComponent;
 class UGameplayAbility;
@@ -331,6 +333,28 @@ struct FB1GymThresholds
 	/** Worst wheel's path from its first mud contact until its coat reached TreadCoat */
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
 	float MaxTireCoatDistance = -1.0f;
+
+	/** Peak lens dirt during the script; needs a UB1MudLensComponent */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MinLensPeak = -1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MaxLensPeak = -1.0f;
+
+	/** Lens dirt at script end */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MaxLensEnd = -1.0f;
+
+	/** Splashes during the script */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	int32 MinLensSplashes = -1;
+
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	int32 MaxLensSplashes = -1;
+
+	/** Peak lens exposure */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MaxLensExposure = -1.0f;
 };
 
 /**
@@ -381,6 +405,10 @@ protected:
 	/** Every dirt value set to this at script start (UB1MudDirtComponent::SetDirt); negative leaves it */
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
 	float StartDirt = -1.0f;
+
+	/** Every lens slot set to this at script start (UB1MudLensComponent::SetLensDirt); negative leaves it */
+	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
+	float StartLensDirt = -1.0f;
 
 	/** Time for the vehicle to settle on its suspension before the script starts */
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config", meta = (Units = "s"))
@@ -497,6 +525,19 @@ private:
 	TArray<float> TireMudStartPath;
 	TArray<float> TireCoatDistance;
 	void SampleTireCoat();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UB1MudLensComponent> MudLens;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UB1MudSprayComponent> MudSpray;
+
+	float LensPeak = 0.0f;
+	float LensExposurePeak = 0.0f;
+	int32 LensSplashesAtStart = 0;
+	/** Peak spray launch speed over the wheels, cm/s */
+	float ThrowPeak = 0.0f;
+	void SampleLens();
 
 	/** The vehicle's winch; steps set its pull */
 	UPROPERTY(Transient)

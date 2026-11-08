@@ -27,3 +27,30 @@ Parameters are the constants at the top of the script (sizes, blotch spectrum, s
 - textures: `SRGB` off, `CompressionSettings` `TC_Grayscale`;
 - mesh: Nanite stays off;
 - reassign the references (`MF_B1MudDirt` texture params, the spray's mesh renderer).
+
+## Lens fields
+
+```
+python gen_lens_textures.py <out_dir> [seed=22] [Concept/mud-on-the-screen.jpg]
+```
+
+Drop field for `M_B1LensMud` (ADR-022), drops only (no specks: the concept's dots were an image artifact). One 2048×1024 tile = one splash slot; the material stacks 4 slots. Tile height maps to screen height (1 px ≈ 1 px at 1080p), tiles wrap in both axes.
+
+| File | Asset | Channels |
+|---|---|---|
+| `T_B1LensDrops.png` | `/Game/B1/FX/Lens/T_B1LensDrops` | RG drop normal xy (0.5-biased), B 1 − normalized radius (0 outside), A reveal id (background 1) |
+| `lens_contact_sheet.png` | — | concept next to a rough numpy stand-in of the material at 0.25 / 0.5 / 0.75 / 1 (flat colours, so refraction barely shows) |
+
+Reveal ids are spread evenly over the drops, so `id < strength` shows that fraction; bigger ones tend to come later. Outlines wobble and some drops have a smaller blob merged in. Slot variants (0–7): bit 0 flips U, bit 1 flips V, bit 2 inverts the reveal order (only inside drops). Parameters are the constants at the top (count, radii, aspect, wobble, satellites). Import: `SRGB` off, `CompressionSettings` `TC_VectorDisplacementmap`, `MipGenSettings` `TMGS_NoMipmaps`, `LODGroup` `TEXTUREGROUP_UI`.
+
+Stills: `photobooth.py` with `MODE = 'lens'` (2 levels per call), then `stage_sheet.py --lens <out_dir> <tool-result files...>`.
+
+## Spray sheet
+
+Shoot `B1Spray_Medium` in `Lvl_Gym_Mud` with a `ProgrammaticToolset.execute_tool_script` that sets the camera to (3300, 2450, 110), pitch −3, yaw 158, sets the rig's `bAutoRun` on, runs `StartPIE` (Simulate), calls `CaptureEditorImage` into keys `c10` / `c20` / `c30` (tenths of a second into the rig script: warmup 2.5 s = t 1 s), then `StopPIE` and `bAutoRun` off. Two captures per call at most. Then:
+
+```
+python spray_sheet.py <out_dir> <tool-result files...>
+```
+
+Writes the captures and `spray_sheet.png` (zoomed 3D view next to frames of `Concept/mud-car-drive.mp4`). Also needs `opencv-python-headless`.

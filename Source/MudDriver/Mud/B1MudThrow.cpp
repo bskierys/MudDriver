@@ -2,7 +2,7 @@
 #include "B1MudVehicleComponent.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 
-namespace
+namespace B1MudThrowPrivate
 {
 	constexpr float CmPerM = 100.0f;
 }
@@ -30,7 +30,7 @@ B1MudThrow::FWheelInput B1MudThrow::GetWheelInput(const UB1MudVehicleComponent& 
 	FWheelInput Input;
 	Input.bOnMud = MudVehicle.GetWheelMud(WheelIndex) != nullptr;
 	Input.SinkDepth = MudVehicle.GetWheelSinkDepth(WheelIndex);
-	Input.TreadSpeed = MudVehicle.GetWheelTreadSpeed(WheelIndex) / CmPerM;
-	Input.SlipSpeed = FMath::Abs(MudVehicle.GetWheelState(WheelIndex).SlipMagnitude) / CmPerM;
+	Input.TreadSpeed = MudVehicle.GetWheelTreadSpeed(WheelIndex) / B1MudThrowPrivate::CmPerM;
+	Input.SlipSpeed = FMath::Abs(MudVehicle.GetWheelState(WheelIndex).SlipMagnitude) / B1MudThrowPrivate::CmPerM;
 	return Input;
 }

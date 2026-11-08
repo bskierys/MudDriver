@@ -9,6 +9,8 @@
 #include "B1MudSprayComponent.h"
 #include "B1MudTrailComponent.h"
 #include "B1MudDirtComponent.h"
+#include "B1MudLensComponent.h"
+#include "Camera/CameraComponent.h"
 #include "B1WinchComponent.h"
 #include "B1WinchShowDebug.h"
 #include "B1Log.h"
@@ -29,6 +31,8 @@ AB1Jeep::AB1Jeep(const FObjectInitializer& ObjectInitializer)
 	MudSpray = CreateDefaultSubobject<UB1MudSprayComponent>(TEXT("MudSpray"));
 	MudTrail = CreateDefaultSubobject<UB1MudTrailComponent>(TEXT("MudTrail"));
 	MudDirt = CreateDefaultSubobject<UB1MudDirtComponent>(TEXT("MudDirt"));
+	MudLens = CreateDefaultSubobject<UB1MudLensComponent>(TEXT("MudLens"));
+	GetBackCamera()->ComponentTags.AddUnique(MudLens->TargetTag);
 
 	Winch = CreateDefaultSubobject<UB1WinchComponent>(TEXT("Winch"));
 	Winch->SetupAttachment(GetMesh());

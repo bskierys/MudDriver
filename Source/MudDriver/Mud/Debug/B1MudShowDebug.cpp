@@ -1,6 +1,7 @@
 #include "B1MudShowDebug.h"
 #include "B1MudVehicleComponent.h"
 #include "B1MudDirtComponent.h"
+#include "B1MudLensComponent.h"
 #include "B1PhysicalMaterial_Mud.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "B1MudPatch.h"
@@ -59,6 +60,13 @@ namespace B1MudShowDebug
 			Lines.Add(FString::Printf(TEXT("dirt w %.2f/%.2f/%.2f/%.2f  body %.2f%s"), Dirt->GetWheelDirt(0), Dirt->GetWheelDirt(1),
 				Dirt->GetWheelDirt(2), Dirt->GetWheelDirt(3), Dirt->GetBodyDirt(),
 				Dirt->PreviewDirt >= 0.0f ? *FString::Printf(TEXT("  (preview %.2f)"), Dirt->PreviewDirt) : TEXT("")));
+		}
+
+		if (const UB1MudLensComponent* Lens = Owner->FindComponentByClass<UB1MudLensComponent>())
+		{
+			Lines.Add(FString::Printf(TEXT("lens d %.2f  exp %.2f  slots %.2f/%.2f/%.2f/%.2f%s"), Lens->GetLensDirt(), Lens->GetExposure(),
+				Lens->GetSlot(0).Strength, Lens->GetSlot(1).Strength, Lens->GetSlot(2).Strength, Lens->GetSlot(3).Strength,
+				Lens->PreviewLensDirt >= 0.0f ? *FString::Printf(TEXT("  (preview %.2f)"), Lens->PreviewLensDirt) : TEXT("")));
 		}
 
 		for (int32 WheelIndex = 0; WheelIndex < Mud.GetNumWheels(); ++WheelIndex)

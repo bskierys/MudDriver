@@ -41,6 +41,14 @@ public:
 	UFUNCTION(Exec)
 	void B1DirtClean();
 
+	/** Every lens slot to Value (0..1); negative cleans */
+	UFUNCTION(Exec)
+	void B1Lens(float Value);
+
+	/** One lens splash as at full exposure */
+	UFUNCTION(Exec)
+	void B1LensSplash();
+
 	/** Hooks the nearest winch anchor within cable range; rest length = current distance */
 	UFUNCTION(Exec)
 	void B1WinchAttachNearest();
@@ -69,6 +77,8 @@ private:
 	class UB1WinchComponent* GetPlayerWinch(const TCHAR* CheatName) const;
 
 	class UB1MudDirtComponent* GetPlayerDirt(const TCHAR* CheatName) const;
+
+	class UB1MudLensComponent* GetPlayerLens(const TCHAR* CheatName) const;
 
 	class UB1AbilitySystemComponent* GetPlayerASC(const TCHAR* CheatName) const;
 };

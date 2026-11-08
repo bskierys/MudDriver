@@ -499,3 +499,41 @@ The CVar is global; there's no per-vehicle or per-surface switch.
 - **Cap:** `DirtScale` (0.8) in the function scales the body and crust values, so the first look's 0.8 is the new 1.
 - **Clean:** a `B1DirtClean` cheat resets everything (S5-11). Gameplay still has no wash path.
 - Rims on the tire mesh need a tire material (`MI_Wrangler_Rim`, `bIsTire` on), or they run the body branch and read the tire slots as wheel dirt.
+
+**As built (S5-18 check, 2026-11-08).**
+- Targets resolve in the first tick that has wheels, not at BeginPlay (wheels come with the physics state). The tire match is "within the wheel radius of that wheel's centre".
+- Accumulation never lowers dirt; `SetDirt` / `Clean` (debug) can. The tire coat and wetness go down on their own (amendment above).
+- Glass calls the function too (`M_Wrangler_Glass`, film from slot 0), so "every material calls `MF_B1MudDirt`" holds for body, tires, rims and glass.
+- Slot 5 is still free; body wetness stays a stretch.
+- The CPD writes go to the runtime copy (`SetCustomPrimitiveDataFloat`), so `PreviewDirt` never dirties a level or BP.
+
+---
+
+## ADR-022 — Mud on the lens is a camera post-process driven by the spray's throw
+
+**Status:** accepted (2026-11-08, user request; plan: [plans/2026-11-08-mud-lens.md](plans/2026-11-08-mud-lens.md))
+
+**Problem.** Hard wheelspin should splash the chase camera's lens. The mud builds up, fades, and caps at `Concept/mud-on-the-screen.jpg`: small dark specks plus muddy drops that refract the scene, with the HUD clean on top. The user asked for a cheap trigger tied to the big spray, not a simulation of drops hitting the camera, and for a generous aim (splashed more often than not).
+
+**Decision.**
+- **Look:** one post-process material (`M_B1LensMud`, after tonemapping) added as a MID to the `WeightedBlendables` of camera components tagged `B1MudLens`. Only the active tagged camera shows and gathers mud. The host tags `BackCamera`; the in-cabin camera isn't tagged (the windshield has glass dirt, ADR-021).
+- **State:** 4 splash slots (strength, screen offset, 1 of 8 rotation/mirror variants). A splash fills an empty slot or tops up the weakest. Each slot holds, then fades linearly. `LensDirt` = mean strength, 1 = the concept. Generated textures carry per-drop and per-speck reveal ids, so a slot's strength reveals that fraction of its drops and specks, and the drops shrink as it fades.
+- **Trigger:** the portable `UB1MudLensComponent` (`Mud/`) reads each wheel's launch origin and velocity from `UB1MudSprayComponent`. Exposure = throw intensity × a launch-speed band × a wide aim window × distance falloff, max over the wheels. Accumulation is set in seconds (`LensSecondsToFull`). Random placement uses a seeded stream.
+
+**Rationale.** A post-process pass is the only cheap way to get refraction, and it costs one full-screen pass (fits ADR-011). After tonemapping keeps the drops out of TSR and bloom and leaves the UMG HUD clean. Slots give variety (no same-drops-every-time) without a render target. The speed band follows the visible spray: a rolling throw (~250 cm/s) doesn't reach the lens, medium wheelspin (~510 cm/s) does, and retuning the spray moves the trigger the right way. Tagging cameras keeps the component portable and free of controller or camera-manager code.
+
+**Alternatives.**
+- UMG overlay with drop images (no refraction).
+- Niagara sprites on the camera's near plane (more cost, harder fade/accumulation control).
+- A render target painted by splash stamps or real particle hits (true placement, more work, needs a decay pass).
+- A ballistic reach test (safety parabola) as the gate: physically honest, but at today's spray speeds medium wheelspin can't reach a camera 5.5 m back, so it would never fire.
+- A `UCameraModifier` on the player camera manager (needs a host-side camera manager hook; the tag is simpler).
+
+**As built (S5-28, 2026-11-08).**
+- **Look:** drops only. The concept's dark specks were an image artifact (user, lens checkpoint round 1), so `T_B1LensSpecks` and the speck path are gone. Drops are translucent, blurred and irregular, with brown towards their lower edge. They're more and larger at the bottom of the screen (`LensBottomScale` 1.2, `LensTopDensity` 0.45). The reveal is front-loaded (`LensRevealGamma` 0.5), so the first splashes show medium drops. Final sheet: `Saved/MudTextures/lens/stills4/lens_sheet.png`.
+- **Trigger:** measured throw peaks (S5-27, `s527_measure.log`): rolling 150–291 cm/s, firm 0; wheelspin 547–555 (buggy, medium), 675 (Wrangler, medium), 900 (deep). The plan's band `LensMinThrowSpeed` 350 / `LensFullThrowSpeed` 500 sits in the 291–547 gap and stays. The rationale's ~510 cm/s guess for medium wheelspin was low.
+- **Rates:** with the defaults (threshold 0.1, interval 0.25 s, 4 s to full, hold 1.5 s, fade 6 s), 4 s of Wrangler wheelspin in medium gives exposure 0.68, 14 splashes and `LensDirt` 0.52. It clears in ~4.5 s once the spin stops (`B1Lens_Fade` ends at 0 after 10 s idle). The cap holds at 1.
+- **Camera:** an unpossessed jeep's `BackCamera` is active, so rigs measure the lens without a controller. The camera PP blendable applies from the next `GetCameraView`; no refresh needed.
+- **Debug:** the Mud window "Lens" section, cheats `B1Lens <v>` / `B1LensSplash`, telemetry `lens=d/exp`, ShowDebug `lens d exp slots`, CVar `b1.Mud.Lens`. Rigs: `B1Lens_Firm`, `_Roll`, `_Spin`, `_Cap`, `_Fade` (`Lvl_Gym_Mud`, `B1Tests/Lens`).
+
+**Consequences.** The lens reads the spray on purpose: `b1.Mud.Spray 0` means a clean lens. That's unlike dirt (ADR-021), which stays independent of the spray. A front wheel's throw counts through the body (no occlusion). Spray retuning shifts the trigger, so the lens rigs are re-run after spray changes. Phase 3 water can reuse the slots for lens water.

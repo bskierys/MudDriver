@@ -7,6 +7,7 @@
 #include "B1FuelConsumptionComponent.h"
 #include "B1MudSprayComponent.h"
 #include "B1MudDirtComponent.h"
+#include "B1MudLensComponent.h"
 #include "B1WinchAnchorComponent.h"
 #include "B1WinchComponent.h"
 #include "AbilitySystemComponent.h"
@@ -101,11 +102,16 @@ namespace B1VehicleTelemetry
 			Line.Appendf(TEXT(" dirt=%.2f/%.2f/%.2f/%.2f/%.2f"), Dirt->GetWheelDirt(0), Dirt->GetWheelDirt(1), Dirt->GetWheelDirt(2), Dirt->GetWheelDirt(3), Dirt->GetBodyDirt());
 		}
 
+		if (const UB1MudLensComponent* Lens = Owner->FindComponentByClass<UB1MudLensComponent>())
+		{
+			Line.Appendf(TEXT(" lens=%.2f/%.2f"), Lens->GetLensDirt(), Lens->GetExposure());
+		}
+
 		const UB1MudSprayComponent* Spray = Owner->FindComponentByClass<UB1MudSprayComponent>();
 		for (int32 WheelIndex = 0; WheelIndex < Mud.GetNumWheels(); ++WheelIndex)
 		{
 			const FWheelStatus& Status = Mud.GetWheelState(WheelIndex);
-			Line.Appendf(TEXT(" | w%d mat=%s sink=%.1f slip=%.2f mu=%.2f rr=%.0f pull=%.0f spray=%.0f"),
+			Line.Appendf(TEXT(" | w%d mat=%s sink=%.1f slip=%.2f mu=%.2f rr=%.0f pull=%.0f spray=%.0f/%.2f"),
 				WheelIndex,
 				*GetNameSafe(Status.PhysMaterial.Get()),
 				Mud.GetWheelSinkDepth(WheelIndex),
@@ -113,7 +119,8 @@ namespace B1VehicleTelemetry
 				Mud.GetWheelMudFrictionScale(WheelIndex),
 				Mud.GetWheelRollingResistance(WheelIndex),
 				Mud.GetWheelSlopePull(WheelIndex),
-				Spray ? Spray->GetWheelSpawnRate(WheelIndex) : 0.0f);
+				Spray ? Spray->GetWheelSpawnRate(WheelIndex) : 0.0f,
+				Spray ? Spray->GetWheelIntensity(WheelIndex) : 0.0f);
 		}
 
 		UE_LOG(LogB1Mud, Log, TEXT("%s"), *Line);

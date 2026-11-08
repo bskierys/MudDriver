@@ -1,5 +1,6 @@
 #include "B1MudSprayComponent.h"
 #include "B1MudVehicleComponent.h"
+#include "B1MudThrow.h"
 #include "B1PhysicalMaterial_Mud.h"
 #include "B1MudLog.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -15,9 +16,9 @@ namespace
 	const FName SpawnRateParam(TEXT("User.SpawnRate"));
 	const FName SprayVelocityParam(TEXT("User.SprayVelocity"));
 	const FName ColorParam(TEXT("User.Color"));
-
-	/** cm clear of the mud surface and the tread, so depth-buffer collision doesn't catch particles at birth */
-	constexpr float SurfaceLift = 20.0f;
+	const FName IntensityParam(TEXT("User.Intensity"));
+	const FName SpraySpreadParam(TEXT("User.SpraySpread"));
+	const FName SpeedSpreadParam(TEXT("User.SpeedSpread"));
 }
 
 UB1MudSprayComponent::UB1MudSprayComponent()
@@ -61,6 +62,9 @@ void UB1MudSprayComponent::CreateWheelEmitters()
 		WheelEmitters.Add(Emitter);
 	}
 	SpawnRates.Init(0.0f, WheelEmitters.Num());
+	Intensities.Init(0.0f, WheelEmitters.Num());
+	SprayOrigins.Init(FVector::ZeroVector, WheelEmitters.Num());
+	SprayVelocities.Init(FVector::ZeroVector, WheelEmitters.Num());
 }
 
 void UB1MudSprayComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -79,6 +83,7 @@ void UB1MudSprayComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 	}
 
 	const FVector Forward = GetOwner()->GetActorForwardVector().GetSafeNormal2D();
+	const float TravelSign = FVector::DotProduct(GetOwner()->GetVelocity(), Forward) >= 0.0f ? 1.0f : -1.0f;
 	const bool bEnabled = CVarMudSpray.GetValueOnGameThread();
 
 	for (int32 WheelIndex = 0; WheelIndex < WheelEmitters.Num() && WheelIndex < MudVehicle->GetNumWheels(); ++WheelIndex)
@@ -88,18 +93,24 @@ void UB1MudSprayComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 		const UB1PhysicalMaterial_Mud* Mud = MudVehicle->GetWheelMud(WheelIndex);
 		// Same slip the sink model uses (cm/s). Forward drive torque spins the tread forward, so mud flies backward.
 		const float SlipSpeed = FMath::Abs(Status.SlipMagnitude) * (Status.DriveTorque >= 0.0f ? 1.0f : -1.0f);
-		const float ExcessSlip = FMath::Abs(SlipSpeed) / 100.0f - MinSlipSpeed;
-		const bool bSpray = bEnabled && Mud && MudVehicle->GetWheelSinkDepth(WheelIndex) > 0.0f && ExcessSlip > 0.0f;
+		const bool bSpinning = FMath::Abs(SlipSpeed) / 100.0f > MinSlipSpeed;
+		const float Intensity = bEnabled ? B1MudThrow::GetIntensity(B1MudThrow::GetWheelInput(*MudVehicle, WheelIndex)) : 0.0f;
+		const bool bSpray = Mud && Intensity > 0.0f;
 
-		SpawnRates[WheelIndex] = bSpray ? FMath::Min(ExcessSlip * SpawnRatePerSlip, MaxSpawnRate) : 0.0f;
+		Intensities[WheelIndex] = Intensity;
+		SpawnRates[WheelIndex] = bSpray ? FMath::Min(Intensity * MaxSpawnRate * (bSpinning ? 1.0f : RollingRateFactor), MaxSpawnRate) : 0.0f;
 		Emitter->SetVariableFloat(SpawnRateParam, SpawnRates[WheelIndex]);
+		Emitter->SetVariableFloat(IntensityParam, Intensity);
+		SprayOrigins[WheelIndex] = FVector::ZeroVector;
+		SprayVelocities[WheelIndex] = FVector::ZeroVector;
 		if (!bSpray)
 		{
 			continue;
 		}
 
 		const float Speed = FMath::Clamp(MinSpraySpeed + FMath::Abs(SlipSpeed) * SpraySpeedPerSlip, MinSpraySpeed, MaxSpraySpeed);
-		const FVector Back = -Forward * FMath::Sign(SlipSpeed);
+		// A rolling wheel throws mud off the back of its travel; a spinning one opposite to its spin.
+		const FVector Back = -Forward * (bSpinning ? FMath::Sign(SlipSpeed) : TravelSign);
 		const float Elevation = FMath::DegreesToRadians(SprayElevation);
 		const FVector WorldVelocity = (Back * FMath::Cos(Elevation) + FVector::UpVector * FMath::Sin(Elevation)) * Speed;
 
@@ -107,10 +118,14 @@ void UB1MudSprayComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 		// where the depth buffer shows neither tire nor ground, or depth-buffer collision pins the particles.
 		const float Radius = MudVehicle->GetWheelRadius(WheelIndex);
 		const FVector Surface = Status.HitLocation + FVector::UpVector * MudVehicle->GetWheelSinkDepth(WheelIndex);
-		Emitter->SetWorldLocation(Surface + FVector::UpVector * SurfaceLift + Back * (Radius + SurfaceLift));
+		Emitter->SetWorldLocation(Surface + FVector::UpVector * SpawnLift + Back * (Radius + SpawnBackOffset));
+		SprayOrigins[WheelIndex] = Emitter->GetComponentLocation();
+		SprayVelocities[WheelIndex] = WorldVelocity;
 
 		// The emitter's cone axis is in system space, which follows the attached component's rotation.
 		Emitter->SetVariableVec3(SprayVelocityParam, Emitter->GetComponentTransform().InverseTransformVectorNoScale(WorldVelocity));
 		Emitter->SetVariableLinearColor(ColorParam, Mud->SprayColor);
+		Emitter->SetVariableFloat(SpraySpreadParam, SpraySpread);
+		Emitter->SetVariableFloat(SpeedSpreadParam, SpraySpeedSpread);
 	}
 }

@@ -1220,7 +1220,7 @@ Plan: [plans/2026-10-28-fallen-tree.md](plans/2026-10-28-fallen-tree.md) (critiq
 
 **Status:** planned 2026-11-07. Start with `/work`.
 
-**Goal.** Close Phase V. The Wrangler starts clean and collects mud (tires, then arches, then splatter, then spots), capped at `Concept/jeep_wrangler_mud_reference.jpg`. The tires throw a spray close to `Concept/mud-car-drive.mp4`.
+**Goal.** Close Phase V. The Wrangler starts clean and collects mud (tires, then arches, then splatter, then spots), capped at `Concept/jeep_wrangler_mud_reference.jpg`. The tires throw a spray close to `Concept/mud-car-drive.mp4`. Hard wheelspin splashes the chase camera's lens, capped at `Concept/mud-on-the-screen.jpg` (S5-21..S5-28, added 2026-11-08).
 
 Design: [plans/2026-11-07-visuals.md](plans/2026-11-07-visuals.md) (revision 1). Decision: ADR-021 (material layer + Custom Primitive Data, not decals).
 
@@ -1254,7 +1254,12 @@ Design: [plans/2026-11-07-visuals.md](plans/2026-11-07-visuals.md) (revision 1).
   **Done:** a capture of the placed Wrangler shows one red tire; the tags persist after save and reload; the result is noted in this task.
   **User check:** —
 
-- [ ] **S5-02** Spike: Niagara toolset builds a GPU mesh-renderer emitter with depth-buffer collision (1.5 h)
+- [x] **S5-02** Spike: Niagara toolset builds a GPU mesh-renderer emitter with depth-buffer collision (1.5 h) <!-- done: 2026-11-08 -->
+  Result (done inside S5-14 on `NS_B1MudSpray` itself, no scratch system; the existing GPU emitter already had depth-buffer collision): the toolset covers it all.
+  - `NiagaraToolset_System`: `AddRenderer(newRendererLocation, rendererClass)`, `RemoveRenderer(rendererToRemove)`, `SetRendererData(renderer, rendererData.propertyValues)` (JSON string: `Meshes[0].mesh`, `bOverrideMaterials`, `OverrideMaterials[{explicitMat}]`), `AddModule(moduleLocationRef{scriptName: ParticleSpawnScript/ParticleUpdateScript}, moduleAsset)` appends, `SetStackInputData(stackInputRef{inputNameStack:[name]}, inputData)`, `AddUserVariables`, `GetSystemCompileState`, `GetStackIssues(system)`. Every ref needs all six fields (`rendererIndex` -1, empty strings).
+  - Input values: float `{struct NiagaraFloat, value{value}}`, enum `NiagaraExt_StackInputData_Enum` (enumName `X::NewEnumeratorN`, look up with `NiagaraToolset_Info.UEnum_Info`), HLSL `NiagaraExt_StackInputData_HlslExpression {hlslExpression}`; `rand(1.0f)` and `User.*` / `Particles.*` work in expressions.
+  - `GetEmitterTopology` / `GetEmitterInputValues` are ~60k chars: run them inside `execute_tool_script` and return only what's needed. Scripts' result dicts reject `.get(k, default)`.
+  - Modules: `/Niagara/Modules/Spawn/Orientation/V3/InitialMeshOrientation`, `/Niagara/Modules/Update/Orientation/V3/UpdateMeshOrientation`, `/Niagara/Modules/Update/Size/ScaleMeshSize`.
   🔍 Research first: `describe_toolset` on `NiagaraToolset_System` (once) and `NiagaraToolset_Assets.FindNiagaraScripts` for the collision and mesh-renderer modules.
   In a scratch system `/Game/B1/FX/Scratch/NS_B1Spike`: one GPU emitter, a mesh renderer with an engine cube, spawn rate, velocity, gravity, collision (depth buffer, no kill), and a user float wired to the spawn rate.
   ⚠️ Note: ADR-011 rules out distance fields, so collision has to be depth buffer. If the mesh renderer or collision can't be configured, record the fallback (masked clump sprites, or the user wires the module from a written spec).
@@ -1443,7 +1448,12 @@ Design: [plans/2026-11-07-visuals.md](plans/2026-11-07-visuals.md) (revision 1).
 
 ### Spray
 
-- [ ] **S5-13** Spray rate from `B1MudThrow` + `User.Intensity` (1.5 h) _(requires S5-10)_
+- [x] **S5-13** Spray rate from `B1MudThrow` + `User.Intensity` (1.5 h) _(requires S5-10)_ <!-- done: 2026-11-08 -->
+  Result:
+  - Rate = intensity × `MaxSpawnRate` (400, also the per-wheel cap), × `RollingRateFactor` 0.4 when |slip| < `MinSlipSpeed`. `SpawnRatePerSlip` removed. Speed formula unchanged; a rolling wheel throws back along its travel (sign of velocity · forward), a spinning one opposite its spin as before.
+  - `User.Intensity` set every tick; `GetWheelIntensity`. Telemetry `spray=rate/intensity`. MIGRATION.md: the fourth user param and the rate rule.
+  - Headless mud 27/27 (`s513_mud.log`): medium wheel with slip 0.00 at sink 16.9 → `spray=27/0.17`. With `-ini:Engine:[ConsoleVariables]:b1.Mud.Spray=0`, `B1Dirt_Medium` gives `spray=0/0.00` and the same dirt (wheels 0.52, body 0.172).
+  - Unity build fix on the way: `CmPerM` in `B1MudThrow.cpp` clashed with `B1VehicleSimulation.cpp` → `B1MudThrowPrivate::CmPerM`.
   - `UB1MudSprayComponent`: rate = f(`B1MudThrow` intensity), capped per wheel, so a rolling wheel in mud sprays too.
   - New `User.Intensity` (0..1).
   - Velocity stays with today's rules.
@@ -1452,7 +1462,12 @@ Design: [plans/2026-11-07-visuals.md](plans/2026-11-07-visuals.md) (revision 1).
   **Done:** builds; telemetry shows spray > 0 for a wheel rolling in medium mud with |slip| < `MinSlipSpeed`.
   **User check:** —
 
-- [ ] **S5-14** `NS_B1MudSpray`: clump emitter (3 h) _(requires S5-02, S5-04)_
+- [x] **S5-14** `NS_B1MudSpray`: clump emitter (3 h) _(requires S5-02, S5-04)_ <!-- done: 2026-11-08 -->
+  Result: emitter `Spray` (GPU) now renders `SM_B1MudClump` with `M_B1MudClump` (new: opaque, lit, ParticleColor RGB, roughness 0.2, specular 0.6, no shadows); sprite renderer removed. `User.Intensity` added (default 1 so the asset previews).
+  - Size: Mesh Scale Mode Uniform = `lerp(1.1, 6.5, pow(rand(1.0f), 3.0)) * lerp(0.6, 1.0, saturate(User.Intensity))` (clump ≈ 2 cm across, so ~2–12 cm, skewed small).
+  - Rotation: `InitialMeshOrientation` Random; `UpdateMeshOrientation` axis = velocity × up, rate = `saturate(|v| / 300) * 3`, so it tumbles in flight and stops at rest.
+  - Lifetime 0.6–1.2 s; `ScaleMeshSize` = `saturate((1 - NormalizedAge) * 4)` (shrinks over the last 25 %). Collision: depth buffer, radius from mesh, restitution 0, friction 0.9, rest state on. Gravity, drag, `SpawnRate`/`SprayVelocity`/`Color` bindings unchanged.
+  - Capture (Simulate, `B1Mud_DigInMedium` temporarily auto-run with the Wrangler, reverted): `spray/clump_b.png` and `clump_b_crop.png` in the session scratchpad: mixed clumps off the rear tread, landing behind the wheel. They read a bit light/grey in sun; colour is for S5-17 / checkpoint 2.
   Replace the sprite emitter with GPU mesh particles (`SM_B1MudClump`):
   - size 2–12 cm, skewed (e.g. `pow(rand, 3)`), scaled by `User.Intensity`;
   - random rotation and spin rate, gravity, drag;
@@ -1464,26 +1479,157 @@ Design: [plans/2026-11-07-visuals.md](plans/2026-11-07-visuals.md) (revision 1).
   **Done:** a capture from a PIE rig with wheelspin shows small mixed-size clumps landing and resting.
   **User check:** —
 
-- [ ] **S5-15** `NS_B1MudSpray`: droplets + haze emitters (2 h) _(requires S5-14)_
+- [x] **S5-15** `NS_B1MudSpray`: droplets + haze emitters (2 h) _(requires S5-14)_ <!-- done: 2026-11-08 -->
+  Result: two emitters from `/Niagara/DefaultAssets/Templates/Emitters/Fountain`, both cone velocity on `User.SprayVelocity`, sphere 10 cm spawn.
+  - `Droplets`: GPU, fixed bounds as `Spray`; rate `User.SpawnRate * 2`; life 0.3–0.6 s; non-uniform size `float2(1, 2.5) * lerp(0.5, 3, pow(rand, 2))` cm, `VelocityAligned`, `M_B1MudSpray`, `User.Color`; speed ×0.9–1.25, cone 30°, drag 0.5, gravity −980.
+  - `Haze`: CPU; rate `User.SpawnRate > 0 ? 8 * saturate(User.Intensity) : 0` (≤ 8/s per wheel); life 1–2 s; 50–150 cm; colour = `User.Color` lerped 50 % to (0.55, 0.5, 0.45), alpha `0.13 * lerp(0.5, 1, Intensity)`; speed ×0.3, cone 40°, drag 4, gravity −50. New `M_B1MudHaze` (translucent lit, sphere-mask disc × particle alpha, depth fade 60 cm).
+  - Compiles with no errors or warnings. Captures in the session scratchpad `spray/`: `full_a_vp.png`, `full_b_vp.png` (all three), `near_a_vp.png` (faint haze puff behind the front tire), `droponly_a_vp.png` (clumps and haze hidden: fine droplet streaks). Droplets are small at 3–4 m, haze is subtle; both are tuning for S5-17 / checkpoint 2.
+  - `stat Niagara` counts: not taken (no console exec from the agent); user-side.
   - **Droplets:** GPU sprites 0.5–3 cm, velocity-aligned, ~2× the clump rate, short life.
   - **Haze:** CPU or GPU, a handful of soft translucent sprites (50–150 cm, opacity ≤ 0.15, `User.Color` lightened), slow, high drag, rate scaled by `User.Intensity`.
   ⚠️ Note: cap the haze spawn (≤ 8/s per wheel) to keep overdraw down. It's tuning, not optimisation.
   **Done:** a capture shows the rooster tail with fine droplets and a faint haze; `stat Niagara` counts noted (user-side, or from the log if available).
   **User check:** —
 
-- [ ] **S5-16** Spray section in the Mud window (1.5 h) _(requires S5-13)_
+- [x] **S5-16** Spray section in the Mud window (1.5 h) _(requires S5-13)_ <!-- done: 2026-11-08 -->
+  Result: Mud window → "Spray" header (player pawn's `UB1MudSprayComponent`): per-wheel rate bar (rate / `MaxSpawnRate`, with throw intensity), typed fields for `MinSlipSpeed`, `MaxSpawnRate`, `RollingRateFactor`, `SpraySpeedPerSlip`, `Min/MaxSpraySpeed`, `SprayElevation`; "Save to asset" copies them to the pawn BP's component archetype (same path as Dirt). Builds; core 12/12 (`s516_core.log`). The render check is left to the user check (the agent can't connect a NetImGui client).
+  - Fix found at the user check: the `NetImGuiLaunch` cheat crashed the editor. UE 5.8's `FPlatformProcess::CreateProc` asserts on `nullptr` Parms (`WindowsPlatformProcess.cpp:542`), so it now passes `TEXT("")`.
   Per-wheel intensity and rate; `DragFloatTyped` for the `Mud|Spray` config (`MinSlipSpeed`, rates, speeds, elevation, rolling factor); "Save to asset" to the pawn's own BP class.
   **Done:** builds; the section renders (smoke check in a PIE log or capture).
   **User check:** edits change the spray live; Save keeps them after a restart.
 
-- [ ] **S5-17** Spray capture rig + reference comparison (1.5 h) _(requires S5-14, S5-15)_
+- [x] **S5-17** Spray capture rig + reference comparison (1.5 h) _(requires S5-14, S5-15)_ <!-- done: 2026-11-08 -->
+  Result:
+  - Rig `B1Spray_Medium` (`Lvl_Gym_Mud`, folder `B1Tests/Spray`): X 15, Y 29 m (the `DigInMedium` spot), Wrangler, one 5 s full-throttle step, no thresholds. Saved with `bAutoRun` **off**: saved on, it would also start in headless runs and drive into the medium lane next to the other rigs. The capture script turns it on, captures in Simulate, then turns it off again. Headless mud 28/28 (`s517_mud.log`): `dist=23.33 vmax=13.40`, out of the patch by the end.
+  - Camera (x, y, z cm, pitch, yaw): (3300, 2450, 110, −3, 158), low front ¾ left like the clip. Captures: warmup 2.5 s → t=1 s, +2 s → t=3 s (one call), warmup 3.5 s → t=2 s (second call); at most 2 captures per call.
+  - `Scripts/MudTextures/spray_sheet.py <out_dir> <result files…>` decodes the `cNN` captures, crops the 3D view out of the editor shot (it's only ~680×440) and puts them next to 3 frames of `mud-car-drive.mp4` (only 30 frames, 1.25 s). Needs `opencv-python-headless`. Sheet: `spray3/spray_sheet.png` in the session scratchpad.
+  - Comparison for checkpoint 2: our spray is a low, flat trail at wheel height behind the rear tire; the clip's is a rooster tail rising above the roof and fanning out back and up. Clumps read grey or light-edged (clip: dark brown); no haze visible at this distance (clip: a large tan cloud). The Wrangler speeds up fast (13 m/s by 5 s), so at t=2–3 s it's mostly rolling throw, not spin.
   `B1Spray_Medium` (`bAutoRun`, Wrangler, full throttle from rest on the medium lane of `Lvl_Gym_Mud`). Set the camera before `StartPIE` (mcp-tools.md) at an angle similar to `mud-car-drive.mp4`, then `CaptureEditorImage` at about 1, 2 and 3 s. Build a side-by-side sheet with the reference frames (scratchpad OpenCV, or re-extract with `Scripts/MudTextures`).
   **Done:** comparison sheet saved and noted here; the rig passes its smoke check (no thresholds).
   **User check:** —
 
+### Lens mud (added 2026-11-08)
+
+User request before checkpoint 2: hard wheelspin splashes the chase camera's lens, the mud builds up and fades, capped at `Concept/mud-on-the-screen.jpg`. Design: [plans/2026-11-08-mud-lens.md](plans/2026-11-08-mud-lens.md) (revision 1). Decision: ADR-022. Same look-first order: component → textures → material → stills → **lens checkpoint** (S5-25) → debug and rigs.
+
+- [x] **S5-21** Spray getters + `UB1MudLensComponent` core (3.5 h) <!-- done: 2026-11-08 -->
+  Result:
+  - Spray: `GetNumWheels`, `GetWheelSprayOrigin` (emitter world location), `GetWheelSprayVelocity` (world launch velocity), zero when not spraying. Behaviour unchanged.
+  - `Mud/B1MudLensComponent` on `AB1Jeep` as `MudLens` (`GetMudLens()`); `AB1Jeep` tags `BackCamera` with `B1MudLens` (inherited on `BP_B1Jeep_Wrangler`; its PP is empty, `WeightedBlendables` []). Ticks after the spray (tick prerequisite). Per-wheel exposure struct (intensity, throw, aim, distance, launch speed, aim angle), slots, `RandomSeed` 22, getters, `SetLensDirt`/`CleanLens`/`Splash`, `PreviewLensDirt`, CVar `b1.Mud.Lens`. Log `lens d= exp= splashes=` per new tenth, with one tenth of slack (at the cap, fading between splashes re-logged every splash: 51 lines → 10 in `B1Dirt_Cap`). Camera PP blendables apply from the next `GetCameraView`, no refresh needed.
+  - `UB1MudSettings::LensMaterial` added, **left unset** in `DefaultGame.ini` until S5-23 makes the MI (a missing asset path would warn on every load). Unset: logs once, the lens still simulates.
+  - Headless instead of the PIE run (same check): mud 28/28 (`s521_mud.log`), numbers unchanged. Lens lines: `B1Spray_Medium` (Wrangler, full throttle at the DigInMedium spot) up to 0.52; buggy `DigInMedium` / `ExitMediumFull` 0.32, `SinkMedium` / `RecoverMedium` 0.2; deep spins `DeepFullThrottle` / `Fuel_DeepFull` 0.62, `Dirt_Cap` (30 s stuck in deep) 1.0 at exp ~0.62. None in `FirmSmoke`, any firm rig, `Dirt_Medium`/`Drive90` (50 % shuttle), `CrossMedium` or `CrawlIntoMedium`. Core 12/12 (`s521_core.log`, FullThrottle5s 77.10 m).
+  - `UB1MudSprayComponent`: read-only `GetWheelSprayOrigin` / `GetWheelSprayVelocity` (world, cm/s, zero when not spraying). Spray behaviour unchanged.
+  - `Mud/B1MudLensComponent` (portable) on `AB1Jeep` as `MudLens`:
+    - targets: camera components tagged `B1MudLens` (host tags `BackCamera` in `AB1Jeep`'s constructor); only an `IsActive()` camera accumulates and shows mud;
+    - MID of `UB1MudSettings::LensMaterial` (new soft ref, default `/Game/B1/FX/MI_B1LensMud`; null → log once, no lens) appended to the camera's `PostProcessSettings.WeightedBlendables`, removed in EndPlay;
+    - exposure per wheel = intensity × smoothstep(`LensMinThrowSpeed` 350, `LensFullThrowSpeed` 500, launch speed) × aim (1 to `LensAimFull` 75°, 0 at `LensAimZero` 110°, horizontal angle between throw and emitter → camera) × `1 / (1 + (d / LensFalloffDistance 800 cm)²)`; E = max over the wheels;
+    - splashes while E > `LensSplashThreshold` 0.1, every `LensSplashInterval` 0.25 s ±40 % (seeded `FRandomStream`), amount = interval × E × 4 / `LensSecondsToFull` 4 s;
+    - 4 slots (strength, offset UV, variant 0–7, time since hit): emptiest slot (< 0.05) gets a new placement, else the weakest is topped up; hold `LensHoldSeconds` 1.5 s, then linear fade over `LensFadeSeconds` 6 s; MID params `LensSlot0..3` (strength, offset U, offset V, variant) written on change;
+    - `LensDirt` = mean strength; `PreviewLensDirt` (−1 off); `SetLensDirt(v)`, `CleanLens()`, `Splash()`; getters for exposure factors per wheel and the splash count;
+    - CVar `b1.Mud.Lens`; one `LogB1Mud` line per new tenth: `lens d= exp=`.
+  - MIGRATION.md: component, tag, setting, MI.
+  🔍 Research first: `UCameraComponent::PostProcessSettings.WeightedBlendables` (`FWeightedBlendable`) with a MID, and whether a camera PP change needs `bUsePawnControlRotation`-style refresh or applies next frame; check `BackCamera` on `BP_B1Jeep_Wrangler` has no PP set today.
+  ⚠️ Note: new class + UPROPERTYs → `Scripts/BuildEditor.ps1`. The material doesn't exist yet: the component must run with a null `LensMaterial` (exposure and slots still work, so S5-27 can measure before S5-23). Portability: no project includes; the tag and default come from the host / settings.
+  **Done:** builds; a PIE run of `B1Mud_DigInMedium` with the Wrangler (temporary `VehicleClass`/`bAutoRun`, reverted) logs `lens` lines rising during wheelspin; `B1Gym_FirmSmoke` logs none; core 12/12 and mud 28/28 headless unchanged.
+  **User check:** —
+
+- [x] **S5-22** Lens texture generator (2 h) <!-- done: 2026-11-08 -->
+  Result: `Scripts/MudTextures/gen_lens_textures.py` (seed 22, ~20 s) + README section. Per slot: 20 drops (r 8–34 px, `u^1.6`), 260 specks (r 1.3–5.5 px, 45 % in 14 clusters); 4 slots ≈ the concept's ~70 drops / ~1000 specks on a 16:9 screen. Background id = 255 exactly. Variants: bit 0 flip U, bit 1 flip V, bit 2 invert reveal order (a 2:1 tile can't rotate 90°). Imported `T_B1LensDrops` / `T_B1LensSpecks` 2048×1024, sRGB off, `TC_VectorDisplacementmap`, no mips, `TEXTUREGROUP_UI`. Contact sheet (`Saved/MudTextures/lens/lens_contact_sheet.png`, a numpy stand-in of the material): first pass too small and too few visible (most specks under 1 px); sizes raised. In the stand-in the specks read too black and hard: that's speck colour/alpha in the MI (S5-23/25). The stand-in uses drop fill 1.6, so drops don't shrink to dots at 0.25. Output now goes to `Saved/MudTextures/` (git-ignored) instead of the session scratchpad.
+  `Scripts/MudTextures` (fixed seed, README section):
+  - `T_B1LensDrops` 2048×1024: RG = drop normal xy (0.5-biased), B = dome height, A = per-drop reveal id (histogram-equalized). Sizes skewed small, a few large, about a quarter of the concept's drop count.
+  - `T_B1LensSpecks` 2048×1024: R = speck mask, G = per-speck reveal id. Many 2–8 px specks at 1080p, some clustered, a quarter of the concept's count.
+  - Contact sheet next to `Concept/mud-on-the-screen.jpg` (all four quarters stacked = full density).
+  Import into `/Game/B1/FX/Lens/` with `TextureTools.import_file`: linear (sRGB off), uncompressed / `TC_VectorDisplacementmap` (so ids and normals don't band), no mips needed (screen-space 1:1).
+  ⚠️ Note: `import_file` won't overwrite: delete, re-import, reassign. Tiles must wrap seamlessly in both axes (random slot offsets wrap).
+  **Done:** assets imported and saved; `get_size` is 2048×1024; contact sheet checked; README re-runnable.
+  **User check:** —
+
+- [x] **S5-23** `M_B1LensMud` + `MI_B1LensMud` (3.5 h) _(requires S5-22)_ <!-- done: 2026-11-08 -->
+  Result:
+  - `/Game/B1/FX/M_B1LensMud`: `MD_PostProcess`, `BL_SceneColorAfterTonemapping`, Emissive = one Custom node (`Scripts/MudTextures/M_B1LensMud.hlsl`, 17 inputs). A `SceneTexture` PostProcessInput0 node feeds `Scene`, which also binds the input for `SceneTextureLookup(ClampSceneTextureUV(ViewportUVToSceneTextureUV(uv, 14), 14), 14, true)` at the refracted UV. Aspect from `ViewSize`, UV from `ScreenPosition.ViewportUV`. Only the topmost drop per pixel refracts. Specks are a union over the slots.
+  - Params (group `Lens Mud`): `LensSlot0..3`, `LensDrops`/`LensSpecks` (sampler `LinearColor`), `LensRefraction` 0.03 (screen heights), `LensDropFill` 1.6, `LensDropTint` (0.30, 0.22, 0.13) × `LensDropTintAmount` 0.35, `LensRimDarken` 0.6, `LensHighlight` 0.4, `LensSpeckColor` (0.07, 0.05, 0.03), `LensSpeckOpacity` 0.85.
+  - `MI_B1LensMud` (slots 0) and `MI_B1LensMud_Preview` (all 4 slots at 1, offsets/variants (0.13, 0.71, 0), (0.58, 0.29, 3), (0.87, 0.52, 5), (0.34, 0.06, 6)). `DefaultGame.ini` `LensMaterial=/Game/B1/FX/MI_B1LensMud`. Compiles with no shader errors in the log.
+  - MCP: a Custom node's `Inputs` grows only by appending the element **as read back** (full struct), one at a time; a bare `{inputName}` copy is "ambiguous".
+  `/Game/B1/FX/M_B1LensMud`: post-process domain, blendable location after tonemapping. One Custom node (`Scripts/MudTextures/M_B1LensMud.hlsl`, keep in sync) over the 4 slots:
+  - UV = screen UV with aspect (fit 2:1 tile to screen height), variant rotation/mirror, slot offset, wrap;
+  - specks: id < strength, alpha fades with strength, `LensSpeckColor`;
+  - drops: id < strength and height > 1 − strength × `LensDropFill`; scene sampled at UV − normal × `LensRefraction`, tinted to `LensDropTint`, darker rim from normal length, small highlight;
+  - early-out to the scene colour when every slot strength is 0.
+  `MI_B1LensMud` (game default, slots 0) and `MI_B1LensMud_Preview` (slots set by hand). Set `UB1MudSettings::LensMaterial` default to the MI.
+  🔍 Research first: sampling `PostProcessInput0` at an offset UV from a Custom node in 5.8 (SceneTexture node input vs `SceneTextureLookup`), `ViewSize` / `ScreenPosition` for aspect.
+  ⚠️ Note: Custom node inputs through MCP follow the array rule (set element 0, append copies, rename). Slot params are vector params, so the MID writes 4 values per slot.
+  **Done:** material and both MIs compile with no errors; the `LensMaterial` setting default points at `MI_B1LensMud`.
+  **User check:** —
+
+- [x] **S5-24** Lens preview volume + stills + PIE confirmation (1.5 h) _(requires S5-21, S5-23)_ <!-- done: 2026-11-08 -->
+  Result:
+  - `B1PhotoBooth_LensPreview` (`PostProcessVolume_UAID_7CB566F64C2FEE1203_1507231727`, `B1Tests/PhotoBooth`): bound, scale 30 (so its brush edges stay out of frame), priority 10, blendable `MI_B1LensMud_Preview`, saved **disabled**. A volume spawned through `SceneTools.add_to_scene_from_class` does get a brush (its edges showed at scale 2).
+  - Chase pose (back camera: arm 680, 95 + 160 cm up): (−1713, −13616, 257), pitch −7, yaw 115.
+  - `photobooth.py` `MODE = 'lens'`: `LENS_LEVELS` (`None` = volume off), sets all 4 slots of the preview MI, then restores slots to 1, disables the volume and saves the MI. `stage_sheet.py --lens <out> <results…>` → `lens_sheet.png` next to the concept; it prints non-image keys.
+  - Look pass before the stills: specks were too big/black/hard → generator speck radius 0.8–3.4 px with 1.3 px soft edge (re-imported), `LensSpeckColor` (0.13, 0.09, 0.05), `LensSpeckOpacity` 0.8. Drops read as grey glass → `LensRefraction` 0.05, `LensDropTint` (0.32, 0.22, 0.12) × 0.25, `LensRimDarken` 0.85, `LensHighlight` 0.25 (parent material defaults).
+  - Sheet: `Saved/MudTextures/lens/stills1/lens_sheet.png`. `l000` vs `lnone`: mean diff 0.7/255, 0.8 % of pixels > 8, mostly in the sky (moving clouds, the same noise floor as S5-06); the shader early-outs at 0.
+  - PIE (floating window, `PreviewLensDirt` 1 on the Wrangler CDO's `MudLens`, reverted): mud over the game view, HUD clean on top (`Saved/MudTextures/lens/pie/c_pie.png`). `UB1MudSettings::LensMaterial` was also set on the running editor's CDO, since the ini changed after startup. `StartPIE` takes `{"options": {"bSimulate", "playMode"}}`; `CaptureEditorImage` returns `{data, mimeType}` directly.
+  - Core 12/12 with the volume placed (`s524_core.log`, FullThrottle5s 76.98 m). The editor didn't close for the run (a save-changes dialog for an unknown package; none of the lens assets were dirty), so the run went with the editor open.
+  - Bound `PostProcessVolume` `B1PhotoBooth_LensPreview` in `Lvl_Gym_Core` (`B1Tests/PhotoBooth`) around a new **chase pose** behind the booth Wrangler (like the back camera: ~6.8 m behind, pitch −7°), blendable `MI_B1LensMud_Preview`, **saved disabled**.
+  - `photobooth.py` lens mode: enable the volume, set slot strengths for `LensDirt` 0 / 0.25 / 0.5 / 0.75 / 1, `CaptureViewport` from the chase pose, disable. `stage_sheet.py` lens mode: stills next to the concept image.
+  - One PIE capture: `PreviewLensDirt` 1 on the player's jeep (set before `StartPIE`, reverted), `CaptureEditorImage`: mud under a clean HUD.
+  ⚠️ Note: new actor in a WP map → `save_assets([])`, check `git status`. At most 2 captures per reply. Scalability medium / shadows high. Restored asset-editor tabs can sit in front of the PIE capture (HISTORY 2026-11-08): close them first.
+  **Done:** 5 stills + sheet in the scratchpad; the 0 still equals the volume-disabled capture; the PIE capture shows the effect with the HUD on top; the core suite still 12/12 with the volume placed.
+  **User check:** —
+
+- [x] **S5-25** **Lens checkpoint:** look stills (user, 0.5–1.5 h with iterations) _(requires S5-24)_ <!-- done: 2026-11-08 -->
+  ✅ User sign-off on round 3. Final sheet: `Saved/MudTextures/lens/stills4/lens_sheet.png` (regenerate with `photobooth.py` `MODE = 'lens'` + `stage_sheet.py --lens`).
+  Round 1 feedback (2026-11-08, sheet `stills1`): drops too dark, black outline (only slightly brown wanted), too sharp (should be blurred), too regular (almost all round). The small black specks were an artifact of the concept image: drops only. Fewer drops: the old 0.75 count is the max.
+  Round 2 changes (sheet `Saved/MudTextures/lens/stills2/lens_sheet.png`):
+  - Specks removed everywhere: generator, `T_B1LensSpecks` deleted, shader, params `LensSpecks`/`LensSpeckColor`/`LensSpeckOpacity`. `LensRimDarken` removed too (no dark rim).
+  - Generator: 15 drops per slot, r 9–36 px, aspect 1–1.5, wobbly outline (2nd/3rd/5th harmonics 0.11/0.06/0.03), 40 % get a merged satellite blob (0.35–0.7 r). B = 1 − normalized radius, so the edge fades in the shader.
+  - Shader (Custom node rebuilt, 16 inputs): edge fade over `LensDropSoftness` 0.3; refracted scene blurred with 9 taps at `LensDropBlur` 0.004 screen heights; light brown towards the edge (`LensDropTint` × `LensDropTintAmount` 0.3 × (0.25 + 0.75 n²)); soft highlight `LensHighlight` 0.12; blended at `LensDropOpacity` 0.85. `LensRefraction` 0.04, `LensDropFill` 2.5 (drops are full size from strength 0.4; at 1.3 they had vanished at 0.25–0.5).
+  - A capture right after a material recompile showed a brown blurred frame round the screen: a transient, gone in the re-shot.
+  Round 2 feedback: too invisible, should look muddy (brown near some edges); a few more and slightly larger drops low on the screen, where most mud lands; 0.25 shows almost nothing, medium drops should come first.
+  Round 3 changes (sheet `Saved/MudTextures/lens/stills4/lens_sheet.png`):
+  - Generator: 26 drops per slot; reveal order medium-first (score = 0.5·rand + |size − 0.4|), tiny and largest later.
+  - Shader: new params `LensBottomScale` 1.2 (tile zoomed towards the bottom by UV.y², so drops there are 1.2× larger), `LensTopDensity` 0.45 (drops shown where id < strength^γ × lerp(TopDensity, 1, UV.y²): ~12 per slot at the top, ~18 per slot at the bottom after the zoom), `LensRevealGamma` 0.5 (0.25 already shows half the drops). Mud: brown tint weight = `LensDropTintAmount` 0.85 × per-drop muddiness (0.35–1 from its id) × (0.35 + 0.65 · n² · lower-edge weight); `LensDropTint` (0.30, 0.20, 0.10), `LensDropOpacity` 0.95. `LensDropFill` 5 (full size from strength 0.2; at 2.5 the 0.25 drops were faint and small), also on `MI_B1LensMud`.
+  - First try with `LensBottomScale` 1.35 and 18 drops gave *fewer* drops at the bottom: zooming spreads them out, so density has to beat zoom².
+  The user reviews the lens sheet. Iterate on the generator (S5-22: counts, sizes, clustering) and the MI params (tint, refraction, speck colour, drop fill) until 1 matches `Concept/mud-on-the-screen.jpg` and the in-between levels read as "a few splashes", not rain.
+  **Done:** user sign-off; final sheet path noted here.
+  **User check:** the lens look at 0.25–1 next to the concept image.
+
+- [x] **S5-26** Lens debug: Mud window, cheats, telemetry, ShowDebug (2 h) _(requires S5-21)_ <!-- done: 2026-11-08 -->
+  Result: Mud window "Lens" section (`B1ImGuiMud.cpp` `DrawLens`): bar, exposure/splashes/cameras line, slot table (hold = time left, fade = strength × `LensFadeSeconds`), per-wheel exposure table, Splash/Clean/Max, typed preview, 10 typed `Mud|Lens` floats, "Save to asset##Lens" (`SaveLensDefaults`, not `PreviewLensDirt`/`RandomSeed`/`TargetTag`). Cheats `B1Lens <v>` / `B1LensSplash`. Telemetry `lens=d/exp` after `dirt=`; ShowDebug `lens d  exp  slots` (+ preview). Builds; mud 28/28 headless (`s526_mud.log`), `lens=` on the Wrangler rigs (`B1Dirt_Cap` up to 1.0). MIGRATION.md §7 updated. The first build attempt hit a save-changes dialog for packages not touched here; the user closed the editor.
+  - Mud window → "Lens": `LensDirt` bar; slot table (strength, hold/fade, offset, variant); per wheel exposure with throw / aim / distance / intensity factors, launch speed and aim angle; splash count; `DragFloatTyped` for every `Mud|Lens` float; Splash / Clean / Max buttons; "Save to asset" to the pawn BP's component archetype (same path as Dirt and Spray).
+  - Cheats `B1Lens <v>` (negative = clean) and `B1LensSplash` on `UB1CheatManager`.
+  - Telemetry `lens=<dirt>/<exposure>` on the `B1Mud` line. ShowDebug B1Mud: `lens d  exp e  slots a/b/c/d`.
+  **Done:** builds; telemetry shows `lens=` in a rig run; MIGRATION.md §7 lists the section and fields.
+  **User check:** while flooring it in medium the Lens section's exposure and bar move; Splash / Clean / `B1Lens 0.5` work; Save keeps edits after an editor restart.
+
+- [x] **S5-27** Lens rig metrics + four lens rigs (3 h) _(requires S5-21)_ <!-- done: 2026-11-08 -->
+  Result:
+  - `AB1GymTestRig`: `StartLensDirt`; thresholds `Min/MaxLensPeak`, `MaxLensEnd`, `Min/MaxLensSplashes`, `MaxLensExposure`; line fields `lensPeak= lensEnd= lensSplashes= lensExpPeak= throwPeak= lensCams=` on every vehicle with a `UB1MudLensComponent`. `throwPeak` is read from the spray (max launch speed over the wheels, cm/s), so it doesn't need an active camera. Unpossessed rig jeeps have an active `BackCamera` (`lensCams=1` everywhere).
+  - Rigs (`Lvl_Gym_Mud`, `B1Tests/Lens`, Wrangler): `B1Lens_Firm` (8000, −4500; 20 s 50 % steer 1; splashes ≤ 0, exposure ≤ 0), `B1Lens_Roll` (CrossMedium spot; 10 s 50 %; peak ≤ 0.1, exposure ≤ 0.1), `B1Lens_Spin` (DigInMedium spot; 4 s full; ≥ 3 splashes, peak ≥ 0.3), `B1Lens_Cap` (Spin + `StartLensDirt` 0.9; peak ≤ 1), `B1Lens_Fade` (Spin + 10 s idle; peak ≥ 0.3, end ≤ 0.05).
+  - Measured (`s527_measure.log`, no thresholds): rolling throw peaks 150 (Roll, CrossMedium, CrawlInto, Restart*) to 291 cm/s (`Dirt_Drive90`), `ExitDeep` 283; firm 0. Wheelspin: buggy medium 547–555, Wrangler medium 675 (exp 0.68, 14 splashes in 4 s, peak 0.52), deep 900 (exp 0.57). `LensMin/FullThrowSpeed` 350/500 sit in the 291–547 gap: defaults unchanged. Cap: 1.000, Fade: 0.000 after 10 s idle.
+  - Headless: mud 33/33 (`s527_mud.log`), core 12/12 (`s527_core.log`, FullThrottle5s 77.31 m), winch 36/36 (`s527_winch.log`).
+  - MCP: `save_actor` on a new WP actor still fails after a `save_assets([])` and a restart ("Asset does not exist"); `save_assets([])` works.
+  `AB1GymTestRig`: `StartLensDirt` (−1 = leave); line fields `lensPeak= lensEnd= lensSplashes= lensExpPeak= throwPeak=` on vehicles with the component; thresholds `Min/MaxLensPeak`, `MaxLensEnd`, `Min/MaxLensSplashes`, `MaxLensExposure`.
+  Rigs (`Lvl_Gym_Mud`, `B1Tests/Lens`, Wrangler):
+  - `B1Lens_Firm`: 20 s at 50 % on firm → 0 splashes, exposure 0;
+  - `B1Lens_Roll`: 50 % cross of medium → peak ≤ 0.1 and below Spin's;
+  - `B1Lens_Spin`: 4 s full throttle from rest at the DigInMedium spot → ≥ 3 splashes, peak ≥ 0.3; a second rig `B1Lens_Cap` with `StartLensDirt` 0.9 never shows > 1;
+  - `B1Lens_Fade`: spin 4 s, then 10 s idle → end ≤ 0.05.
+  **Measure first:** run Firm / Roll / Spin (plus a deep spin) with no thresholds, record `throwPeak` and `lensExpPeak` here, then set the `LensMin/FullThrowSpeed` defaults and the thresholds.
+  ⚠️ Note: check first that the rig's own jeep has an active `BackCamera` without a controller (exposure is measured from it). If Roll splashes, tune the defaults, not the thresholds. Rigs on one lane collide in PIE: headless runs only, or PIE in rounds.
+  **Done:** measured numbers noted here; the 5 lens rigs PASS headless; core 12/12, mud 28/28 (+5), winch 36/36 unchanged.
+  **User check:** —
+
+- [x] **S5-28** Lens docs pass (1 h) _(requires S5-25, S5-26, S5-27)_ <!-- done: 2026-11-08 -->
+  Result: ADR-022 "As built" replaces the interim note: look, measured throw speeds (band 350/500 kept), rates and clear time, camera, debug and rigs. MIGRATION.md checked: §3 `LensMaterial`, §4 material/MIs/texture, §5 component + `B1MudLens` tag + spray getters, §7 debug (S5-26), §9 rigs (S5-27); nothing missing. ARCHITECTURE.md through the `/save` that closes this session.
+  ADR-022 "As built" note (measured throw speeds, final defaults); MIGRATION.md complete (component, `B1MudLens` tag, `LensMaterial` setting, `M_B1LensMud` + MIs + textures, spray getters, debug, rigs). ARCHITECTURE.md through `/save`.
+  **Done:** MIGRATION.md lists every lens host requirement; `/save` run.
+  **User check:** —
+
 ### Close
 
-- [ ] **S5-18** Docs pass (1 h) _(requires S5-12, S5-17)_
+- [x] **S5-18** Docs pass (1 h) _(requires S5-12, S5-17)_ <!-- done: 2026-11-08 -->
+  Result: MIGRATION.md already had the component, `B1MudThrow`, tag, CPD layout, `MF_B1MudDirt` + textures, `User.Intensity`, `SM_B1MudClump`. Added: the three spray emitters (§4), dirt/spray in ShowDebug, the ImGui Dirt/Spray sections and the telemetry fields (§7), the dirt and spray rigs (§9). ADR-021 gets an "As built" note: targets resolve on the first tick with wheels (not BeginPlay), only debug lowers dirt, glass calls the function, slot 5 still free, CPD on the runtime copy. ARCHITECTURE.md: via the `/save` that closes this session.
   MIGRATION.md complete:
   - the component, `B1MudThrow`;
   - the tag and the CPD layout;
@@ -1493,7 +1639,14 @@ Design: [plans/2026-11-07-visuals.md](plans/2026-11-07-visuals.md) (revision 1).
   **Done:** MIGRATION.md lists every new host requirement; `/save` run.
   **User check:** —
 
-- [ ] **S5-19** **Checkpoint 2:** Phase V playtest (user + agent, 1–2 h) _(requires S5-11..S5-18, S5-20)_
+- [x] **S5-19** **Checkpoint 2:** Phase V playtest (user + agent, 1–2 h) _(requires S5-11..S5-18, S5-20, S5-21..S5-28)_ <!-- done: 2026-11-08 -->
+  ✅ User sign-off (2026-11-08): Swamp playtest done, happy with spray, dirt and lens. Suites after the lens work: mud 33/33, core 12/12, winch 36/36 (`s527_*.log`).
+  Lens (added 2026-11-08): the playtest also covers the lens: flooring it in medium splashes it within ~1 s and fills it in a few seconds of wheelspin; rolling doesn't; a side orbit still gets splashed, a front view doesn't; it clears within ~8 s.
+  Agent part (2026-11-08): headless core 12/12, mud 28/28 (22 mud + 5 dirt + `B1Spray_Medium`), winch 36/36 (`s519_*.log`). Waiting on the user's Swamp playtest and sign-off.
+  Playtest request (2026-11-08): spray tunables in `Mud|Spray` + the Mud window (typed, Save to asset):
+  - `SpawnBackOffset` 20 / `SpawnLift` 20 cm replace the hard-coded `SurfaceLift`; same placement by default.
+  - `SpraySpread` 35° → `User.SpraySpread` (Spray cone; Droplets ×1.2). `SpraySpeedSpread` 0.35 → `User.SpeedSpread`: per-particle speed × U(1 − s, 1 + s) on Spray and Droplets (Droplets also × 1.075). The clumps had a fixed 25° cone and no speed variation. Haze unchanged.
+  - Builds; `NS_B1MudSpray` compiles with no errors or warnings. MIGRATION.md updated (6 user params).
   **Agent:** all suites headless (core, mud + dirt rigs, winch).
   **User:** Swamp playtest. The spray reads as mud (small mixed clumps, haze) on spin and when rolling; dirt builds tires → arches → spots and stops at about the concept look in ~90 s of mud driving. Tune with the Mud window as needed.
   **Done:** all suites PASS; ROADMAP Phase V ticked.
