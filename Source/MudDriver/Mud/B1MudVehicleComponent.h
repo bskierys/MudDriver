@@ -29,6 +29,9 @@ public:
 	float GetWheelRadius(int32 WheelIndex) const;
 	float GetWheelWidth(int32 WheelIndex) const;
 
+	/** World location of the wheel centre */
+	FVector GetWheelLocation(int32 WheelIndex) const;
+
 	/** The wheel's mud material; null when airborne or off mud */
 	const UB1PhysicalMaterial_Mud* GetWheelMud(int32 WheelIndex) const;
 
@@ -46,6 +49,9 @@ public:
 
 	/** N along the wheel forward that rolling resistance caps against (tire, gravity, external force, slope pull); 0 off mud */
 	float GetWheelNetPush(int32 WheelIndex) const;
+
+	/** cm/s, tread surface speed (spin included), from the latest physics step */
+	float GetWheelTreadSpeed(int32 WheelIndex) const;
 
 	/** cm the average sink depth is past BellyClearance */
 	float GetBellyDepth() const { return SimOutput.BellyDepth; }

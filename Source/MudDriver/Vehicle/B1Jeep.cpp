@@ -8,6 +8,7 @@
 #include "B1MudShowDebug.h"
 #include "B1MudSprayComponent.h"
 #include "B1MudTrailComponent.h"
+#include "B1MudDirtComponent.h"
 #include "B1WinchComponent.h"
 #include "B1WinchShowDebug.h"
 #include "B1Log.h"
@@ -27,6 +28,7 @@ AB1Jeep::AB1Jeep(const FObjectInitializer& ObjectInitializer)
 	MudVehicle->InMudTag = B1GameplayTags::Vehicle_State_InMud;
 	MudSpray = CreateDefaultSubobject<UB1MudSprayComponent>(TEXT("MudSpray"));
 	MudTrail = CreateDefaultSubobject<UB1MudTrailComponent>(TEXT("MudTrail"));
+	MudDirt = CreateDefaultSubobject<UB1MudDirtComponent>(TEXT("MudDirt"));
 
 	Winch = CreateDefaultSubobject<UB1WinchComponent>(TEXT("Winch"));
 	Winch->SetupAttachment(GetMesh());

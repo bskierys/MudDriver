@@ -49,7 +49,14 @@ void FB1MudSimulation::EndStep(UChaosWheeledVehicleSimulation& Vehicle, float De
 	}
 	UpdateSinkDepth(Vehicle, DeltaTime);
 
+	TreadSpeed.SetNumUninitialized(Vehicle.PVehicle->Wheels.Num());
+	for (int32 WheelIdx = 0; WheelIdx < TreadSpeed.Num(); ++WheelIdx)
+	{
+		TreadSpeed[WheelIdx] = FMath::Abs(Vehicle.PVehicle->Wheels[WheelIdx].GetWheelGroundSpeed());
+	}
+
 	FScopeLock Lock(&OutputLock);
+	LatestOutput.TreadSpeed = TreadSpeed;
 	LatestOutput.SinkDepth = SinkDepth;
 	LatestOutput.MudFrictionScale = MudFrictionScale;
 	LatestOutput.RollingResistance = RollingResistance;

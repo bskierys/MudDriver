@@ -1,5 +1,6 @@
 #include "B1MudShowDebug.h"
 #include "B1MudVehicleComponent.h"
+#include "B1MudDirtComponent.h"
 #include "B1PhysicalMaterial_Mud.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "B1MudPatch.h"
@@ -52,6 +53,13 @@ namespace B1MudShowDebug
 		const TCHAR* InMud = !AbilitySystem ? TEXT("n/a (no ASC)")
 			: AbilitySystem->HasMatchingGameplayTag(Mud.InMudTag) ? TEXT("yes") : TEXT("no");
 		Lines.Add(FString::Printf(TEXT("mud  InMud %s  belly %.1f cm / %.0f N"), InMud, Mud.GetBellyDepth(), Mud.GetBellyDrag()));
+
+		if (const UB1MudDirtComponent* Dirt = Owner->FindComponentByClass<UB1MudDirtComponent>())
+		{
+			Lines.Add(FString::Printf(TEXT("dirt w %.2f/%.2f/%.2f/%.2f  body %.2f%s"), Dirt->GetWheelDirt(0), Dirt->GetWheelDirt(1),
+				Dirt->GetWheelDirt(2), Dirt->GetWheelDirt(3), Dirt->GetBodyDirt(),
+				Dirt->PreviewDirt >= 0.0f ? *FString::Printf(TEXT("  (preview %.2f)"), Dirt->PreviewDirt) : TEXT("")));
+		}
 
 		for (int32 WheelIndex = 0; WheelIndex < Mud.GetNumWheels(); ++WheelIndex)
 		{

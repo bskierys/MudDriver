@@ -76,6 +76,7 @@ private:
 	TArray<float> RollingResistance;
 	TArray<float> SlopePull;
 	TArray<float> WheelNetPush;
+	TArray<float> TreadSpeed;
 	float BellyDepth = 0.0f;
 	float BellyDrag = 0.0f;
 	float MudGroundUpZ = 1.0f;

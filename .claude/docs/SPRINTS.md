@@ -1213,3 +1213,292 @@ Plan: [plans/2026-10-28-fallen-tree.md](plans/2026-10-28-fallen-tree.md) (critiq
 ### Backlog (found during the sprint)
 
 - **Mud idle check reads empty inputs (suspected, S4-14).** `FB1MudSimulation::PreFriction` decides "no input" from `Vehicle.VehicleInputs`, which Chaos only fills with network prediction on (`ChaosVehicleManagerAsyncCallback.cpp`), so it may always read 0. If so, brake, handbrake and parking torque are zeroed on every muddy slope. Verify with a rig (brake on the medium slope vs idle), then pass the step's `InputData` controls like the handbrake hold does.
+
+---
+
+## Sprint 5 — Visuals: dirty jeep + mud spray (Phase V)
+
+**Status:** planned 2026-11-07. Start with `/work`.
+
+**Goal.** Close Phase V. The Wrangler starts clean and collects mud (tires, then arches, then splatter, then spots), capped at `Concept/jeep_wrangler_mud_reference.jpg`. The tires throw a spray close to `Concept/mud-car-drive.mp4`.
+
+Design: [plans/2026-11-07-visuals.md](plans/2026-11-07-visuals.md) (revision 1). Decision: ADR-021 (material layer + Custom Primitive Data, not decals).
+
+**Sprint-wide notes**
+- **Look-first order.**
+  - Spikes S5-01..03 → generator → material → `PreviewDirt` → stills → **checkpoint 1** (S5-09).
+  - Then accumulation, rigs and spray → **checkpoint 2** (S5-19).
+  - Don't start S5-10 before the user signs off the stills.
+- ⚠️ **Gym rigs spawn `BP_B1Jeep` (buggy) by default.** Dirt and spray rigs set `VehicleClass` = `BP_B1Jeep_Wrangler`.
+- ⚠️ **Child-BP rule:** config saves and CDO edits go to `BP_B1Jeep_Wrangler` (the player's pawn), not only `BP_B1Jeep`. Check with `get_properties`.
+- ⚠️ **Portability:** `UB1MudDirtComponent` and `B1MudThrow` live in `Mud/` with no project includes. Wrangler-specific setup (tags, arch params) is host-side. Each task that adds a host requirement updates MIGRATION.md.
+- ⚠️ **ImGui rule:** every tunable float uses `B1ImGui::DragFloatTyped`.
+- ⚠️ **Glass isn't on `M_Wrangler_Base`:** `MI_Wrangler_Glass` is a child of the template's `M_SportsCar_Lights`. The glass film needs its own Wrangler glass material that calls `MF_B1MudDirt` (S5-06), so the template material stays untouched.
+- **Out of scope:** splash sheet, washing, UV-painted dirt, dirt material on the buggy, perf work. **Stretch:** wetness (CPD slot 5), tread-arc spawn.
+- **Suites:** `Lvl_Gym_Core` (12), `Lvl_Gym_Mud` (22), `Lvl_Gym_Winch` (36) must stay green. The spray and dirt are visual only.
+
+### Spikes
+
+- [x] **S5-01** Spike: Custom Primitive Data and tags on the Wrangler's inherited components (1 h) <!-- done: 2026-11-07 -->
+  Result: both work in the BP, no host-side fallback needed.
+  - Inherited C++ components are reachable as `/Game/B1/Vehicles/BP_B1Jeep_Wrangler.Default__BP_B1Jeep_Wrangler_C:<name>` (names: `Chassis`, `Tire Front Left`, `Tire Front Right`, `Tire Rear Left`, `Tire Rear Right`). `ObjectTools.set_properties` with `ComponentTags` and `CustomPrimitiveData` (`{"data": [..]}`) sticks; the parent `BP_B1Jeep` stays untouched. Tags survive compile, save and an editor restart.
+  - Material side: CPD is read by a `ScalarParameter` with `bUseCustomPrimitiveData=true` and `PrimitiveDataIndex`, not `PerInstanceCustomData` (that one is for ISMs). A temporary lerp to red on `M_Wrangler_Base` BaseColor turned only `Tire Front Left` red (capture in the scratchpad, `spike_cpd.png`); `MI_Wrangler_Tire` inherits from the base, so tires and body both see it.
+  - Kept: tag `B1MudDirt` on `Chassis` + four tires of `BP_B1Jeep_Wrangler`. Reverted: the material nodes (graph back to its 5 original expressions, re-saved) and the tire's CPD (empty array).
+  🔍 Research first: `UPrimitiveComponent::SetCustomPrimitiveDataFloat`, the `PerInstance/CustomPrimitiveData` material node, and whether `ComponentTags` / `CustomPrimitiveData` are editable on inherited C++ components in a child BP through `ObjectTools`.
+  On `BP_B1Jeep_Wrangler`:
+  - tag `Chassis` and the four tire components with `B1MudDirt`;
+  - set CPD slot 0 = 1 on one tire;
+  - add a temporary `CustomPrimitiveData[0]` → tint lerp in `M_Wrangler_Base`.
+  Revert the material change at the end.
+  ⚠️ Note: if the tags won't stick on inherited components, set them host-side in `AB1Jeep`'s constructor (portability still holds). Record which way worked.
+  **Done:** a capture of the placed Wrangler shows one red tire; the tags persist after save and reload; the result is noted in this task.
+  **User check:** —
+
+- [ ] **S5-02** Spike: Niagara toolset builds a GPU mesh-renderer emitter with depth-buffer collision (1.5 h)
+  🔍 Research first: `describe_toolset` on `NiagaraToolset_System` (once) and `NiagaraToolset_Assets.FindNiagaraScripts` for the collision and mesh-renderer modules.
+  In a scratch system `/Game/B1/FX/Scratch/NS_B1Spike`: one GPU emitter, a mesh renderer with an engine cube, spawn rate, velocity, gravity, collision (depth buffer, no kill), and a user float wired to the spawn rate.
+  ⚠️ Note: ADR-011 rules out distance fields, so collision has to be depth buffer. If the mesh renderer or collision can't be configured, record the fallback (masked clump sprites, or the user wires the module from a written spec).
+  **Done:** a PIE/Simulate capture shows cubes landing and stopping on the floor; findings (tool names, gotchas) noted here; scratch system deleted.
+  **User check:** —
+
+- [x] **S5-03** Spike: Wrangler body space (0.5 h) <!-- done: 2026-11-07 -->
+  Result (cm, body local space = `SKM_Wrangler` mesh space, since `Chassis` sits at 0/0/0 on the mesh and the `VisWheel_*` sockets have zero offset on `PhysWheel_*`):
+  - **Arch centres = wheel centres** (from `Scripts/VehicleImport` `wrangler_info.json`, run `wrangler2` with the defaults 19.5 / 1.2 / 6 / 3; its body bounds match `get_bounds` exactly): FL (136.5, −80.4, 46.3), FR (136.5, 80.4, 46.3), BL (−136.5, −80.4, 46.3), BR (−136.5, 80.4, 46.3). Wheel index order in Chaos is FL, FR, BL, BR (CPD slots 1–4).
+  - **Body bounds** `SM_Wrangler_Body`: min (−245.6, −109.9, 42.4), max (213.0, 109.9, 211.1). Tire `SM_Wrangler_Tire`: ±46.3 radius, ±18.2 width, centred.
+  - **Sill:** body underside 42.4; the side step / rocker band reads as ~42–75 cm from the S5-01 capture (top of the tire is 92.6). Start `SillHeight` at 75 and refine in the S5-08 stills. Arch falloff radius start: tire radius + ~20 = 65.
+  - **CPD unused:** `M_Wrangler_Base` (all body/tire MIs) has one parameter `Tint`; `MI_Wrangler_Glass`'s parent `M_SportsCar_Lights` (thin translucent) has `BaseColor`, `Metallic`, `Specular`, `Roughness`, `Opacity`. None uses CPD.
+  Read:
+  - the bounds of `SM_Wrangler_Body` and `SM_Wrangler_Tire` (`StaticMeshTools`);
+  - the `VisWheel_*` socket positions in `SKM_Wrangler`;
+  - the `Chassis` relative transform in `BP_B1Jeep_Wrangler`.
+  From these, work out the four arch centres and the sill height in the body mesh's local space. Check that no `MI_Wrangler_*` reads CPD already.
+  **Done:** arch centres, body bounds and sill height written into this task (cm, body local space).
+  **User check:** —
+
+### Dirt look (checkpoint 1)
+
+- [x] **S5-04** Mud texture + clump mesh generator (2.5 h) <!-- done: 2026-11-07 -->
+  Result: `Scripts/MudTextures/gen_mud_textures.py` (seed 7, ~40 s) + README. Masks are reveal-order fields (histogram-equalized, so threshold t covers fraction t of the area); splatter is 0 outside the splats (12 % covered). Imported: `T_B1MudBlotch` 1024², `T_B1MudSplatter` 1024², `T_B1MudNoise` 512² (all `SRGB` off, `TC_Grayscale`: 8-bit uncompressed, so thresholds don't band; separate textures, not packed), `SM_B1MudClump` (48 tris, bounds ±1.13 × 0.79 × 0.77 cm, Nanite off). Contact sheet checked: no seams on 2×2 repeats; the first noise pass was too fine and got lowered. Python deps aren't installed system-wide: use a venv with `numpy` + `pillow`.
+  `Scripts/MudTextures/` (Python + numpy/pillow, fixed seeds, README with the parameters and the re-import steps, like `Scripts/VehicleImport`):
+  - `T_B1MudBlotch` (1K tileable, large soft blotches);
+  - `T_B1MudSplatter` (1K tileable, small hard splats with drips);
+  - `T_B1MudNoise` (512 breakup);
+  - `SM_B1MudClump.obj` (low-poly lumpy blob, ~40 tris, centred, 1 cm radius).
+  Import the textures into `/Game/B1/Mud/Dirt/` with `TextureTools.import_file` (masks: linear, BC4 / grayscale), and the mesh into `/Game/B1/FX/`.
+  ⚠️ Note: `import_file` won't overwrite: delete, re-import, reassign (HISTORY 2026-11-07). Pack the masks into channels of one texture if it saves samples, but keep it simple.
+  **Done:** assets imported and saved; `get_size` matches; a contact sheet PNG of the masks is checked; the README is re-runnable.
+  **User check:** —
+
+- [x] **S5-05** `MF_B1MudDirt` material function (3.5 h) _(requires S5-01, S5-03, S5-04)_ <!-- done: 2026-11-07 -->
+  Result: `/Game/B1/Mud/Dirt/MF_B1MudDirt`.
+  - **Inputs:** BaseColor, Roughness, Normal (default 0,0,1), IsTire (scalar, default 0; the host feeds it from a static switch), ArchFL/FR/BL/BR, SillHeight, BoundsMin/Max. **Outputs:** BaseColor, Roughness, Normal, Mask (for the host's own lerps, e.g. metallic).
+  - **CPD params** (in the function, group `Mud Dirt`): `DirtOwn` slot 0, `DirtWheelFL/FR/BL/BR` slots 1–4. **Look params:** `DirtBlotchTex`/`DirtSplatterTex`/`DirtNoiseTex` (texture objects, `LinearGrayscale` sampler), `DirtBlotchTile` 150 / `DirtSplatterTile` 120 / `DirtNoiseTile` 60 cm, `DirtArchRadius` 65, `DirtArchFade` 50, `DirtEdgeSoftness` 0.08, `DirtRoughness` 0.85, `DirtNormalFlatten` 1, `DirtMudColor`.
+  - **Logic** is one Custom node (`Scripts/MudTextures/MF_B1MudDirt.hlsl`, keep in sync): local-space triplanar (`LocalPosition`, `VertexNormalWS` → Transform to local), drips run down on side projections. Tire: coat by `field = lerp(blotch, noise, 0.35)` vs slot 0. Body: blotch-coverage = max(arch spheres × wheel slot, sill gradient × max(body, mean wheels), low-body × body); splatter = body dirt denser low, + late sparse spots (> 0.7), + near arches. Returns `float4(lerp(BC, mud, m), m)`; early-out to `BC` when every slot is 0, and every other output is a lerp with alpha = mask, so dirt 0 is exact.
+  - Custom node inputs through MCP: set element 0, then N copies, then the names (26 inputs).
+  - Stage test with CPD set by hand on the placed photo-booth Wrangler at 1.0: tires coated, arches/sills/lower body filled, splatter up the doors (stills in the scratchpad, `caps/d100_*.png`). First look for S5-08: mud too light/sandy in sun, door blotches too big, upper body lacks the reference's light film.
+  🔍 Research first: `MaterialTools` function creation and inputs/outputs; triplanar in local space (`LocalPosition`, vertex normal in local space).
+  `/Game/B1/Mud/Dirt/MF_B1MudDirt`:
+  - **Inputs:** BaseColor, Roughness, Normal, `bIsTire` (static bool), arch centres (4 × vector), sill height, body bounds.
+  - **CPD:** slot 0 = own dirt (body or tire), slots 1–4 = the wheels.
+  - **Mask:** a two-scale triplanar mask (blotch × splatter, with noise breakup).
+  - **Region-weighted reveal:**
+    - tire: full coat by slot 0;
+    - arches: a sphere falloff per wheel, by that wheel's slot;
+    - sills: low-height gradient;
+    - doors and bumpers: splatter by body dirt, denser low;
+    - hood, roof and glass: sparse spots late (body dirt > ~0.7).
+  - **Output:** a lerp to one dry mud colour and roughness ~0.85, normal flattened under mud.
+  ⚠️ Note: dirt 0 must leave the inputs bit-exact, so the clean jeep doesn't change. Keep the HLSL in Custom nodes small, as `M_B1Mud` does.
+  **Done:** the function compiles; a test MI with CPD set by hand shows each stage.
+  **User check:** —
+
+- [x] **S5-06** Wire `MF_B1MudDirt` into the Wrangler materials (1.5 h) _(requires S5-05)_ <!-- done: 2026-11-07 -->
+  Result:
+  - `M_Wrangler_Base`: BaseColor (D × Tint), MRA.G, Normal → the function → BaseColor/Roughness/Normal outputs; Metallic = lerp(MRA.R, 0, Mask). Params (group `Mud Dirt`): `bIsTire` static switch (1/0 into IsTire), `DirtArchFL/FR/BL/BR`, `DirtSillHeight` 75, `DirtBoundsMin/Max` with the S5-03 values. `MI_Wrangler_Tire` sets `bIsTire` = true.
+  - `M_Wrangler_Glass`: duplicate of `M_SportsCar_Lights` (thin translucent) + the function and a light film: film = `DirtOwn` × `DirtGlassFilm` (0.35); BaseColor lerps to `DirtGlassFilmColor` by film, roughness → 0.85 by film; Opacity → 1, Metallic → 0 and TransmittanceColor → dark brown by max(mask, film). `MI_Wrangler_Glass` reparented: Metallic 1, Specular 1, Roughness 0.05, Opacity 0.35, BaseColor (0.02, 0.025, 0.03) kept.
+  - Dirt-0 check: before/after captures at the photo-booth poses differ only at the capture noise floor (two captures with no change differ by the same amount: animated sky reflected in paint/glass, TAA). Exact by construction (all lerps alpha 0, early-out).
+  - `M_Wrangler_Base` calls the function, with the arch centres, sill and bounds from S5-03 as parameters.
+  - `MI_Wrangler_Tire` sets `bIsTire`.
+  - New `/Game/Vehicles/Wrangler/Materials/M_Wrangler_Glass`: a duplicate of the `M_SportsCar_Lights` graph, or a simple translucent glass, plus the function (light film only). `MI_Wrangler_Glass` is reparented to it.
+  ⚠️ Note: reparenting `MI_Wrangler_Glass` can drop parameter overrides. Check its look before and after with a capture at dirt 0.
+  **Done:** captures at dirt 0 before and after are identical (no visual change on a clean jeep); all `MI_Wrangler_*` compile.
+  **User check:** —
+
+- [x] **S5-07** `UB1MudDirtComponent`: targets, CPD writes, `PreviewDirt` (2.5 h) _(requires S5-01)_ <!-- done: 2026-11-07 -->
+  Result: `Mud/B1MudDirtComponent` on `AB1Jeep` as `MudDirt` (`GetMudDirt()`), `TargetTag` `B1MudDirt`, `PreviewDirt`, `WheelDirt[4]` / `BodyDirt` (0 until S5-10), `GetShown*` (preview or accumulated), `GetNumTire/BodyTargets` for the rig.
+  - Targets resolve in the first tick that has wheels (they come with the physics state, like the spray's emitters); tire = within the wheel radius of `UB1MudVehicleComponent::GetWheelLocation` (new, forwards `IB1MudSimHost`). PIE in `Lvl_Gym_Core`: both the player's and the booth Wrangler log `dirt targets: body=Chassis w0=Tire Front Left w1=Tire Front Right w2=Tire Rear Left w3=Tire Rear Right`.
+  - CPD goes through `SetCustomPrimitiveDataFloat` (the runtime copy), so preview never dirties a level or BP; the serialized `CustomPrimitiveData` stays empty. Writes compare against the component's current CPD (≥ 0.005, or exactly 0/1), so a re-registered part is caught.
+  - Editor (no game world): `bTickInEditor`, `OnRegister` and `PostEditChangeProperty` write `max(PreviewDirt, 0)` into slots 0–4 of every tagged part. `PreviewDirt` 0.5 via `ObjectTools` on the placed booth jeep renders in a `CaptureViewport` with no PIE.
+  - Headless: core 12/12 and mud 22/22 PASS, numbers as before (FullThrottle5s 77.13 m). MIGRATION.md: component, tag, CPD layout, `MF_B1MudDirt` + textures, `SM_B1MudClump`.
+  - Fix found on the way: `MaterialInstanceTools.set_parent` doesn't mark the package dirty, so `MI_Wrangler_Glass`'s reparent (S5-06) wasn't saved. Re-set a parameter after `set_parent`, then save.
+  ⚠️ Note: new class → `Scripts/BuildEditor.ps1` (drops `Makefile.bin`).
+  `Mud/B1MudDirtComponent` (portable), on `AB1Jeep` as `MudDirt`:
+  - `WheelDirt[4]`, `BodyDirt`;
+  - `PreviewDirt` (−1 = off; `Mud|Dirt`, applied in `OnRegister` and `PostEditChangeProperty`, so it works in the editor and in game);
+  - target discovery at BeginPlay: components tagged `B1MudDirt`, nearest wheel within the wheel radius → that wheel's tire, none → the body. Wheel locations come through `UB1MudVehicleComponent` / `IB1MudSimHost`. In the editor (no wheels), use the target's distance to the owner's wheel sockets, or treat all tagged parts as preview-only (every slot = `PreviewDirt`);
+  - one log line on `LogB1Mud`: `dirt targets: body=… w0=… w1=… w2=… w3=…`;
+  - CPD written only on a change ≥ 0.005.
+  MIGRATION.md: the component, the tag and the CPD layout.
+  **Done:** builds; a placed Wrangler shows stages when `PreviewDirt` is set through `ObjectTools`; PIE logs four tires plus the body; no other suite changes.
+  **User check:** —
+
+- [x] **S5-08** Photo booth + stage stills (1.5 h) _(requires S5-06, S5-07)_ <!-- done: 2026-11-07 -->
+  Result:
+  - Booth: `B1PhotoBooth_Wrangler` in `Lvl_Gym_Core` (folder `B1Tests/PhotoBooth`) at (−20, −130, 0.02) m, **yaw 115°**, 130 m from the rigs at the origin; core suite 12/12 with it placed. The two concept angles face opposite ways, so one is always backlit unless the sun (yaw ≈166°) rakes both from the side; yaw 115 does that.
+  - Poses (x, y, z cm, pitch, yaw): front ¾ left (−1855, −12458, 150, −6, −105); rear ¾ right (−2145, −13542, 165, −7, 75).
+  - Scripts: `Scripts/MudTextures/photobooth.py` (paste into `ProgrammaticToolset.execute_tool_script`, **one stage per call**: 10 captures in one reply closed the MCP connection) and `stage_sheet.py <out_dir> <result files…>` (crops the stills next to the clean and mud concept images).
+  - Look passes before the checkpoint: mud colour 0.2/0.13/0.07 → 0.055/0.047/0.038 → 0.065/0.05/0.035 (was sandy in sun); body film (`DirtFilmStrength` 0.5, from body dirt 0.3, patchy by noise; new Custom input `FilmStrength`); `DirtBlotchTile` 150 → 100; glass film colour → 0.06/0.05/0.04.
+  - Sheet: `stills3/stage_sheet.png` in the session scratchpad.
+  A placed `BP_B1Jeep_Wrangler` in `Lvl_Gym_Core` (folder `B1Tests/PhotoBooth`, a clear spot away from the rigs), with two camera transforms matching the concept angles (front three-quarter left, rear three-quarter right) recorded in this task. A `ProgrammaticToolset` script sets `PreviewDirt` to 0 / 0.25 / 0.5 / 0.75 / 1 and captures both poses (`CaptureViewport`, overlays off).
+  ⚠️ Note: a new actor in a World Partition map needs `save_assets([])` to write its external package; check `git status` afterwards. Make sure the parked Wrangler doesn't spawn into a rig's lane (placed jeeps simulate in PIE).
+  **Done:** 10 stills in the scratchpad, plus a side-by-side sheet with the concept images; the script is saved under `Scripts/MudTextures/photobooth.py` (or noted here) for reuse.
+  **User check:** —
+
+- [x] **S5-09** **Checkpoint 1:** dirt look stills (user, 0.5–2 h with iterations) _(requires S5-08)_ <!-- done: 2026-11-08 -->
+  ✅ User sign-off on round 2 ("All good for now"). Final sheet: `stills6/stage_sheet.png` (session scratchpad; regenerate with `photobooth.py` + `stage_sheet.py`).
+  Round 1 feedback (2026-11-07):
+  - Editor scalability is now medium with high shadows (user's change): judge all Phase V captures with it.
+  - Scale the effect down: today's 0.8 is the new 1.0 → `DirtScale` 0.8 in `MF_B1MudDirt`.
+  - Clean cheat → S5-11 (`B1DirtClean`).
+  - A separate tire mud layer → material part here, runtime in S5-20: tread fully coated after one wheel rotation in mud, thicker (towards the rim) the longer it's in mud, thinner again on firm ground; wet = darker, dries lighter. Subtle, not comical.
+  Round 2 changes (shot at the new scalability, sheet `stills6/stage_sheet.png` in the session scratchpad):
+  - `DirtScale` 0.8 on body dirt and the tire crust (not on the tire layer).
+  - Tire branch: tire CPD slot 1 = coat (0.4 = tread band r > `TireTreadRadius` 40 covered; above 0.4 the band edge moves in to `TireRimRadius` 23), slot 2 = wetness (× `DirtTireWetDarken` 0.7). Tire mud is 1.6× the body mud colour: at body colour it vanished on black rubber (a red-colour test showed full coverage on all four tires). New function inputs `TireTreadRadius`/`TireRimRadius` (defaults 40/23), params `DirtScale`, `DirtTireWetDarken`.
+  - Rims: the tire mesh's `Metal_part` slot shared `MI_Wrangler_MetalPart` with the body, so it ran the body branch. New `MI_Wrangler_Rim` (copy, `bIsTire` on) on `SM_Wrangler_Tire`.
+  - Glass went milky white from 0.5: rough + metallic + specular 1 spreads the sky. Glass roughness now only rises to 0.35 and specular drops to 0.25 under mud.
+  - Captures right after a material recompile can show glass missing (shaders still compiling): wait a few seconds.
+  The user reviews the stage sheet. Iterate on S5-04 and S5-05 parameters (thresholds, scales, colour) and re-shoot with S5-08's script until the stages read as tires → arches → splatter → spots, and dirt 1 matches the concept.
+  **Done:** user sign-off on the stills; final sheet path noted here.
+  **User check:** stages and the cap look right next to `jeep_wrangler_mud_reference.jpg`.
+
+### Dirt accumulation
+
+- [x] **S5-10** `B1MudThrow` helper + dirt accumulation (2 h) _(requires S5-07, S5-09)_ <!-- done: 2026-11-08 -->
+  Result:
+  - `Mud/B1MudThrow` (namespace, plain structs): intensity = lerp(`MinDepthFactor` 0.3, 1, sink / `FullSinkDepth` 15 cm) × clamp(tread / `FullTreadSpeed` 5 m/s + slip / `FullSlipSpeed` 3 m/s); 0 off mud. `GetWheelInput` reads `UB1MudVehicleComponent`.
+  - Tread speed: new `FB1MudSimOutput::TreadSpeed` (|`GetWheelGroundSpeed`|, cm/s) → `UB1MudVehicleComponent::GetWheelTreadSpeed`. Inside `Mud/`, no new host requirement.
+  - `UB1MudDirtComponent`: `WheelSecondsToFull` 20, `BodySecondsToFull` 80, belly term `BellyBodyRate` 1 × belly depth / `BellyFullDepth` 20 cm × max wheel motion. `GetWheelIntensity`. One `LogB1Mud` line per new tenth: `dirt w=a/b/c/d body=`.
+  - Headless mud 22/22 PASS, rig numbers unchanged. Medium rigs reach ~0.1 wheel / 0.02 body in ~2 s, deep 0.1 / 0.04 (belly); firm rigs log no dirt.
+  - `Mud/B1MudThrow` (static, plain C++): intensity 0..1 per wheel from sink depth, tread speed and slip.
+  - `UB1MudDirtComponent` tick:
+    - `WheelDirt[i] += intensity·dt / WheelSecondsToFull` (start 20 s);
+    - `BodyDirt += mean intensity·dt / BodySecondsToFull` (start 80 s), plus a belly term in deep mud;
+    - all clamped to 1, never decreasing.
+  - Reads only `UB1MudVehicleComponent`.
+  ⚠️ Note: the tick must not touch the sim or the spray. `PreviewDirt` ≥ 0 overrides the accumulated values (it doesn't reset them).
+  **Done:** builds; in PIE a jeep driven by a rig into medium mud shows the values rising in the log; firm ground stays 0.
+  **User check:** —
+
+- [x] **S5-11** Dirt debug: Mud window, cheat, telemetry, ShowDebug (2 h) _(requires S5-10)_ <!-- done: 2026-11-08 -->
+  Result:
+  - Mud window → "Dirt" header (player pawn's `UB1MudDirtComponent`): bars w0–w3 (with throw intensity) and body, target counts, Clean / Max, `Preview dirt (-1 off)`, typed fields for wheel/body seconds-to-full, belly full depth, belly body rate. "Save to asset" copies those four (not `PreviewDirt`, which stays live-only) to the pawn BP's component archetype and saves it.
+  - `UB1MudDirtComponent::SetDirt(v)` (all values to v, preview off, can lower) and `Clean()`; cheats `B1Dirt <v>` (negative = clean) and `B1DirtClean` call them. S5-20 extends `SetDirt` to the tire layer.
+  - Telemetry: `dirt=w0/w1/w2/w3/body` after `belly=` on the `B1Mud` line (CrossMedium: `dirt=0.16/0.16/0.17/0.17/0.04` at the far edge). ShowDebug B1Mud: `dirt w a/b/c/d  body e  (preview p)`.
+  - **Mud window "Dirt" section:**
+    - per-wheel and body bars, per-wheel intensity;
+    - `DragFloatTyped` for both seconds-to-full values and `PreviewDirt`;
+    - Clean / Max buttons;
+    - "Save to asset" writes the component archetype on the pawn's own BP class (`BP_B1Jeep_Wrangler`).
+  - **Cheat** `B1Dirt <0..1>` (negative = clean) on `UB1CheatManager`.
+  - **Cheat** `B1DirtClean` (user request, 2026-11-07): wheel and body dirt and the tire mud layer (S5-20) back to 0. The component gets a `Clean()` the cheat and the ImGui Clean button share.
+  - **Telemetry:** `dirt=w0/w1/w2/w3/body` on the `B1Mud` line.
+  - **ShowDebug:** a dirt line in `ShowDebug B1Mud`.
+  **Done:** builds; the telemetry line shows dirt in a rig run.
+  **User check:** Mud window bars move while driving; Clean / Max / `B1Dirt 0.5` work; Save keeps edits after restarting the editor.
+
+- [x] **S5-12** Dirt rig metrics + four dirt rigs (3 h) _(requires S5-10)_ <!-- done: 2026-11-08 -->
+  Result:
+  - Rig: `StartDirt`; line `dirtW=a/b/c/d dirtBody= dirtLast= dirtTargets=tires/body` on every vehicle with the component; thresholds `Min/MaxWheelDirt` (lowest/highest wheel), `Min/MaxBodyDirt`, `bExpectBodyBehindWheels`, plus `MaxLastStepDirtChange` (`dirtLast` = summed change during the last step, for the cap).
+  - New step option `ShuttleDistance` (m): forward at `Throttle`, reverse (brake) once the vehicle is that far past the step start along its heading, and back. Open-loop forward/reverse legs drifted out of the 20 m patch (4/4 s +54 m, 3/4 s backwards in 15 s).
+  - Rigs (`Lvl_Gym_Mud`, `B1Tests/Dirt`, Wrangler): `B1Dirt_Firm` (X 80, Y −45 m, 20 s 50 % full lock circle: 0/0), `B1Dirt_Medium` (X 20, Y 29 m, 15 s 50 % shuttle ±6 m: wheels 0.51–0.52, body 0.17), `B1Dirt_Drive90` (same, 90 s: wheels 1, body 1), `B1Dirt_Cap` (deep lane X 14, Y 55 m — medium let it drive out — `StartDirt` 0.95, 20 + 10 s full: all 1, dirtLast 0).
+  - Tuning (not thresholds): `WheelSecondsToFull` 20 → 15, `BodySecondsToFull` 80 → 45. Continuous medium driving at 50 % gives ~0.5 throw intensity, so body ≈ 1 at ~87 s.
+  - Headless: mud 26/26 (22 + 4 dirt), core 12/12, FullThrottle5s 76.99 m (77.07–77.13 in earlier runs). A `LogHttp` timeout error once failed `B1Dirt_Firm` (its line said PASS); environment flake.
+  `AB1GymTestRig`:
+  - `StartDirt` (−1 = leave);
+  - line fields `dirtW=a/b/c/d dirtBody=` and `dirtTargets=` (tires/body found);
+  - thresholds `Min/MaxWheelDirt`, `Min/MaxBodyDirt`, `bExpectBodyBehindWheels`.
+  Rigs (Wrangler `VehicleClass`, `Lvl_Gym_Mud` folder `B1Tests/Dirt`):
+  - `B1Dirt_Firm` (20 s at 50 % on firm → all 0);
+  - `B1Dirt_Medium` (15 s at 50 % → wheels ≥ 0.4, body < min wheel);
+  - `B1Dirt_Drive90` (90 s at 50 % in medium, back and forth → body ≥ 0.9, wheels 1);
+  - `B1Dirt_Cap` (`StartDirt` 0.95, then 30 s full throttle → all exactly 1, unchanged over the last 10 s).
+  ⚠️ Note: if `Drive90` misses, tune the seconds-to-full values, not the threshold, and record the values. Thresholds check order and cap, not exact numbers.
+  **Done:** the 4 dirt rigs PASS headless; mud suite 22/22 and core 12/12 unchanged.
+  **User check:** —
+
+- [x] **S5-20** Tire mud layer: coat + wetness (2.5 h) _(requires S5-10)_ <!-- done: 2026-11-08 -->
+  Result:
+  - `UB1MudDirtComponent` (`Mud|Dirt|Tire`): `TreadCoat` 0.4, `TireCoatSecondsToFull` 20, `TireShedDistance` 150 m, `TireDrySeconds` 40. On mud the coat rises by tread distance (|ω·r|, so spin coats faster) to 0.4 in one 2πr, then by time to 1; off mud (or airborne) it sheds by tread distance and the wetness dries. Tire CPD slot 1 = coat, 2 = wetness; `PreviewDirt` drives both; `SetDirt`/`Clean` reset both. `GetTireCoat/Wetness`.
+  - Mud window Dirt section: per-tire coat/wet bars and typed fields for the four values (in "Save to asset").
+  - Rig: `tireCoat=a/b/c/d coatPeak= coatDrop= coatDist=` (worst wheel's path from its first mud contact to `TreadCoat`), thresholds `MinTireCoatPeak`, `MinTireCoatDrop`, `MaxTireCoatDistance`. `B1Dirt_TireCoat` (X 2, Y 29 m, 12 s 50 % through medium, then ~75 m firm): coatDist 2.86 ≤ 3, peak 0.49, end 0 (drop 0.49 ≥ 0.1).
+  - ADR-021 CPD table and MIGRATION.md updated. Headless mud 27/27, core 12/12.
+  User request at checkpoint 1. Per wheel, in `UB1MudDirtComponent`, on top of the slow `WheelDirt` crust:
+  - `TireCoat` 0..1: on mud, rises by rolled distance so the first wheel rotation (2πr) takes it to `TreadCoat` (0.4 = tread fully covered), then keeps thickening by time in mud to 1 (`TireCoatSecondsToFull`, start 20 s). Off mud it falls by rolled distance (`TireShedDistance`, start 150 m to 0).
+  - `TireWetness` 0..1: 1 while touching mud, then dries over time (`TireDrySeconds`, start 40 s).
+  - CPD on tires: slot 1 = coat, slot 2 = wetness (the material reads them in S5-09's tire branch). `PreviewDirt` drives both. Clean resets both.
+  - Rig fields `tireCoat=a/b/c/d` and checks: entering medium mud gives ≥ 0.4 on every wheel within ~3 m; driving 50 m on firm afterwards lowers it.
+  ⚠️ Note: ADR-021's CPD table gets the tire slots 1–2; MIGRATION.md too.
+  **Done:** builds; rig line shows the coat rising on entry and falling on firm ground.
+  **User check:** drive into mud: tires go muddy almost at once and darker; drive on firm ground: they lighten and thin out, without looking comical.
+
+### Spray
+
+- [ ] **S5-13** Spray rate from `B1MudThrow` + `User.Intensity` (1.5 h) _(requires S5-10)_
+  - `UB1MudSprayComponent`: rate = f(`B1MudThrow` intensity), capped per wheel, so a rolling wheel in mud sprays too.
+  - New `User.Intensity` (0..1).
+  - Velocity stays with today's rules.
+  - Update the `spray=` telemetry and MIGRATION.md (new user param).
+  ⚠️ Note: `b1.Mud.Spray 0` must not change dirt (dirt doesn't read the spray). Check it in a rig run with the CVar off, via an `ini` / `-ExecCmds` on the headless runner, or skip it if the agent can't set CVars.
+  **Done:** builds; telemetry shows spray > 0 for a wheel rolling in medium mud with |slip| < `MinSlipSpeed`.
+  **User check:** —
+
+- [ ] **S5-14** `NS_B1MudSpray`: clump emitter (3 h) _(requires S5-02, S5-04)_
+  Replace the sprite emitter with GPU mesh particles (`SM_B1MudClump`):
+  - size 2–12 cm, skewed (e.g. `pow(rand, 3)`), scaled by `User.Intensity`;
+  - random rotation and spin rate, gravity, drag;
+  - depth-buffer collision with high friction and no bounce; scale-out after resting;
+  - lifetime 0.6–1.2 s;
+  - material: a mesh variant of `M_B1MudSpray` (lit, wet, `User.Color`).
+  Fixed bounds as today.
+  ⚠️ Note: keep the existing user param names (`SpawnRate`, `SprayVelocity`, `Color`) so the component keeps working between tasks.
+  **Done:** a capture from a PIE rig with wheelspin shows small mixed-size clumps landing and resting.
+  **User check:** —
+
+- [ ] **S5-15** `NS_B1MudSpray`: droplets + haze emitters (2 h) _(requires S5-14)_
+  - **Droplets:** GPU sprites 0.5–3 cm, velocity-aligned, ~2× the clump rate, short life.
+  - **Haze:** CPU or GPU, a handful of soft translucent sprites (50–150 cm, opacity ≤ 0.15, `User.Color` lightened), slow, high drag, rate scaled by `User.Intensity`.
+  ⚠️ Note: cap the haze spawn (≤ 8/s per wheel) to keep overdraw down. It's tuning, not optimisation.
+  **Done:** a capture shows the rooster tail with fine droplets and a faint haze; `stat Niagara` counts noted (user-side, or from the log if available).
+  **User check:** —
+
+- [ ] **S5-16** Spray section in the Mud window (1.5 h) _(requires S5-13)_
+  Per-wheel intensity and rate; `DragFloatTyped` for the `Mud|Spray` config (`MinSlipSpeed`, rates, speeds, elevation, rolling factor); "Save to asset" to the pawn's own BP class.
+  **Done:** builds; the section renders (smoke check in a PIE log or capture).
+  **User check:** edits change the spray live; Save keeps them after a restart.
+
+- [ ] **S5-17** Spray capture rig + reference comparison (1.5 h) _(requires S5-14, S5-15)_
+  `B1Spray_Medium` (`bAutoRun`, Wrangler, full throttle from rest on the medium lane of `Lvl_Gym_Mud`). Set the camera before `StartPIE` (mcp-tools.md) at an angle similar to `mud-car-drive.mp4`, then `CaptureEditorImage` at about 1, 2 and 3 s. Build a side-by-side sheet with the reference frames (scratchpad OpenCV, or re-extract with `Scripts/MudTextures`).
+  **Done:** comparison sheet saved and noted here; the rig passes its smoke check (no thresholds).
+  **User check:** —
+
+### Close
+
+- [ ] **S5-18** Docs pass (1 h) _(requires S5-12, S5-17)_
+  MIGRATION.md complete:
+  - the component, `B1MudThrow`;
+  - the tag and the CPD layout;
+  - `MF_B1MudDirt` + textures;
+  - `User.Intensity`, `SM_B1MudClump`.
+  ADR-021 consequences checked against what was built. ARCHITECTURE.md is updated through `/save`.
+  **Done:** MIGRATION.md lists every new host requirement; `/save` run.
+  **User check:** —
+
+- [ ] **S5-19** **Checkpoint 2:** Phase V playtest (user + agent, 1–2 h) _(requires S5-11..S5-18, S5-20)_
+  **Agent:** all suites headless (core, mud + dirt rigs, winch).
+  **User:** Swamp playtest. The spray reads as mud (small mixed clumps, haze) on spin and when rolling; dirt builds tires → arches → spots and stops at about the concept look in ~90 s of mud driving. Tune with the Mud window as needed.
+  **Done:** all suites PASS; ROADMAP Phase V ticked.
+  **User check:** sign-off on Phase V.
+
+### Backlog (found during the sprint)
+
+- _(empty)_

@@ -6,6 +6,7 @@
 #include "B1VehicleAttributeSet.h"
 #include "B1FuelConsumptionComponent.h"
 #include "B1MudSprayComponent.h"
+#include "B1MudDirtComponent.h"
 #include "B1WinchAnchorComponent.h"
 #include "B1WinchComponent.h"
 #include "AbilitySystemComponent.h"
@@ -94,6 +95,11 @@ namespace B1VehicleTelemetry
 		TStringBuilder<512> Line;
 		Line.Appendf(TEXT("B1Mud %s v=%.1fkmh belly=%.1fcm/%.0fN"), *GetNameSafe(Owner),
 			FVector::DotProduct(Owner->GetVelocity(), Owner->GetActorForwardVector()) * 0.036f, Mud.GetBellyDepth(), Mud.GetBellyDrag());
+
+		if (const UB1MudDirtComponent* Dirt = Owner->FindComponentByClass<UB1MudDirtComponent>())
+		{
+			Line.Appendf(TEXT(" dirt=%.2f/%.2f/%.2f/%.2f/%.2f"), Dirt->GetWheelDirt(0), Dirt->GetWheelDirt(1), Dirt->GetWheelDirt(2), Dirt->GetWheelDirt(3), Dirt->GetBodyDirt());
+		}
 
 		const UB1MudSprayComponent* Spray = Owner->FindComponentByClass<UB1MudSprayComponent>();
 		for (int32 WheelIndex = 0; WheelIndex < Mud.GetNumWheels(); ++WheelIndex)

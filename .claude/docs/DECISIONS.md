@@ -460,3 +460,42 @@ The CVar is global; there's no per-vehicle or per-surface switch.
 - A native wheel-visual component instead of an AnimBP (new C++ for something the template already does).
 
 **Consequences.** `SKM_Offroad_Skeleton` is now shared; removing the template car means moving the skeleton first. The Wrangler mesh carries the skeleton's unused suspension bones at their Offroad ref pose. Gym rigs still spawn `BP_B1Jeep`, so tests keep the buggy's geometry.
+
+---
+
+## ADR-021 — Mud on the vehicle is a material layer, not decals
+
+**Status:** accepted (2026-11-07, user choice; plan: Phase V Visuals)
+
+**Problem.** The jeep should start clean and collect mud while it drives in mud: tires first, then the arches, then splatter up the body, capped at the concept look (`Concept/jeep_wrangler_mud_reference.jpg`).
+
+**Decision.**
+- **The dirt look** is a material function, `MF_B1MudDirt` (`/Game/B1/Mud/Dirt/`), called by the vehicle's base material (`M_Wrangler_Base`). It's a two-scale triplanar mask in the mesh's local space. Its reveal threshold falls as dirt grows, weighted by region: tires, then arches and sills, then doors and bumpers, then hood, roof and glass.
+- **Values** are 0..1. Custom Primitive Data carries them, written by the portable `UB1MudDirtComponent` (`Mud/`):
+
+  | Slot | Body | Tire |
+  |---|---|---|
+  | 0 | `BodyDirt` | its own wheel's dirt (crust) |
+  | 1 | `WheelDirt[0]` | tire coat (amendment 2026-11-08) |
+  | 2 | `WheelDirt[1]` | tire wetness (amendment 2026-11-08) |
+  | 3–4 | `WheelDirt[2..3]` | unused |
+
+  A static switch on the MI tells tire from body.
+- **Targets** are components tagged `B1MudDirt`, matched to wheels by position at BeginPlay. A tagged component near no wheel is the body.
+- **Dirt only grows** and caps at 1. Both dirt and the spray rate come from one helper (`B1MudThrow`), which computes thrown-mud intensity from sink depth, tread speed and slip. Dirt doesn't read the spray component.
+
+**Rationale.** Deferred decals on a moving car also project onto the ground and through the body, smear at panel edges, and can't follow a rotating tire. A material layer has none of those problems. CPD needs no dynamic material instances and keeps the meshes batching. The material function and the tag keep the look and the logic portable: a host only calls the function and tags its parts.
+
+**Alternatives.**
+- Decal components attached around the arches and doors (projection artifacts, nothing on the tires).
+- A UV-space render target painted by particle hits (needs unique UVs, much more work).
+- Dynamic MIs per component (more draw-state churn than CPD for the same result).
+- Dirt driven by the spray's particle rate (couples two visuals: spray off would mean no dirt).
+
+**Consequences.** Every material on a dirt-capable vehicle has to call `MF_B1MudDirt`. CPD slots 0–4 are reserved on tagged components (slot 5 is held for a future `Wetness`). Nothing washes off yet; Phase 3 water can add a decrease path.
+
+**Amendment (2026-11-08, user feedback at checkpoint 1).**
+- **Tire mud layer:** tires get a second, fast layer on top of the slow crust. CPD on tires: slot 1 = coat (0.4 = tread covered after one wheel rotation in mud, 1 = thick, reaching the rim), slot 2 = wetness (darker when wet). Unlike the crust, the coat sheds on firm ground and the wetness dries, so tire values can go down. Body slots are unchanged. Runtime in S5-20.
+- **Cap:** `DirtScale` (0.8) in the function scales the body and crust values, so the first look's 0.8 is the new 1.
+- **Clean:** a `B1DirtClean` cheat resets everything (S5-11). Gameplay still has no wash path.
+- Rims on the tire mesh need a tire material (`MI_Wrangler_Rim`, `bIsTire` on), or they run the body branch and read the tire slots as wheel dirt.

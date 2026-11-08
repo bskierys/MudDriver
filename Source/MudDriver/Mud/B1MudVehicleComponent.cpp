@@ -175,6 +175,11 @@ float UB1MudVehicleComponent::GetWheelWidth(int32 WheelIndex) const
 	return Host ? Host->GetMudWheelWidth(WheelIndex) : 0.0f;
 }
 
+FVector UB1MudVehicleComponent::GetWheelLocation(int32 WheelIndex) const
+{
+	return Host ? Host->GetMudWheelLocation(WheelIndex) : GetOwner()->GetActorLocation();
+}
+
 const UB1PhysicalMaterial_Mud* UB1MudVehicleComponent::GetWheelMud(int32 WheelIndex) const
 {
 	const FWheelStatus& Status = GetWheelState(WheelIndex);
@@ -204,6 +209,11 @@ float UB1MudVehicleComponent::GetWheelSlopePull(int32 WheelIndex) const
 float UB1MudVehicleComponent::GetWheelNetPush(int32 WheelIndex) const
 {
 	return SimOutput.NetPush.IsValidIndex(WheelIndex) ? SimOutput.NetPush[WheelIndex] : 0.0f;
+}
+
+float UB1MudVehicleComponent::GetWheelTreadSpeed(int32 WheelIndex) const
+{
+	return SimOutput.TreadSpeed.IsValidIndex(WheelIndex) ? SimOutput.TreadSpeed[WheelIndex] : 0.0f;
 }
 
 float UB1MudVehicleComponent::GetAverageSinkDepth() const

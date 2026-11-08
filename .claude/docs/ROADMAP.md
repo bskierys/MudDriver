@@ -3,10 +3,11 @@
 Source plans (closed):
 - [plans/2026-10-25-river-crossing.md](plans/2026-10-25-river-crossing.md): the whole prototype, Testing model, Phases 0, 1, G.
 - [plans/2026-10-26-mud-winch-first.md](plans/2026-10-26-mud-winch-first.md): phase reorder (mud + winch first), Phase 2 design, slope rules.
+- [plans/2026-11-07-visuals.md](plans/2026-11-07-visuals.md): Phase V (mud spray rework, dirt on the jeep).
 
 Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md](SPRINTS.md); tick them there.
 
-**Phase order (replanned 2026-10-26):** 0 → 1 / G → **2 On foot and winch** (was 4) → **3 River** → **4 Damage and vegetation** (was 2) → 5 Scenario. Older docs (HISTORY.md, the 2026-10-25 plan) use the old numbers.
+**Phase order (replanned 2026-10-26):** 0 → 1 / G → **2 On foot and winch** (was 4) → **V Visuals** (added 2026-11-07) → **3 River** → **4 Damage and vegetation** (was 2) → 5 Scenario. Older docs (HISTORY.md, the 2026-10-25 plan) use the old numbers.
 
 **Phase closes when:** the agent's rig tests pass **and** the user signs off after a playtest. If feel and numbers disagree, feel wins and the thresholds get updated.
 **Performance target:** 60 fps at 1080p Medium on i7-12700H / RTX 3050 Ti Laptop (4 GB VRAM).
@@ -43,7 +44,7 @@ Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md]
 - [x] Niagara mud spray (GPU sprites, depth-buffer collision) (Sprint 2) <!-- done: 2026-10-27 -->
 - [x] Visual tire trails with rut depth (ADR-008) (Sprint 2) <!-- done: 2026-10-26 -->
 
-**Stretch.** Spray tinted by surface, dirt mask on the jeep, fake trail depth, character slowed in mud. Done beyond scope: mud and fuel made portable (S2-18..S2-25, MIGRATION.md).
+**Stretch.** Spray tinted by surface, dirt mask on the jeep (moved to Phase V), fake trail depth, character slowed in mud. Done beyond scope: mud and fuel made portable (S2-18..S2-25, MIGRATION.md).
 
 **Done when.**
 - Full throttle digs in on medium mud in 2–4 s.
@@ -109,6 +110,32 @@ Read the relevant one before starting a phase. Sprint tasks live in [SPRINTS.md]
   - hooked at the middle, it opens less than hooked at the end (probably not passable; that's the puzzle);
   - with the handbrake held and the hook on a tree, the jeep moves ≤ 0.3 m at full pull, and a detach mid-hold doesn't shove it.
 - The user signs off at the Sprint 3 checkpoint (mud + winch) and at the phase playtest (full loop on foot, including the fallen tree scenario from VISION.md).
+
+---
+
+## Phase V — Visuals
+**Status:** planned (Sprint 5) (plan: [2026-11-07-visuals](plans/2026-11-07-visuals.md), ADR-021)
+
+**Outcome.** Mud reads as mud. The tires throw a dense spray of small clumps of mixed sizes with a faint haze, when spinning and when rolling (`Concept/mud-car-drive.mp4`). The Wrangler starts clean (`Concept/jeep-wrangler.png`) and collects mud in stages (tires, then arches and sills, then splatter on the doors and bumpers, then spots on the hood, roof and glass), capped at `Concept/jeep_wrangler_mud_reference.jpg`.
+
+**Scope (minimum).**
+- [ ] Spikes: CPD and tags on the inherited Wrangler components, Niagara mesh renderer + depth-buffer collision through MCP, body-space arch centres (Sprint 5)
+- [ ] `Scripts/MudTextures` generator (masks + clump mesh), `MF_B1MudDirt` (local-space triplanar, region-weighted reveal) in the Wrangler materials, including a Wrangler glass material (Sprint 5)
+- [ ] `UB1MudDirtComponent` (portable): `B1MudDirt`-tagged targets matched to wheels, CPD writes, `PreviewDirt`, accumulation from `B1MudThrow` in seconds-to-full, capped and monotonic (ADR-021) (Sprint 5)
+- [ ] Photo booth stills at 5 dirt levels from the two concept angles; **checkpoint 1** (user signs off the look before the accumulation is built) (Sprint 5)
+- [ ] Dirt debug: Mud window section, `B1Dirt` cheat, telemetry, `ShowDebug B1Mud`; rig `StartDirt` + dirt metrics and four dirt rigs (Sprint 5)
+- [ ] `NS_B1MudSpray` rebuilt as clumps (mesh) + droplets + haze, rate from `B1MudThrow` (rolling spray), `User.Intensity`, Spray section in the Mud window (Sprint 5)
+
+**Stretch.** Fresh vs dried mud (`Wetness`, CPD slot 5); spray spawned along the tread arc.
+
+**Out of scope.** The `mud-car-splash.mp4` sheet splash, washing dirt off (Phase 3 can add it), UV-painted dirt, the dirt material on the buggy, performance work.
+
+**Done when.**
+- On firm ground the jeep stays clean (`B1Dirt_Firm`: all 0).
+- In medium mud the tires lead the body (`B1Dirt_Medium`).
+- 90 s at 50 % in medium mud gives body ≥ 0.9 and wheels at 1 (`B1Dirt_Drive90`); dirt holds at exactly 1 once capped (`B1Dirt_Cap`).
+- Existing suites unchanged (core, mud, winch).
+- The user signs off the stills (checkpoint 1) and the Swamp playtest (checkpoint 2).
 
 ---
 

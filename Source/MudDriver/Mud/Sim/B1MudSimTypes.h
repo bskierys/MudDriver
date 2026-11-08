@@ -51,6 +51,9 @@ struct FB1MudSimOutput
 	/** Per mud wheel, N along the wheel forward: tire + gravity + external force + slope pull, what rolling resistance caps against */
 	TArray<float> NetPush;
 
+	/** Per wheel, cm/s, |angular velocity × radius|: how fast the tread surface moves, slip included */
+	TArray<float> TreadSpeed;
+
 	/** cm the average sink depth is past belly clearance */
 	float BellyDepth = 0.0f;
 

@@ -33,6 +33,14 @@ public:
 	UFUNCTION(Exec)
 	void B1Unstuck();
 
+	/** Every wheel and body dirt value to Value (0..1); negative cleans */
+	UFUNCTION(Exec)
+	void B1Dirt(float Value);
+
+	/** Wheel and body dirt and the tire mud layer back to 0 */
+	UFUNCTION(Exec)
+	void B1DirtClean();
+
 	/** Hooks the nearest winch anchor within cable range; rest length = current distance */
 	UFUNCTION(Exec)
 	void B1WinchAttachNearest();
@@ -59,6 +67,8 @@ public:
 private:
 
 	class UB1WinchComponent* GetPlayerWinch(const TCHAR* CheatName) const;
+
+	class UB1MudDirtComponent* GetPlayerDirt(const TCHAR* CheatName) const;
 
 	class UB1AbilitySystemComponent* GetPlayerASC(const TCHAR* CheatName) const;
 };

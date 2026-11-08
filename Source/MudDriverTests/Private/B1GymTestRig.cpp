@@ -9,6 +9,7 @@
 #include "B1VehicleAttributeSet.h"
 #include "B1VehicleMovementComponent.h"
 #include "B1MudVehicleComponent.h"
+#include "B1MudDirtComponent.h"
 #include "B1WinchAnchorComponent.h"
 #include "B1WinchLog.h"
 #include "Camera/CameraComponent.h"
@@ -81,6 +82,7 @@ void AB1GymTestRig::PrepareTest()
 	Movement = Vehicle ? Cast<UChaosWheeledVehicleMovementComponent>(Vehicle->GetVehicleMovementComponent()) : nullptr;
 	B1Movement = Cast<UB1VehicleMovementComponent>(Movement);
 	MudVehicle = Vehicle ? Vehicle->FindComponentByClass<UB1MudVehicleComponent>() : nullptr;
+	MudDirt = Vehicle ? Vehicle->FindComponentByClass<UB1MudDirtComponent>() : nullptr;
 	if (StartOnFootClass && !Character)
 	{
 		FinishTest(EFunctionalTestResult::Error, TEXT("StartOnFootClass didn't spawn, or there is no player 0"));
@@ -219,7 +221,21 @@ void AB1GymTestRig::StartTest()
 		B1Movement->SetTestForce(TestForce);
 	}
 
-	Winch = Vehicle ? Vehicle->FindComponentByClass<UB1WinchComponent>() : nullptr;
+	DirtAtLastStep = -1.0f;
+	TireCoatPeak.Init(0.0f, UB1MudDirtComponent::NumWheelSlots);
+	TireMudStartPath.Init(-1.0f, UB1MudDirtComponent::NumWheelSlots);
+	TireCoatDistance.Init(-1.0f, UB1MudDirtComponent::NumWheelSlots);
+	if (StartDirt >= 0.0f)
+	{
+		if (!MudDirt)
+		{
+			FinishTest(EFunctionalTestResult::Error, TEXT("StartDirt needs a UB1MudDirtComponent on the vehicle"));
+			return;
+		}
+		MudDirt->SetDirt(StartDirt);
+	}
+
+	Winch =Vehicle ? Vehicle->FindComponentByClass<UB1WinchComponent>() : nullptr;
 	bHookUsed = false;
 	MaxCarryDistance = 0.0f;
 
@@ -334,6 +350,12 @@ void AB1GymTestRig::EnterStep(int32 StepIndex)
 	}
 	CurrentStep = StepIndex;
 	const FB1GymInputStep& Step = InputScript[StepIndex];
+	if (Vehicle)
+	{
+		ShuttleOrigin = Vehicle->GetActorLocation();
+		ShuttleAxis = Vehicle->GetActorForwardVector().GetSafeNormal2D();
+		bShuttleReverse = false;
+	}
 	if (Step.bUnstuck && MudVehicle)
 	{
 		MudVehicle->Unstuck();
@@ -526,6 +548,7 @@ void AB1GymTestRig::Tick(float DeltaSeconds)
 			{
 				bInLastStep = true;
 				LastStepStart = LastLocation;
+				DirtAtLastStep = GetDirtSum();
 			}
 			break;
 		}
@@ -555,9 +578,19 @@ void AB1GymTestRig::ApplyInput(const FB1GymInputStep& Step)
 		const FVector Local = Vehicle->GetActorTransform().InverseTransformPosition(GetActorTransform().TransformPosition(Step.SteerTarget));
 		Steer = FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan2(Local.Y, Local.X)) / FullSteerHeadingError, -1.0f, 1.0f);
 	}
-	Movement->SetThrottleInput(Step.Throttle);
+	float Throttle = Step.Throttle;
+	float Brake = Step.Brake;
+	if (Step.ShuttleDistance > 0.0f)
+	{
+		const float Offset = ((Vehicle->GetActorLocation() - ShuttleOrigin) | ShuttleAxis) / CmPerM;
+		bShuttleReverse = Offset > Step.ShuttleDistance ? true : Offset < -Step.ShuttleDistance ? false : bShuttleReverse;
+		// Brake is reverse once stopped (Chaos bReverseAsBrake).
+		Throttle = bShuttleReverse ? 0.0f : Step.Throttle;
+		Brake = bShuttleReverse ? Step.Throttle : Step.Brake;
+	}
+	Movement->SetThrottleInput(Throttle);
 	Movement->SetSteeringInput(Steer);
-	Movement->SetBrakeInput(Step.Brake);
+	Movement->SetBrakeInput(Brake);
 	Movement->SetHandbrakeInput(Step.bHandbrake);
 	// Only on a change, so the rig doesn't unpark a jeep the player has just left.
 	AB1Jeep* Jeep = Cast<AB1Jeep>(Vehicle);
@@ -597,6 +630,8 @@ void AB1GymTestRig::Sample(float DeltaSeconds)
 	{
 		SettleTimeMeasured = ScriptTime;
 	}
+
+	SampleTireCoat();
 
 	float SlopePull = 0.0f;
 	for (int32 WheelIndex = 0; WheelIndex < MaxSinkDepth.Num(); ++WheelIndex)
@@ -738,6 +773,43 @@ void AB1GymTestRig::SampleSpring()
 	}
 }
 
+void AB1GymTestRig::SampleTireCoat()
+{
+	if (!MudDirt || !MudVehicle)
+	{
+		return;
+	}
+
+	for (int32 WheelIndex = 0; WheelIndex < FMath::Min(MudVehicle->GetNumWheels(), UB1MudDirtComponent::NumWheelSlots); ++WheelIndex)
+	{
+		const float Coat = MudDirt->GetTireCoat(WheelIndex);
+		TireCoatPeak[WheelIndex] = FMath::Max(TireCoatPeak[WheelIndex], Coat);
+		if (TireMudStartPath[WheelIndex] < 0.0f && MudVehicle->GetWheelMud(WheelIndex))
+		{
+			TireMudStartPath[WheelIndex] = PathLength;
+		}
+		if (TireCoatDistance[WheelIndex] < 0.0f && TireMudStartPath[WheelIndex] >= 0.0f && Coat >= MudDirt->TreadCoat)
+		{
+			TireCoatDistance[WheelIndex] = PathLength - TireMudStartPath[WheelIndex];
+		}
+	}
+}
+
+float AB1GymTestRig::GetDirtSum() const
+{
+	if (!MudDirt)
+	{
+		return 0.0f;
+	}
+
+	float Sum = MudDirt->GetBodyDirt();
+	for (int32 WheelIndex = 0; WheelIndex < UB1MudDirtComponent::NumWheelSlots; ++WheelIndex)
+	{
+		Sum += MudDirt->GetWheelDirt(WheelIndex);
+	}
+	return Sum;
+}
+
 void AB1GymTestRig::FinishScript()
 {
 	bScriptRunning = false;
@@ -843,6 +915,86 @@ void AB1GymTestRig::FinishScript()
 			PerWheel.Add(FString::Printf(TEXT("%.1f"), Depth));
 		}
 		SinkMetrics = TEXT(" sink=") + FString::Join(PerWheel, TEXT("/")) + FString::Printf(TEXT(" belly=%.0f pull=%.0f"), MaxBellyDrag, MaxSlopePull);
+	}
+
+	FString DirtMetrics;
+	const bool bDirtChecks = Thresholds.MinWheelDirt >= 0.0f || Thresholds.MaxWheelDirt >= 0.0f || Thresholds.MinBodyDirt >= 0.0f
+		|| Thresholds.MaxBodyDirt >= 0.0f || Thresholds.bExpectBodyBehindWheels || Thresholds.MaxLastStepDirtChange >= 0.0f
+		|| Thresholds.MinTireCoatPeak >= 0.0f || Thresholds.MinTireCoatDrop >= 0.0f || Thresholds.MaxTireCoatDistance >= 0.0f;
+	if (MudDirt)
+	{
+		float MinWheel = 1.0f;
+		float MaxWheel = 0.0f;
+		TArray<FString> PerWheel;
+		for (int32 WheelIndex = 0; WheelIndex < UB1MudDirtComponent::NumWheelSlots; ++WheelIndex)
+		{
+			const float Value = MudDirt->GetWheelDirt(WheelIndex);
+			MinWheel = FMath::Min(MinWheel, Value);
+			MaxWheel = FMath::Max(MaxWheel, Value);
+			PerWheel.Add(FString::Printf(TEXT("%.3f"), Value));
+		}
+		const float Body = MudDirt->GetBodyDirt();
+		const float LastStepChange = DirtAtLastStep >= 0.0f ? GetDirtSum() - DirtAtLastStep : -1.0f;
+
+		if (Thresholds.MinWheelDirt >= 0.0f && MinWheel < Thresholds.MinWheelDirt)
+		{
+			Failures.Add(FString::Printf(TEXT("dirtW<%.3f"), Thresholds.MinWheelDirt));
+		}
+		if (Thresholds.MaxWheelDirt >= 0.0f && MaxWheel > Thresholds.MaxWheelDirt)
+		{
+			Failures.Add(FString::Printf(TEXT("dirtW>%.3f"), Thresholds.MaxWheelDirt));
+		}
+		if (Thresholds.MinBodyDirt >= 0.0f && Body < Thresholds.MinBodyDirt)
+		{
+			Failures.Add(FString::Printf(TEXT("dirtBody<%.3f"), Thresholds.MinBodyDirt));
+		}
+		if (Thresholds.MaxBodyDirt >= 0.0f && Body > Thresholds.MaxBodyDirt)
+		{
+			Failures.Add(FString::Printf(TEXT("dirtBody>%.3f"), Thresholds.MaxBodyDirt));
+		}
+		if (Thresholds.bExpectBodyBehindWheels && Body >= MinWheel)
+		{
+			Failures.Add(TEXT("dirtBody>=minW"));
+		}
+		if (Thresholds.MaxLastStepDirtChange >= 0.0f && (LastStepChange < 0.0f || LastStepChange > Thresholds.MaxLastStepDirtChange))
+		{
+			Failures.Add(FString::Printf(TEXT("dirtLast>%.4f"), Thresholds.MaxLastStepDirtChange));
+		}
+		DirtMetrics = FString::Printf(TEXT(" dirtW=%s dirtBody=%.3f dirtLast=%.4f dirtTargets=%d/%d"), *FString::Join(PerWheel, TEXT("/")), Body,
+			LastStepChange, MudDirt->GetNumTireTargets(), MudDirt->GetNumBodyTargets());
+
+		TArray<FString> Coats;
+		float CoatPeak = 1.0f;
+		float CoatDrop = 1.0f;
+		float CoatDistance = 0.0f;
+		for (int32 WheelIndex = 0; WheelIndex < UB1MudDirtComponent::NumWheelSlots; ++WheelIndex)
+		{
+			const float Coat = MudDirt->GetTireCoat(WheelIndex);
+			Coats.Add(FString::Printf(TEXT("%.3f"), Coat));
+			CoatPeak = FMath::Min(CoatPeak, TireCoatPeak[WheelIndex]);
+			CoatDrop = FMath::Min(CoatDrop, TireCoatPeak[WheelIndex] - Coat);
+			// A wheel that touched mud but never reached the tread coat counts as infinitely far.
+			const float Distance = TireCoatDistance[WheelIndex] >= 0.0f ? TireCoatDistance[WheelIndex] : TireMudStartPath[WheelIndex] >= 0.0f ? UE_BIG_NUMBER : 0.0f;
+			CoatDistance = FMath::Max(CoatDistance, Distance);
+		}
+		if (Thresholds.MinTireCoatPeak >= 0.0f && CoatPeak < Thresholds.MinTireCoatPeak)
+		{
+			Failures.Add(FString::Printf(TEXT("coatPeak<%.3f"), Thresholds.MinTireCoatPeak));
+		}
+		if (Thresholds.MinTireCoatDrop >= 0.0f && CoatDrop < Thresholds.MinTireCoatDrop)
+		{
+			Failures.Add(FString::Printf(TEXT("coatDrop<%.3f"), Thresholds.MinTireCoatDrop));
+		}
+		if (Thresholds.MaxTireCoatDistance >= 0.0f && CoatDistance > Thresholds.MaxTireCoatDistance)
+		{
+			Failures.Add(FString::Printf(TEXT("coatDist>%.2f"), Thresholds.MaxTireCoatDistance));
+		}
+		DirtMetrics += FString::Printf(TEXT(" tireCoat=%s coatPeak=%.3f coatDrop=%.3f coatDist=%.2f"), *FString::Join(Coats, TEXT("/")), CoatPeak, CoatDrop,
+			CoatDistance >= UE_BIG_NUMBER ? -1.0f : CoatDistance);
+	}
+	else if (bDirtChecks)
+	{
+		Failures.Add(TEXT("noDirtComponent"));
 	}
 
 	FString WinchMetrics;
@@ -1051,9 +1203,9 @@ void AB1GymTestRig::FinishScript()
 
 	const bool bPassed = Failures.Num() == 0;
 	const FString Name = TestLabel.IsEmpty() ? GetName() : TestLabel;
-	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f maxH=%.2f avgDt=%.4f frames=%d%s%s%s%s%s%s%s%s"),
+	const FString Line = FString::Printf(TEXT("B1Test %s %s dist=%.2f disp=%.2f vmax=%.2f vend=%.2f lastDisp=%.3f stuck=%.2f settle=%.2f peakOsc=%.3f endH=%.2f maxH=%.2f avgDt=%.4f frames=%d%s%s%s%s%s%s%s%s%s"),
 		*Name, bPassed ? TEXT("PASS") : TEXT("FAIL"),
-		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, PeakHeight, AvgDt, NumFrames, *SinkMetrics, *SpringMetrics, *WinchMetrics, *LogMetrics, *FuelMetrics, *PlayerMetrics,
+		PathLength, Displacement, MaxSpeed, EndSpeed, LastStepDisplacement, TimeToStuck, SettleTimeMeasured, PeakOscillation, EndHeight, PeakHeight, AvgDt, NumFrames, *SinkMetrics, *DirtMetrics, *SpringMetrics, *WinchMetrics, *LogMetrics, *FuelMetrics, *PlayerMetrics,
 		bPassed ? TEXT("") : TEXT(" failed="), *FString::Join(Failures, TEXT(",")));
 
 	UE_LOG(LogB1Test, Display, TEXT("%s"), *Line);

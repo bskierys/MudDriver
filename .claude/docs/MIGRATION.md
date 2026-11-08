@@ -2,7 +2,7 @@
 
 How to copy mud and fuel into another UE 5.8 project with its own vehicle, movement component and fuel attribute. Keep this current: any change that adds a host requirement, setting, asset or dependency to `Mud/` or `Fuel/` updates this file in the same task ([portability rule](../rules/portability.md)).
 
-ADRs behind it: ADR-001 (sinking), ADR-002 (mud material), ADR-003 (forces in the Chaos sim), ADR-008 (visual ruts), ADR-010 (fuel), ADR-012 (collision layering), ADR-015 (mud surface contract).
+ADRs behind it: ADR-001 (sinking), ADR-002 (mud material), ADR-003 (forces in the Chaos sim), ADR-008 (visual ruts), ADR-010 (fuel), ADR-012 (collision layering), ADR-015 (mud surface contract), ADR-021 (dirt layer).
 
 ## 1. Files
 
@@ -10,7 +10,7 @@ Copy into the target module's source folder (paths are relative to `Source/MudDr
 
 | Folder | Files | Notes |
 |---|---|---|
-| `Mud/` | `B1PhysicalMaterial_Mud`, `B1MudSettings.h`, `B1MudLog`, `B1MudSimHost.h`, `B1MudVehicleComponent`, `B1MudSprayComponent`, `B1MudTrailComponent`, `B1MudTrailSurfaceComponent`, `B1MudTrailSubsystem`, `B1MudPatch` | Runtime. `B1MudPatch` is optional (one surface producer, ADR-015) |
+| `Mud/` | `B1PhysicalMaterial_Mud`, `B1MudSettings.h`, `B1MudLog`, `B1MudSimHost.h`, `B1MudVehicleComponent`, `B1MudSprayComponent`, `B1MudTrailComponent`, `B1MudDirtComponent`, `B1MudThrow`, `B1MudTrailSurfaceComponent`, `B1MudTrailSubsystem`, `B1MudPatch` | Runtime. `B1MudPatch` is optional (one surface producer, ADR-015) |
 | `Mud/Sim/` | `B1MudWheelModel` (plain C++, no Chaos), `B1MudSimTypes.h`, `B1MudSimulation` | Physics-thread mud |
 | `Mud/Debug/` | `B1MudShowDebug`, `B1ImGuiMud` | Optional. `B1ImGuiMud` needs NetImGui and `Debug/B1ImGuiWidgets` + `Debug/B1ImGuiAssetSave` |
 | `Fuel/` | `B1FuelConsumptionComponent`, `B1FuelConsumptionData.h`, `B1FuelLoadSource.h`, `B1EngineLoadSource.h`, `B1FuelLog` | |
@@ -67,6 +67,8 @@ Migrate with the editor's Asset Actions → Migrate so references come along:
 | `/Game/B1/Mud/PM_B1Mud_Shallow/Medium/Heavy/Deep` | `UB1PhysicalMaterial_Mud` presets |
 | `/Game/B1/Mud/BP_B1MudPatch` | Placeable patch |
 | `/Game/B1/FX/NS_B1MudSpray`, `M_B1MudSpray` | Wheel spray (user params `SpawnRate`, `SprayVelocity`, `Color`) |
+| `/Game/B1/Mud/Dirt/MF_B1MudDirt`, `T_B1MudBlotch`, `T_B1MudSplatter`, `T_B1MudNoise` | Dirt layer (ADR-021); the host's vehicle materials call the function. Textures regenerate with `Scripts/MudTextures` |
+| `/Game/B1/FX/SM_B1MudClump` | Spray clump mesh |
 | `/Game/B1/GAS/GE_B1FuelDrain` | Instant GE, SetByCaller modifier on the fuel attribute (or make your own) |
 | `/Game/B1/Vehicles/DA_B1JeepTuning` | `UB1FuelConsumptionData` (optional, defaults match it) |
 
@@ -125,6 +127,13 @@ Use async physics with a fixed step (ADR-003, `bTickPhysicsAsync=True`, `AsyncFi
 **Components on the vehicle actor** (this project creates them in `AB1Jeep`'s constructor):
 - `UB1MudVehicleComponent`: required for mud. It feeds the sim from `FPhysScene_Chaos::OnPhysSceneStep`, so the host doesn't override `Update` for mud. Config: `BellyClearance` (axle height), unstuck settings, `MudFullStrainDepth`, `FuelLoadName`.
 - `UB1MudSprayComponent`, `UB1MudTrailComponent`: optional visuals. They find the mud component in BeginPlay.
+- `UB1MudDirtComponent`: optional dirt on the vehicle (ADR-021). It reads only the mud component. The host:
+  - tags the body and tire primitives with `B1MudDirt` (`TargetTag`; this project sets it on `BP_B1Jeep_Wrangler`'s inherited `Chassis` and four `Tire *` components). Once the wheels exist, a tagged part within a wheel's radius of that wheel's centre is its tire, any other is body; the mapping is logged once (`dirt targets: body=… w0=…`).
+  - calls `MF_B1MudDirt` from the body/tire material: BaseColor, Roughness, Normal in; IsTire (1 on tire materials, this project uses a `bIsTire` static switch); the four arch centres (= wheel centres), `SillHeight` and the body's local bounds, all in the body mesh's local space; use the `Mask` output to fade anything else (metallic). Glass can add its own film from CPD slot 0 (see `M_Wrangler_Glass`).
+  - CPD layout: body slot 0 = body dirt, slots 1–4 = wheel 0–3 dirt; tire slot 0 = its wheel's dirt (crust), 1 = tire coat, 2 = tire wetness. Keep slots 0–4 free on tagged parts.
+  - `PreviewDirt` (0..1, −1 off) shows a stage in the editor without PIE; it drives the tire coat and wetness too.
+  - Growth comes from `Mud/B1MudThrow` (intensity from sink, tread speed, slip), shared with the spray. Tread speed is a mud sim output (`UB1MudVehicleComponent::GetWheelTreadSpeed`), so no new host call. Tuning: `Mud|Dirt` (seconds to full, belly term) and `Mud|Dirt|Tire` (coat, shed distance, dry time) on the component.
+  - Debug: `SetDirt(v)` / `Clean()` reset everything (this project's `B1Dirt` / `B1DirtClean` cheats call them).
 - `UB1FuelConsumptionComponent`: optional fuel. Finds `IB1EngineLoadSource` and every `IB1FuelLoadSource` component in BeginPlay.
 
 `B1Unstuck` lives on the mud component (`Unstuck()`); wire your own cheat to it. It assumes the actor's root is the simulating body.

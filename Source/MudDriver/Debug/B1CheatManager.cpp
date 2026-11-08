@@ -3,6 +3,7 @@
 #include "B1Log.h"
 #include "B1VehicleMovementComponent.h"
 #include "B1MudVehicleComponent.h"
+#include "B1MudDirtComponent.h"
 #include "B1WinchComponent.h"
 #include "B1WinchAnchorComponent.h"
 #include "B1WinchLog.h"
@@ -95,6 +96,33 @@ void UB1CheatManager::B1Unstuck()
 	}
 
 	Jeep->GetMudVehicle()->Unstuck();
+}
+
+UB1MudDirtComponent* UB1CheatManager::GetPlayerDirt(const TCHAR* CheatName) const
+{
+	const APawn* Pawn = GetOuterAPlayerController()->GetPawn();
+	UB1MudDirtComponent* Dirt = Pawn ? Pawn->FindComponentByClass<UB1MudDirtComponent>() : nullptr;
+	if (!Dirt)
+	{
+		UE_LOG(LogB1Vehicle, Warning, TEXT("%s: the player's pawn has no UB1MudDirtComponent"), CheatName);
+	}
+	return Dirt;
+}
+
+void UB1CheatManager::B1Dirt(float Value)
+{
+	if (UB1MudDirtComponent* Dirt = GetPlayerDirt(TEXT("B1Dirt")))
+	{
+		Dirt->SetDirt(Value < 0.0f ? 0.0f : Value);
+	}
+}
+
+void UB1CheatManager::B1DirtClean()
+{
+	if (UB1MudDirtComponent* Dirt = GetPlayerDirt(TEXT("B1DirtClean")))
+	{
+		Dirt->Clean();
+	}
 }
 
 UB1WinchComponent* UB1CheatManager::GetPlayerWinch(const TCHAR* CheatName) const

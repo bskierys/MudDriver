@@ -2,7 +2,9 @@
 #include "B1MudLog.h"
 #include "B1PhysicalMaterial_Mud.h"
 #include "B1MudVehicleComponent.h"
+#include "B1MudDirtComponent.h"
 #include "NetImguiModule.h"
+#include "Engine/Blueprint.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
@@ -97,6 +99,114 @@ namespace B1ImGui
 		return bChanged;
 	}
 
+	static void DrawDirtBar(const char* Label, float Value, float Intensity)
+	{
+		char Overlay[48];
+		if (Intensity >= 0.0f)
+		{
+			FCStringAnsi::Snprintf(Overlay, sizeof(Overlay), "%.2f  (throw %.2f)", Value, Intensity);
+		}
+		else
+		{
+			FCStringAnsi::Snprintf(Overlay, sizeof(Overlay), "%.2f", Value);
+		}
+		ImGui::ProgressBar(Value, ImVec2(-120.0f, 0.0f), Overlay);
+		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+		ImGui::TextUnformatted(Label);
+	}
+
+#if WITH_EDITOR
+	/** Copies the Mud|Dirt and Mud|Dirt|Tire tuning (not PreviewDirt) to the pawn BP's component template and saves the BP */
+	static bool SaveDirtDefaults(const UB1MudDirtComponent& Dirt)
+	{
+		UB1MudDirtComponent* Archetype = Cast<UB1MudDirtComponent>(Dirt.GetArchetype());
+		const AActor* Owner = Dirt.GetOwner();
+		UBlueprint* Blueprint = Owner ? Cast<UBlueprint>(Owner->GetClass()->ClassGeneratedBy) : nullptr;
+		if (!Archetype || !Blueprint || Archetype->GetPackage() != Blueprint->GetPackage())
+		{
+			return false;
+		}
+
+		Archetype->Modify();
+		Archetype->WheelSecondsToFull = Dirt.WheelSecondsToFull;
+		Archetype->BodySecondsToFull = Dirt.BodySecondsToFull;
+		Archetype->BellyFullDepth = Dirt.BellyFullDepth;
+		Archetype->BellyBodyRate = Dirt.BellyBodyRate;
+		Archetype->TreadCoat = Dirt.TreadCoat;
+		Archetype->TireCoatSecondsToFull = Dirt.TireCoatSecondsToFull;
+		Archetype->TireShedDistance = Dirt.TireShedDistance;
+		Archetype->TireDrySeconds = Dirt.TireDrySeconds;
+		Archetype->MarkPackageDirty();
+		return SaveAssetPackage(*Blueprint);
+	}
+#endif
+
+	static void DrawDirt(UB1MudDirtComponent& Dirt)
+	{
+		static TSet<TWeakObjectPtr<UB1MudDirtComponent>> Edited;
+
+		for (int32 WheelIndex = 0; WheelIndex < UB1MudDirtComponent::NumWheelSlots; ++WheelIndex)
+		{
+			char Label[16];
+			FCStringAnsi::Snprintf(Label, sizeof(Label), "w%d", WheelIndex);
+			DrawDirtBar(Label, Dirt.GetWheelDirt(WheelIndex), Dirt.GetWheelIntensity(WheelIndex));
+		}
+		DrawDirtBar("body", Dirt.GetBodyDirt(), -1.0f);
+		for (int32 WheelIndex = 0; WheelIndex < UB1MudDirtComponent::NumWheelSlots; ++WheelIndex)
+		{
+			char Overlay[48];
+			FCStringAnsi::Snprintf(Overlay, sizeof(Overlay), "coat %.2f  wet %.2f", Dirt.GetTireCoat(WheelIndex), Dirt.GetTireWetness(WheelIndex));
+			ImGui::ProgressBar(Dirt.GetTireCoat(WheelIndex), ImVec2(-120.0f, 0.0f), Overlay);
+			ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+			ImGui::Text("tire w%d", WheelIndex);
+		}
+		ImGui::Text("Targets: %d tires, %d body", Dirt.GetNumTireTargets(), Dirt.GetNumBodyTargets());
+
+		if (ImGui::Button("Clean"))
+		{
+			Dirt.Clean();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Max"))
+		{
+			Dirt.SetDirt(1.0f);
+		}
+
+		float Preview = Dirt.PreviewDirt;
+		if (DragFloatTyped("Preview dirt (-1 off)", &Preview, 0.01f, -1.0f, 1.0f))
+		{
+			Dirt.SetPreviewDirt(Preview);
+		}
+
+		bool bChanged = false;
+		bChanged |= DragFloatTyped("Wheel s to full", &Dirt.WheelSecondsToFull, 0.5f, 0.1f, 600.0f);
+		bChanged |= DragFloatTyped("Body s to full", &Dirt.BodySecondsToFull, 0.5f, 0.1f, 600.0f);
+		bChanged |= DragFloatTyped("Belly full depth cm", &Dirt.BellyFullDepth, 0.5f, 1.0f, 200.0f);
+		bChanged |= DragFloatTyped("Belly body rate", &Dirt.BellyBodyRate, 0.01f, 0.0f, 10.0f);
+		bChanged |= DragFloatTyped("Tread coat", &Dirt.TreadCoat, 0.01f, 0.0f, 1.0f);
+		bChanged |= DragFloatTyped("Tire coat s to full", &Dirt.TireCoatSecondsToFull, 0.5f, 0.1f, 600.0f);
+		bChanged |= DragFloatTyped("Tire shed m", &Dirt.TireShedDistance, 1.0f, 1.0f, 5000.0f);
+		bChanged |= DragFloatTyped("Tire dry s", &Dirt.TireDrySeconds, 0.5f, 0.1f, 600.0f);
+		if (bChanged)
+		{
+			Edited.Add(&Dirt);
+		}
+
+#if WITH_EDITOR
+		ImGui::BeginDisabled(!Edited.Contains(&Dirt));
+		if (ImGui::Button("Save to asset##Dirt"))
+		{
+			const bool bSaved = SaveDirtDefaults(Dirt);
+			UE_LOG(LogB1Mud, Log, TEXT("Dirt defaults of %s %s"), *GetNameSafe(Dirt.GetOwner()->GetClass()), bSaved ? TEXT("saved") : TEXT("FAILED to save (not a BP vehicle?)"));
+			if (bSaved)
+			{
+				Edited.Remove(&Dirt);
+			}
+		}
+		ImGui::EndDisabled();
+#endif
+	}
+
 	static void SavePreset(UB1PhysicalMaterial_Mud& Mud)
 	{
 		const bool bSaved = SaveAssetPackage(Mud);
@@ -183,6 +293,16 @@ namespace B1ImGui
 		else
 		{
 			ImGui::TextDisabled("No B1 vehicle");
+		}
+
+		if (UB1MudDirtComponent* Dirt = Vehicle ? Vehicle->FindComponentByClass<UB1MudDirtComponent>() : nullptr)
+		{
+			if (ImGui::CollapsingHeader("Dirt", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::PushID("Dirt");
+				DrawDirt(*Dirt);
+				ImGui::PopID();
+			}
 		}
 
 		if (ImGui::CollapsingHeader("Presets", ImGuiTreeNodeFlags_DefaultOpen))

@@ -10,6 +10,7 @@ class AWheeledVehiclePawn;
 class UChaosWheeledVehicleMovementComponent;
 class UB1VehicleMovementComponent;
 class UB1MudVehicleComponent;
+class UB1MudDirtComponent;
 class UB1AbilitySystemComponent;
 class UB1WinchComponent;
 class UGameplayAbility;
@@ -67,6 +68,10 @@ struct FB1GymInputStep
 
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (InlineEditConditionToggle))
 	bool bSteerToTarget = false;
+
+	/** Back and forth: Throttle forward, then Throttle as brake/reverse once the vehicle is this far past the step's start along its heading, and back. 0 = off */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m", ClampMin = "0"))
+	float ShuttleDistance = 0.0f;
 
 	/** Runs B1Unstuck when the step starts; needs a UB1MudVehicleComponent */
 	UPROPERTY(EditAnywhere, Category = "B1Test")
@@ -292,6 +297,40 @@ struct FB1GymThresholds
 
 	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (InlineEditConditionToggle))
 	bool bCheckCharZmin = false;
+
+	/** Lowest wheel dirt at script end; needs a UB1MudDirtComponent */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MinWheelDirt = -1.0f;
+
+	/** Highest wheel dirt at script end */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MaxWheelDirt = -1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MinBodyDirt = -1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MaxBodyDirt = -1.0f;
+
+	/** Body dirt below the lowest wheel dirt at script end */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	bool bExpectBodyBehindWheels = false;
+
+	/** Sum of every dirt value's change during the last input step, a cap check */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MaxLastStepDirtChange = -1.0f;
+
+	/** Lowest per-wheel peak tire coat */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MinTireCoatPeak = -1.0f;
+
+	/** Lowest per-wheel drop from peak tire coat to the end, e.g. after firm ground */
+	UPROPERTY(EditAnywhere, Category = "B1Test")
+	float MinTireCoatDrop = -1.0f;
+
+	/** Worst wheel's path from its first mud contact until its coat reached TreadCoat */
+	UPROPERTY(EditAnywhere, Category = "B1Test", meta = (Units = "m"))
+	float MaxTireCoatDistance = -1.0f;
 };
 
 /**
@@ -338,6 +377,10 @@ protected:
 	/** Litres set at script start; negative fills the tank */
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config", meta = (EditCondition = "bPossessWithPlayer"))
 	float StartFuel = -1.0f;
+
+	/** Every dirt value set to this at script start (UB1MudDirtComponent::SetDirt); negative leaves it */
+	UPROPERTY(EditAnywhere, Category = "B1Test|Config")
+	float StartDirt = -1.0f;
 
 	/** Time for the vehicle to settle on its suspension before the script starts */
 	UPROPERTY(EditAnywhere, Category = "B1Test|Config", meta = (Units = "s"))
@@ -436,6 +479,24 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UB1MudVehicleComponent> MudVehicle;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UB1MudDirtComponent> MudDirt;
+
+	/** ShuttleDistance state, set when a step starts */
+	FVector ShuttleOrigin = FVector::ZeroVector;
+	FVector ShuttleAxis = FVector::ForwardVector;
+	bool bShuttleReverse = false;
+
+	/** Sum of all dirt values when the last step started; negative before it */
+	float DirtAtLastStep = -1.0f;
+	float GetDirtSum() const;
+
+	/** Per wheel: peak coat, path (m) at first mud contact, path from there to TreadCoat; -1 = not yet */
+	TArray<float> TireCoatPeak;
+	TArray<float> TireMudStartPath;
+	TArray<float> TireCoatDistance;
+	void SampleTireCoat();
 
 	/** The vehicle's winch; steps set its pull */
 	UPROPERTY(Transient)

@@ -9,6 +9,7 @@
 class UB1VehicleMovementComponent;
 class UAbilitySystemComponent;
 class UB1FuelConsumptionComponent;
+class UB1MudDirtComponent;
 class UB1MudSprayComponent;
 class UB1MudTrailComponent;
 class UB1MudVehicleComponent;
@@ -36,6 +37,7 @@ public:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	UB1MudVehicleComponent* GetMudVehicle() const { return MudVehicle; }
+	UB1MudDirtComponent* GetMudDirt() const { return MudDirt; }
 	UB1FuelConsumptionComponent* GetFuelConsumption() const { return FuelConsumption; }
 	UB1WinchComponent* GetWinch() const { return Winch; }
 	USceneComponent* GetDriverSeat() const { return DriverSeat; }
@@ -63,6 +65,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mud|Components")
 	TObjectPtr<UB1MudTrailComponent> MudTrail;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mud|Components")
+	TObjectPtr<UB1MudDirtComponent> MudDirt;
 
 	/** Sits at the winch point on the front bumper */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Winch|Components")
